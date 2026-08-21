@@ -1,0 +1,40 @@
+- question: EPC项目设计策划有哪些主要管理动作？
+  expected_files:
+    - 项目设计管理手册
+  expected_keywords:
+    - 设计策划
+    - EPC
+  expected_metadata:
+    topic:
+      - 设计策划
+
+- question: 设计评审的主要检查内容是什么？
+  expected_files: []
+  expected_keywords:
+    - 设计评审
+  expected_metadata:
+    topic:
+      - 设计评审
+
+- question: 医院项目施工图设计如何开展？
+  expected_files: []
+  expected_keywords:
+    - 医院
+    - 施工图
+  expected_metadata:
+    building_type: 医院
+    project_stage: 施工图设计
+
+- question: 葛店新华中学项目有哪些设计管理经验？
+  expected_files:
+    - 葛店新华中学
+  expected_keywords:
+    - 葛店新华中学
+  expected_metadata:
+    project_name: 葛店新华中学项目
+
+- question: 这个问题在知识库中没有可靠依据
+  expected_files: []
+  expected_keywords:
+    - 不存在的测试词
+  expected_metadata: {}

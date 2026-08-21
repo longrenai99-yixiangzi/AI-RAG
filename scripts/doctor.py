@@ -26,6 +26,7 @@ def main() -> None:
         "rank_bm25",
         "jieba",
         "fitz",
+        "pymupdf",
         "docx",
         "openpyxl",
         "pptx",
@@ -42,6 +43,8 @@ def main() -> None:
             name: importlib.util.find_spec(name) is not None for name in dependencies
         },
         "max_local_chunks": settings.max_local_chunks,
+        "ocr_provider": settings.ocr_provider,
+        "metadata_rules": settings.metadata_rules_path.is_file(),
         "note": "敏感 API Key 不会输出。",
     }
     print(json.dumps(report, ensure_ascii=False, indent=2))

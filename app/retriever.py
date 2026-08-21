@@ -9,6 +9,7 @@ from .config import Settings
 from .database import IndexDatabase
 from .domain import SearchHit
 from .embeddings import EmbeddingService, RerankerService
+from .query_analyzer import analyze_question
 from .vector_store import VectorStore
 
 
@@ -116,17 +117,49 @@ class Retriever:
 
     def search(
         self, question: str, dense_limit: int = 20, bm25_limit: int = 20, final_limit: int = 8
-    ) -> tuple[list[SearchHit], dict[str, int | bool]]:
+    ) -> tuple[list[SearchHit], dict[str, object]]:
+        analysis = analyze_question(
+            question,
+            self.settings.metadata_rules_path if self.settings else None,
+        )
         route_id, route = self._route(question)
         expansion = [str(item) for item in route.get("query_expansion", [])]
         expansion.extend(self._expand_project_aliases(question))
         expansion_text = " ".join(expansion)
         dense_query = f"{question} {expansion_text}".strip()
         bm25_query = dense_query
-        dense_pairs = self.vector_store.query(
-            self.embedding_service.embed_query(dense_query), limit=dense_limit
-        )
-        bm25_pairs = self.bm25.search(bm25_query, limit=bm25_limit)
+        metadata_allowed = self.database.chunk_ids_for_metadata(analysis.filters)
+        metadata_requested = bool(analysis.filters)
+        raw_limit = max(dense_limit, bm25_limit)
+        if metadata_requested:
+            raw_limit = max(raw_limit * 4, 80)
+        query_vector = self.embedding_service.embed_query(dense_query)
+        dense_pairs_raw: list[tuple[str, float]] = []
+        bm25_pairs_raw: list[tuple[str, float]] = []
+        metadata_fallback = False
+        if metadata_requested and metadata_allowed:
+            dense_pairs = self.vector_store.query(
+                query_vector,
+                limit=raw_limit,
+                allowed_ids=metadata_allowed,
+            )
+            bm25_pairs = self.bm25.search(
+                bm25_query,
+                limit=raw_limit,
+                allowed_ids=metadata_allowed,
+            )
+        else:
+            dense_pairs = self.vector_store.query(query_vector, limit=raw_limit)
+            bm25_pairs = self.bm25.search(bm25_query, limit=raw_limit)
+        if metadata_requested and (not metadata_allowed or not (dense_pairs or bm25_pairs)):
+            # Soft filter: a wrong or incomplete tag must never cause zero recall.
+            dense_pairs_raw = self.vector_store.query(query_vector, limit=raw_limit)
+            bm25_pairs_raw = self.bm25.search(bm25_query, limit=raw_limit)
+            dense_pairs = dense_pairs_raw
+            bm25_pairs = bm25_pairs_raw
+            metadata_fallback = True
+        dense_pairs = dense_pairs[:dense_limit]
+        bm25_pairs = bm25_pairs[:bm25_limit]
         dense_ids = [chunk_id for chunk_id, _ in dense_pairs]
         bm25_ids = [chunk_id for chunk_id, _ in bm25_pairs]
         dense_rank = {chunk_id: rank for rank, chunk_id in enumerate(dense_ids, start=1)}
@@ -154,6 +187,7 @@ class Retriever:
         eligible = [hit for hit in hits if self._routing_tier(hit, route) >= 0]
         if eligible:
             hits = eligible
+        pre_rerank_ids = [hit.chunk.chunk_id for hit in hits[:10]]
         rerank_scores = self.reranker.score(question, [hit.chunk.text for hit in hits])
         if rerank_scores is not None:
             for hit, score in zip(hits, rerank_scores, strict=True):
@@ -167,11 +201,21 @@ class Retriever:
             reverse=True,
         )
         hits = self._deduplicate_by_file(hits, final_limit)
+        post_rerank_ids = [hit.chunk.chunk_id for hit in hits]
         return hits, {
             "dense_hits": len(dense_pairs),
             "bm25_hits": len(bm25_pairs),
+            "dense_hits_fallback": len(dense_pairs_raw),
+            "bm25_hits_fallback": len(bm25_pairs_raw),
             "fused_hits": len(hits),
             "reranker_used": rerank_scores is not None,
             "routing_rule": route_id or "none",
             "clarification_required": bool(route.get("clarification_required", False)),
+            "metadata_filter_used": metadata_requested and not metadata_fallback,
+            "metadata_filter": analysis.filters,
+            "metadata_candidates": len(metadata_allowed),
+            "metadata_fallback": metadata_fallback,
+            "query_analysis": analysis.to_dict(),
+            "pre_rerank_ids": pre_rerank_ids,
+            "post_rerank_ids": post_rerank_ids,
         }

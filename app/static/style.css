@@ -189,6 +189,26 @@ button.secondary {
   display: block;
 }
 
+.debug {
+  margin-top: 18px;
+  color: #4d606b;
+  font-size: 13px;
+}
+
+.debug summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.retrieval-debug {
+  max-height: 320px;
+  overflow: auto;
+  padding: 12px;
+  background: #f5f7f8;
+  border-radius: 8px;
+  white-space: pre-wrap;
+}
+
 .citation span {
   margin-top: 3px;
   color: #4d606b;

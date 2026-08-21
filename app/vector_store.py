@@ -58,6 +58,7 @@ class VectorStore:
                     "source_path": chunk.source_path,
                     "heading_path": chunk.heading_path,
                     "location": chunk.location,
+                    "metadata": chunk.metadata,
                 },
             )
             for chunk, vector in zip(chunks, vectors, strict=True)
@@ -65,11 +66,22 @@ class VectorStore:
         if points:
             self.client.upsert(collection_name=COLLECTION_NAME, points=points, wait=True)
 
-    def query(self, vector: object, limit: int = 20) -> list[tuple[str, float]]:
+    def query(
+        self,
+        vector: object,
+        limit: int = 20,
+        allowed_ids: set[str] | None = None,
+    ) -> list[tuple[str, float]]:
+        query_filter = None
+        if allowed_ids:
+            query_filter = models.Filter(
+                must=[models.HasIdCondition(has_id=list(allowed_ids))]
+            )
         response = self.client.query_points(
             collection_name=COLLECTION_NAME,
             query=vector.tolist() if hasattr(vector, "tolist") else vector,
             limit=limit,
+            query_filter=query_filter,
             with_payload=False,
         )
         return [(str(point.id), float(point.score)) for point in response.points]

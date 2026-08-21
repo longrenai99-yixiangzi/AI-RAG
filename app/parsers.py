@@ -13,6 +13,7 @@ from openpyxl import load_workbook
 from pptx import Presentation
 
 from .domain import ParsedDocument, SourceBlock
+from .ocr import DisabledOCRProvider, OCRProvider
 
 
 SUPPORTED_EXTENSIONS = {".md", ".pdf", ".docx", ".xlsx", ".pptx"}
@@ -158,14 +159,28 @@ def _parse_markdown(path: Path, document_id: str) -> list[SourceBlock]:
     return blocks
 
 
-def _parse_pdf(path: Path, document_id: str) -> tuple[list[SourceBlock], str]:
+def _parse_pdf(
+    path: Path,
+    document_id: str,
+    ocr_provider: OCRProvider,
+) -> tuple[list[SourceBlock], str, str | None, bool]:
     blocks: list[SourceBlock] = []
+    page_count = 0
+    character_count = 0
     with pymupdf.open(path) as pdf:
         for page_number, page in enumerate(pdf, start=1):
+            page_count += 1
             text = page.get_text("text").strip()
             if text:
+                character_count += len(text)
                 blocks.append(_block(document_id, path, text, page=page_number))
-    return blocks, "parsed" if blocks else "needs_ocr"
+    minimum_characters = max(80, page_count * 20)
+    if blocks and character_count >= minimum_characters:
+        return blocks, "parsed", None, False
+    result = ocr_provider.extract(path)
+    if result.text.strip():
+        return [_block(document_id, path, result.text, ocr=True)], "parsed", None, False
+    return [], "needs_ocr", result.error or "PDF文字层不足，等待OCR。", True
 
 
 def _parse_docx(path: Path, document_id: str) -> list[SourceBlock]:
@@ -312,7 +327,11 @@ def _parse_pptx(path: Path, document_id: str) -> list[SourceBlock]:
     return blocks
 
 
-def parse_file(path: Path, max_file_size_mb: int) -> ParsedDocument:
+def parse_file(
+    path: Path,
+    max_file_size_mb: int,
+    ocr_provider: OCRProvider | None = None,
+) -> ParsedDocument:
     document_id = _document_identity(path)
     try:
         stat_result = path.stat()
@@ -367,20 +386,27 @@ def parse_file(path: Path, max_file_size_mb: int) -> ParsedDocument:
         "sha256": sha256,
     }
     try:
+        ocr = ocr_provider or DisabledOCRProvider()
         match path.suffix.lower():
             case ".md":
-                blocks, status = _parse_markdown(path, document_id), "parsed"
+                blocks, status, error, needs_ocr = _parse_markdown(path, document_id), "parsed", None, False
             case ".pdf":
-                blocks, status = _parse_pdf(path, document_id)
+                blocks, status, error, needs_ocr = _parse_pdf(path, document_id, ocr)
             case ".docx":
-                blocks, status = _parse_docx(path, document_id), "parsed"
+                blocks, status, error, needs_ocr = _parse_docx(path, document_id), "parsed", None, False
             case ".xlsx":
-                blocks, status = _parse_xlsx(path, document_id), "parsed"
+                blocks, status, error, needs_ocr = _parse_xlsx(path, document_id), "parsed", None, False
             case ".pptx":
-                blocks, status = _parse_pptx(path, document_id), "parsed"
+                blocks, status, error, needs_ocr = _parse_pptx(path, document_id), "parsed", None, False
             case _:
-                blocks, status = [], "unsupported"
-        return ParsedDocument(**common, blocks=blocks, parse_status=status)
+                blocks, status, error, needs_ocr = [], "unsupported", None, False
+        return ParsedDocument(
+            **common,
+            blocks=blocks,
+            parse_status=status,
+            error=error,
+            needs_ocr=needs_ocr,
+        )
     except Exception as error:  # The index report retains failures without stopping the whole vault.
         return ParsedDocument(
             **common,

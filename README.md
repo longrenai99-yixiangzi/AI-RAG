@@ -1,13 +1,15 @@
-# AI设计管理知识库 · V0.1
+# AI设计管理知识库 · V0.2
 
 这是一个本地运行、对 `D:\设计管理` 只读的 RAG 问答程序。
 
-它的第一版只完成一个可验证闭环：
+V0.2 在不更换 V0.1 RAG 底座的前提下增加知识治理和检索诊断：
 
 ```
 只读解析资料 → 章节/页码级切片 → BGE-M3 向量检索 + BM25 → RRF 融合
 → 可选重排 → 内网 DeepSeek 生成答案 → 来源引用校验
 ```
+
+问题分析和 Metadata 软过滤位于混合检索之前；过滤没有候选时自动回退全库，避免错误标签造成零召回。
 
 不会移动、删除、重命名或回写 `D:\设计管理` 中的任何文件。运行数据只写入本项目的 `data/`。
 
@@ -55,6 +57,12 @@ $python = "C:\Users\liu\AppData\Roaming\uv\python\cpython-3.12.13-windows-x86_64
 
 支持 `.md`、`.pdf`、`.docx`、`.xlsx`、`.pptx`；默认排除 Obsidian、AI 工具和配置目录，跳过链接/重解析点、临时文件、超大文件。扫描版 PDF 会记为 `needs_ocr`，不会伪造文字。
 
+每次索引报告还会记录 `new`、`modified`、`unchanged`、`deleted` 四类文件状态。V0.2 仍保留全量 staging 重建和发布前校验，状态检测用于报告和 V0.3 增量写入准备。
+
+Metadata 规则位于 `config/metadata_rules.yaml`，由路径、文件名、标题和正文关键词生成；缺失 Metadata 不会阻止索引。结果会同时写入 SQLite 的 Document 和 Chunk。
+
+默认 OCR Provider 为 `disabled`。PDF 文字层不足时会明确标记 `needs_ocr`；配置 `RAG_OCR_PROVIDER=paddleocr` 后才启用可选 PaddleOCR 适配器。OCR 失败只影响该 PDF，不会让整批索引失败。
+
 若预检发现切片数超过 18,000，程序不会改写已有索引，而是生成报告并停止。这是 Qdrant Local 的单机安全边界；此时应切换为独立 Qdrant Server，而不是强行继续。
 
 如果想在下载模型前先准确检查全部资料能解析出多少切片，可运行：
@@ -73,6 +81,24 @@ $python = "C:\Users\liu\AppData\Roaming\uv\python\cpython-3.12.13-windows-x86_64
 
 `/api/health` 会对生成模型发送一个不含业务数据的轻量健康检查；实际提问时，仅将最终检索到的少量证据发送到内网模型接口。
 
+页面和 `/api/chat` 返回中会显示当前问题的意图、Metadata 过滤、Dense/BM25 命中数、RRF 后结果、重排是否启用和过滤回退状态。
+
+## 检索质量评估
+
+Golden Questions 位于 `tests/golden_questions.yaml`，只评价可验证的文件命中、关键词和 Metadata，不使用 LLM-as-Judge：
+
+```powershell
+.\.venv\Scripts\python.exe scripts\evaluate_retrieval.py
+```
+
+报告写入 `data/reports/`，包含 Recall@5、Recall@10、Metadata Filter 影响和重排前后结果。
+
+## 测试
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
 ## 可选 GPU 加速
 
 当前隔离环境已验证 CPU 回退可用。若要对完整资料库进行更快的向量化，在网络条件允许时，按 PyTorch 官方 CUDA 13.2 源替换 CPU 版：
@@ -88,5 +114,6 @@ $python = "C:\Users\liu\AppData\Roaming\uv\python\cpython-3.12.13-windows-x86_64
 
 - Qdrant Local 仅限单进程：启动服务时只能用一个 worker；索引与服务不能同时运行。
 - `BGE-M3` 和可选 `bge-reranker-v2-m3` 首次加载需要较多内存。程序采用小批量，重排模型加载失败时自动退回 RRF 排序，并在接口中提示。
-- 不支持旧版 `.doc/.xls/.ppt`、RAR、图片与扫描件 OCR；这些会在索引报告中显式保留为后续处理项。
-- V0.1 仅重建索引，不做“在线增量索引”。这是为了避免 Qdrant Local 进程锁和部分写入风险。
+- 不支持旧版 `.doc/.xls/.ppt`、RAR 与图片；扫描件会进入 OCR 待处理统计，不会伪造文字。
+- V0.2 只完成增量状态检测，不改变 Qdrant Local 的全量 staging 发布策略；真正的在线增量写入仍需在 V0.3 处理进程锁、删除和回滚边界。
+- Metadata 是检索辅助信号，不是事实证明；事实仍必须以可定位来源和引用校验为准。

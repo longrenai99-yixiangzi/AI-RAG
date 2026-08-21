@@ -45,6 +45,13 @@ def _source_record(source_id: str, hit: SearchHit) -> dict[str, object]:
         "source_path": chunk.source_path,
         "heading_path": chunk.heading_path,
         "location": _location_label(chunk.location),
+        "metadata": chunk.metadata,
+        "retrieval": {
+            "rrf_score": hit.score,
+            "dense_rank": hit.dense_rank,
+            "bm25_rank": hit.bm25_rank,
+            "reranker_score": hit.reranker_score,
+        },
         "excerpt": chunk.text[:900],
     }
 

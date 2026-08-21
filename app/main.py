@@ -83,7 +83,7 @@ def _services(app: FastAPI) -> Services:
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="AI设计管理知识库", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="AI设计管理知识库", version="0.2.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
@@ -108,6 +108,8 @@ def create_app() -> FastAPI:
             "reranker_ready": services.reranker.ready,
             "reranker_model_available": services.settings.reranker_model_path.joinpath("model.safetensors").is_file(),
             "index": services.database.stats(),
+            "ocr_provider": services.settings.ocr_provider,
+            "metadata_rules": str(services.settings.metadata_rules_path),
         }
 
     @app.get("/api/health")
@@ -133,6 +135,7 @@ def create_app() -> FastAPI:
             "reranker_model_available": services.settings.reranker_model_path.joinpath("model.safetensors").is_file(),
             "reranker_mode": services.settings.reranker_mode,
             "index": services.database.stats(),
+            "ocr_provider": services.settings.ocr_provider,
         }
         if services.embedding.error:
             payload["embedding_error"] = services.embedding.error
@@ -149,7 +152,7 @@ def create_app() -> FastAPI:
                 detail="尚未建立可用索引。请先停止服务并运行 python -m scripts.index_vault。",
             )
 
-        def answer_in_worker() -> tuple[object, dict[str, int | bool]]:
+        def answer_in_worker() -> tuple[object, dict[str, object]]:
             with services.query_lock:
                 hits, retrieval = services.retriever.search(request.question)
                 return generate_answer(request.question, hits, services.llm), retrieval

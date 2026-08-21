@@ -49,13 +49,22 @@ class BM25Index:
         self.model = BM25Okapi(self.corpus) if self.corpus else None
         return self.ready
 
-    def search(self, query: str, limit: int = 20) -> list[tuple[str, float]]:
+    def search(
+        self,
+        query: str,
+        limit: int = 20,
+        allowed_ids: set[str] | None = None,
+    ) -> list[tuple[str, float]]:
         if not self.ready or self.model is None:
             return []
         scores = self.model.get_scores(tokenize(query) or ["_empty_"])
         ranked_indexes = sorted(range(len(scores)), key=lambda index: scores[index], reverse=True)
+        eligible = [
+            index
+            for index in ranked_indexes
+            if scores[index] > 0 and (allowed_ids is None or self.chunk_ids[index] in allowed_ids)
+        ]
         return [
             (self.chunk_ids[index], float(scores[index]))
-            for index in ranked_indexes[:limit]
-            if scores[index] > 0
+            for index in eligible[:limit]
         ]

@@ -189,6 +189,12 @@ button.secondary {
   display: block;
 }
 
+.mode-nav {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0;
+}
+
 .debug {
   margin-top: 18px;
   color: #4d606b;
@@ -219,6 +225,125 @@ button.secondary {
   color: #a93226;
 }
 
+.growth-panel {
+  background: #fff;
+  border: 1px solid #d8e2e8;
+  border-radius: 14px;
+  padding: 24px 28px;
+  box-shadow: 0 6px 20px rgb(15 40 62 / 7%);
+}
+
+.growth-header,
+.growth-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.growth-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.growth-stat {
+  padding: 8px 11px;
+  background: #f0f7f6;
+  border-radius: 7px;
+  color: #1b5c58;
+  font-size: 13px;
+}
+
+.growth-list {
+  display: grid;
+  gap: 10px;
+}
+
+.growth-item {
+  padding: 14px;
+  border: 1px solid #dbe4e9;
+  border-radius: 9px;
+}
+
+.growth-item p,
+.growth-item small {
+  display: block;
+  margin: 5px 0 0;
+  color: #5c6d78;
+  font-size: 13px;
+}
+
+.growth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.growth-actions button {
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.candidate-view {
+  max-height: 360px;
+  overflow: auto;
+  margin-top: 16px;
+  padding: 14px;
+  background: #f5f7f8;
+  border-radius: 8px;
+  white-space: pre-wrap;
+}
+
+.document-search input {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid #b9c9d3;
+  border-radius: 8px;
+  font: inherit;
+}
+
+.documents-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.document-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px;
+  border: 1px solid #dbe4e9;
+  border-radius: 9px;
+}
+
+.document-item p {
+  margin: 5px 0 0;
+  color: #5c6d78;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.document-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: flex-end;
+  color: #5c6d78;
+  font-size: 12px;
+  text-align: right;
+}
+
+.document-meta span,
+.document-meta div span {
+  padding: 3px 6px;
+  background: #f0f7f6;
+  border-radius: 5px;
+}
+
 @media (max-width: 620px) {
   .shell {
     width: min(100% - 20px, 960px);
@@ -227,8 +352,20 @@ button.secondary {
 
   header,
   .form-row,
+  .growth-header,
+  .growth-item,
+  .document-item,
   .answer-header {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .growth-actions {
+    justify-content: flex-start;
+  }
+
+  .document-meta {
+    justify-content: flex-start;
+    text-align: left;
   }
 }

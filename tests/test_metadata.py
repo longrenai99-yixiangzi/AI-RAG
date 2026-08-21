@@ -50,3 +50,4 @@ def test_metadata_round_trips_through_sqlite(tmp_path: Path) -> None:
 
     assert database.get_chunks(["chunk"])[0].metadata["board"] == "设计管理"
     assert database.chunk_ids_for_metadata({"topic": "EPC"}) == {"chunk"}
+    assert database.list_documents()[0]["metadata"]["board"] == "设计管理"

@@ -19,11 +19,44 @@
         <button id="health" type="button" class="secondary">重新检查</button>
       </header>
 
+      <nav class="mode-nav" aria-label="知识库功能">
+        <button id="qa-nav" type="button">AI问答</button>
+        <button id="growth-nav" type="button" class="secondary">知识生长</button>
+        <button id="documents-nav" type="button" class="secondary">知识管理</button>
+      </nav>
+
       <section id="conversation" aria-live="polite">
         <article class="welcome">
           <h2>从已有资料中找依据，再回答</h2>
           <p>回答会给出可追溯的文件、章节和页码/行号。没有依据时，系统会明确说明。</p>
         </article>
+      </section>
+
+      <section id="growth-panel" class="growth-panel" hidden>
+        <div class="growth-header">
+          <div>
+            <h2>知识生长</h2>
+            <p class="status">系统只生成待审核候选，不自动写入正式知识。</p>
+          </div>
+          <button id="growth-refresh" type="button">刷新</button>
+        </div>
+        <div id="growth-stats" class="growth-stats"></div>
+        <div id="growth-list" class="growth-list"></div>
+        <pre id="candidate-view" class="candidate-view" hidden></pre>
+      </section>
+
+      <section id="documents-panel" class="growth-panel" hidden>
+        <div class="growth-header">
+          <div>
+            <h2>知识管理</h2>
+            <p class="status">只读查看索引文件、解析状态、OCR状态和 Metadata。</p>
+          </div>
+          <button id="documents-refresh" type="button">刷新</button>
+        </div>
+        <div class="form-row document-search">
+          <input id="document-query" type="search" placeholder="按文件名或路径搜索" />
+        </div>
+        <div id="documents-list" class="documents-list"></div>
       </section>
 
       <form id="question-form">

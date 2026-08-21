@@ -7,6 +7,13 @@ const submitElement = document.querySelector("#submit");
 const conversation = document.querySelector("#conversation");
 const template = document.querySelector("#answer-template");
 let questionCount = 0;
+const growthPanel = document.querySelector("#growth-panel");
+const growthStats = document.querySelector("#growth-stats");
+const growthList = document.querySelector("#growth-list");
+const candidateView = document.querySelector("#candidate-view");
+const documentsPanel = document.querySelector("#documents-panel");
+const documentsList = document.querySelector("#documents-list");
+const documentQuery = document.querySelector("#document-query");
 
 function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -22,6 +29,83 @@ function formatAnswer(value) {
   return escapeHtml(value)
     .replace(/【([^】]+)】/g, "<strong>【$1】</strong>")
     .replace(/\n/g, "<br>");
+}
+
+function formatGrowthStatus(status) {
+  return ({ OPEN: "待补充", REVIEWING: "审核中", RESOLVED: "已解决", IGNORED: "已忽略" })[status] || status;
+}
+
+async function loadGrowth() {
+  try {
+    const data = await fetch("/api/growth", { cache: "no-store" }).then((response) => response.json());
+    growthStats.innerHTML = Object.entries(data.stats || {})
+      .map(([status, count]) => `<span class="growth-stat">${escapeHtml(formatGrowthStatus(status))}: ${escapeHtml(String(count))}</span>`)
+      .join("") || '<span class="status">暂无知识缺口</span>';
+    growthList.innerHTML = (data.gaps || []).map((gap) => {
+      const candidate = gap.candidate_id
+        ? `<button class="candidate-button secondary" data-candidate="${escapeHtml(gap.candidate_id)}">查看候选</button>`
+        : "";
+      return `<article class="growth-item">
+        <div><strong>${escapeHtml(gap.latest_query || "未命名问题")}</strong>
+        <p>${escapeHtml(gap.reason || "证据不足")} · 频次 ${escapeHtml(String(gap.frequency || 1))}</p>
+        <small>${escapeHtml(formatGrowthStatus(gap.status))}</small></div>
+        <div class="growth-actions">${candidate}
+        <button class="status-button" data-gap="${escapeHtml(gap.gap_id)}" data-status="REVIEWING">审核中</button>
+        <button class="status-button secondary" data-gap="${escapeHtml(gap.gap_id)}" data-status="RESOLVED">解决</button></div>
+      </article>`;
+    }).join("") || '<p class="status">尚未发现知识缺口。提问后，证据不足的问题会自动出现在这里。</p>';
+    growthList.querySelectorAll(".status-button").forEach((button) => {
+      button.addEventListener("click", async () => {
+        await fetch(`/api/growth/gaps/${button.dataset.gap}/status`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: button.dataset.status }),
+        });
+        await loadGrowth();
+      });
+    });
+    growthList.querySelectorAll(".candidate-button").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const result = await fetch(`/api/growth/candidates/${button.dataset.candidate}`).then((response) => response.json());
+        candidateView.hidden = false;
+        candidateView.textContent = result.content || "候选文件不存在。";
+      });
+    });
+  } catch (error) {
+    growthList.innerHTML = `<p class="error">知识生长读取失败：${escapeHtml(error.message)}</p>`;
+  }
+}
+
+async function loadDocuments() {
+  try {
+    const query = encodeURIComponent(documentQuery.value.trim());
+    const data = await fetch(`/api/documents?query=${query}`, { cache: "no-store" }).then((response) => response.json());
+    documentsList.innerHTML = (data.items || []).map((item) => {
+      const metadata = item.metadata || {};
+      const tags = [metadata.board, metadata.knowledge_type, metadata.building_type, metadata.project_stage]
+        .filter(Boolean).map((value) => `<span>${escapeHtml(String(value))}</span>`).join("");
+      return `<article class="document-item">
+        <div><strong>${escapeHtml(item.file_name)}</strong><p>${escapeHtml(item.source_path)}</p></div>
+        <div class="document-meta"><span>${escapeHtml(item.file_type)}</span><span>解析: ${escapeHtml(item.parse_status)}</span>
+        <span>索引: ${escapeHtml(item.index_status)}</span><span>OCR: ${item.needs_ocr ? "待处理" : "否"}</span><div>${tags}</div></div>
+      </article>`;
+    }).join("") || '<p class="status">当前没有已发布索引文件。</p>';
+  } catch (error) {
+    documentsList.innerHTML = `<p class="error">知识管理读取失败：${escapeHtml(error.message)}</p>`;
+  }
+}
+
+function showMode(mode) {
+  const growth = mode === "growth";
+  const documents = mode === "documents";
+  growthPanel.hidden = !growth;
+  documentsPanel.hidden = !documents;
+  conversation.hidden = growth || documents;
+  form.hidden = growth || documents;
+  document.querySelector("#growth-nav").classList.toggle("secondary", !growth);
+  document.querySelector("#documents-nav").classList.toggle("secondary", !documents);
+  document.querySelector("#qa-nav").classList.toggle("secondary", growth || documents);
+  if (growth) loadGrowth();
+  if (documents) loadDocuments();
 }
 
 async function refreshHealth() {
@@ -88,6 +172,7 @@ function showAnswer(data, question) {
   debug.textContent = JSON.stringify(data.retrieval ?? {}, null, 2);
   conversation.appendChild(node);
   conversation.lastElementChild.scrollIntoView({ behavior: "smooth", block: "start" });
+  loadGrowth();
 }
 
 form.addEventListener("submit", async (event) => {
@@ -118,4 +203,10 @@ form.addEventListener("submit", async (event) => {
 });
 
 document.querySelector("#health").addEventListener("click", refreshHealth);
+document.querySelector("#qa-nav").addEventListener("click", () => showMode("qa"));
+document.querySelector("#growth-nav").addEventListener("click", () => showMode("growth"));
+document.querySelector("#growth-refresh").addEventListener("click", loadGrowth);
+document.querySelector("#documents-nav").addEventListener("click", () => showMode("documents"));
+document.querySelector("#documents-refresh").addEventListener("click", loadDocuments);
+documentQuery.addEventListener("keydown", (event) => { if (event.key === "Enter") loadDocuments(); });
 refreshHealth();

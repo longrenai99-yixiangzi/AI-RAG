@@ -5,8 +5,9 @@ import threading
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -17,7 +18,9 @@ from .bm25 import BM25Index
 from .config import Settings
 from .database import IndexDatabase
 from .embeddings import EmbeddingService, ModelUnavailable, RerankerService
+from .growth import GrowthManager
 from .llm import LLMClient, LLMError
+from .query_analyzer import analyze_question
 from .retriever import Retriever
 from .vector_store import VectorStore
 
@@ -35,11 +38,16 @@ class Services:
     bm25: BM25Index
     llm: LLMClient
     retriever: Retriever
+    growth: GrowthManager
     query_lock: threading.Lock
 
 
 class ChatRequest(BaseModel):
     question: str = Field(min_length=2, max_length=2_000)
+
+
+class GapStatusRequest(BaseModel):
+    status: Literal["OPEN", "REVIEWING", "RESOLVED", "IGNORED"]
 
 
 @asynccontextmanager
@@ -70,6 +78,7 @@ async def lifespan(app: FastAPI):
         bm25=bm25,
         llm=llm,
         retriever=Retriever(database, vector_store, embedding, bm25, reranker, settings),
+        growth=GrowthManager(database, settings.data_root),
         query_lock=threading.Lock(),
     )
     try:
@@ -143,6 +152,37 @@ def create_app() -> FastAPI:
             payload["llm_error"] = services.llm.last_error
         return payload
 
+    @app.get("/api/growth")
+    async def growth() -> dict[str, object]:
+        return _services(app).database.growth_snapshot()
+
+    @app.get("/api/documents")
+    async def documents(
+        query: str = Query(default="", max_length=200),
+        limit: int = Query(default=200, ge=1, le=500),
+    ) -> dict[str, object]:
+        return {"items": _services(app).database.list_documents(query, limit)}
+
+    @app.post("/api/growth/gaps/{gap_id}/status")
+    async def update_gap_status(gap_id: str, request: GapStatusRequest) -> dict[str, object]:
+        updated = _services(app).database.update_gap_status(gap_id, request.status)
+        if updated is None:
+            raise HTTPException(status_code=404, detail="知识缺口不存在。")
+        return updated
+
+    @app.get("/api/growth/candidates/{candidate_id}")
+    async def growth_candidate(candidate_id: str) -> dict[str, object]:
+        snapshot = _services(app).database.growth_snapshot()
+        item = next(
+            (row for row in snapshot["gaps"] if row.get("candidate_id") == candidate_id),
+            None,
+        )
+        if not item:
+            raise HTTPException(status_code=404, detail="候选知识不存在。")
+        path = Path(str(item.get("candidate_path", "")))
+        content = path.read_text(encoding="utf-8") if path.is_file() else ""
+        return {"candidate": item, "content": content}
+
     @app.post("/api/chat")
     async def chat(request: ChatRequest) -> dict[str, object]:
         services = _services(app)
@@ -152,14 +192,48 @@ def create_app() -> FastAPI:
                 detail="尚未建立可用索引。请先停止服务并运行 python -m scripts.index_vault。",
             )
 
-        def answer_in_worker() -> tuple[object, dict[str, object]]:
+        def answer_in_worker() -> tuple[object | None, dict[str, object], dict[str, object], Exception | None]:
             with services.query_lock:
-                hits, retrieval = services.retriever.search(request.question)
-                return generate_answer(request.question, hits, services.llm), retrieval
+                try:
+                    hits, retrieval = services.retriever.search(request.question)
+                except Exception as error:
+                    retrieval = {
+                        "fused_hits": 0,
+                        "query_analysis": analyze_question(
+                            request.question,
+                            services.settings.metadata_rules_path,
+                        ).to_dict(),
+                    }
+                    growth = services.growth.record(
+                        question=request.question,
+                        retrieval=retrieval,
+                        answer=None,
+                        citations=[],
+                        citation_valid=None,
+                        error=error,
+                    )
+                    return None, retrieval, growth, error
+                try:
+                    answer = generate_answer(request.question, hits, services.llm)
+                    error = None
+                except (ModelUnavailable, LLMError) as caught:
+                    answer = None
+                    error = caught
+                growth = services.growth.record(
+                    question=request.question,
+                    retrieval=retrieval,
+                    answer=answer.answer if answer else None,
+                    citations=answer.citations if answer else [],
+                    citation_valid=answer.citation_valid if answer else None,
+                    error=error,
+                )
+                return answer, retrieval, growth, error
 
         try:
-            answer, retrieval = await asyncio.to_thread(answer_in_worker)
-        except (ModelUnavailable, LLMError) as error:
+            answer, retrieval, growth_result, error = await asyncio.to_thread(answer_in_worker)
+        except Exception as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+        if error is not None:
             raise HTTPException(status_code=503, detail=str(error)) from error
         return {
             "answer": answer.answer,
@@ -170,6 +244,7 @@ def create_app() -> FastAPI:
             "request_id": answer.request_id,
             "elapsed_ms": answer.elapsed_ms,
             "reranker_warning": services.reranker.error if not retrieval["reranker_used"] else None,
+            "growth": growth_result,
         }
 
     return app

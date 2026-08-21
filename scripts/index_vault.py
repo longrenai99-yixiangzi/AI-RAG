@@ -34,6 +34,11 @@ def main() -> None:
         type=Path,
         help="仅处理 JSON 清单中的资料路径；路径必须位于 Vault 内。",
     )
+    parser.add_argument(
+        "--lexical-only",
+        action="store_true",
+        help="跳过 BGE-M3 向量化，只发布 SQLite + BM25 + Metadata 索引，供模型未就绪时验证。",
+    )
     args = parser.parse_args()
     settings = Settings.load()
     file_paths = None
@@ -69,6 +74,7 @@ def main() -> None:
         file_paths=file_paths,
         source_aliases=source_aliases,
         file_size_overrides=file_size_overrides,
+        lexical_only=args.lexical_only,
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
 

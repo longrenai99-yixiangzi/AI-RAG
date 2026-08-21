@@ -75,6 +75,12 @@ Metadata 规则位于 `config/metadata_rules.yaml`，由路径、文件名、标
 .\.venv\Scripts\python.exe -m scripts.index_vault --preflight
 ```
 
+模型暂未就绪时，可用以下命令发布可运行的 SQLite + BM25 + Metadata 词法索引；它不会伪装成 Dense 索引，模型就绪后仍需用默认命令重建完整索引：
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.index_vault --lexical-only
+```
+
 ## 启动问答页面
 
 ```powershell

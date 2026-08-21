@@ -1,5 +1,6 @@
 const statusElement = document.querySelector("#status");
 const healthDetailsElement = document.querySelector("#health-details");
+const indexDetailsElement = document.querySelector("#index-details");
 const form = document.querySelector("#question-form");
 const questionElement = document.querySelector("#question");
 const submitElement = document.querySelector("#submit");
@@ -42,13 +43,19 @@ async function refreshHealth() {
     statusElement.textContent =
       label + " · 索引 " + status.index.documents + " 个文件 / " +
       status.index.chunks + " 个切片" +
-      (status.embedding_device ? " · " + status.embedding_device.toUpperCase() : "");
+      (status.embedding_device ? " · " + status.embedding_device.toUpperCase() : "") +
+      " · OCR待处理 " + (status.index.ocr_pending ?? 0);
     healthDetailsElement.textContent =
       "LLM: " + (health.llm ? "可用" : "不可用") +
       " · Embedding: " + (health.embedding ? "已加载" : "未加载") +
       " · Reranker文件: " + (health.reranker_model_available ? "可用" : "缺失") +
       " · Reranker运行: " + (health.reranker ? "已加载" : "未加载") +
       " · Qdrant: " + (health.vector_db ? "可用" : "不可用");
+    const types = Object.entries(status.index.file_types || {})
+      .map(([type, count]) => type + " " + count)
+      .join(" · ");
+    indexDetailsElement.textContent = "文件类型: " + (types || "暂无") +
+      " · OCR Provider: " + (status.ocr_provider || "disabled");
     statusElement.classList.toggle("error", health.status !== "ok");
   } catch {
     statusElement.textContent = "无法连接本地服务。请确认服务已启动。";
@@ -77,6 +84,8 @@ function showAnswer(data, question) {
       "<span>" + escapeHtml(citation.excerpt) + "</span>";
     citations.appendChild(card);
   }
+  const debug = node.querySelector(".retrieval-debug");
+  debug.textContent = JSON.stringify(data.retrieval ?? {}, null, 2);
   conversation.appendChild(node);
   conversation.lastElementChild.scrollIntoView({ behavior: "smooth", block: "start" });
 }

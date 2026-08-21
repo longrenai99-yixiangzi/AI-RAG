@@ -81,6 +81,10 @@ class Settings:
         return self.project_root / "config" / "retrieval_routing.yaml"
 
     @property
+    def metadata_rules_path(self) -> Path:
+        return self.project_root / "config" / "metadata_rules.yaml"
+
+    @property
     def cache_root(self) -> Path:
         return self.data_root / "cache" / "huggingface"
 
@@ -95,6 +99,10 @@ class Settings:
     @property
     def reranker_model_path(self) -> Path:
         return self.model_root / "bge-reranker-v2-m3"
+
+    @property
+    def ocr_provider(self) -> str:
+        return _setting("RAG_OCR_PROVIDER", "disabled").lower()
 
     @property
     def api_ready(self) -> bool:

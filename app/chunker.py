@@ -98,6 +98,7 @@ def chunk_blocks(blocks: list[SourceBlock]) -> list[Chunk]:
                     text=text,
                     heading_path=block.heading_path,
                     location=block.location or {},
+                    metadata=dict(block.metadata),
                 )
             )
             ordinal += 1

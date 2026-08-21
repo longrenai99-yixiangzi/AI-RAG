@@ -14,6 +14,9 @@ from .config import Settings
 from .database import IndexDatabase
 from .domain import Chunk, ParsedDocument
 from .embeddings import EmbeddingService
+from .index_state import detect_changes
+from .metadata import METADATA_FIELDS, infer_metadata, metadata_for_block
+from .ocr import build_ocr_provider
 from .parsers import iter_source_files, parse_file
 from .vector_store import VectorStore
 
@@ -86,6 +89,12 @@ def index_vault(
     files = file_paths if file_paths is not None else iter_source_files(settings.vault_root, scan_errors=scan_errors)
     if limit is not None:
         files = files[:limit]
+    try:
+        previous = IndexDatabase(settings.database_path).document_fingerprints()
+    except Exception:
+        previous = {}
+    change_status, _ = detect_changes(files, previous)
+    ocr_provider = build_ocr_provider(settings.ocr_provider)
     documents: list[ParsedDocument] = []
     chunks_by_document: dict[str, list[Chunk]] = {}
     all_chunks: list[Chunk] = []
@@ -95,7 +104,7 @@ def index_vault(
 
     for path in files:
         size_limit = (file_size_overrides or {}).get(str(path), settings.max_file_size_mb)
-        document = parse_file(path, size_limit)
+        document = parse_file(path, size_limit, ocr_provider)
         alias = (source_aliases or {}).get(str(path))
         if alias:
             document.source_path = alias
@@ -104,6 +113,14 @@ def index_vault(
             for block in document.blocks:
                 block.source_path = alias
                 block.file_name = Path(alias).name
+        extracted_text = "\n".join(block.text for block in document.blocks)
+        document.metadata = infer_metadata(
+            path,
+            extracted_text,
+            settings.metadata_rules_path,
+        )
+        for block in document.blocks:
+            block.metadata = metadata_for_block(document.metadata)
         document_chunks = chunk_blocks(document.blocks) if document.parse_status == "parsed" else []
         documents.append(document)
         chunks_by_document[document.document_id] = document_chunks
@@ -123,6 +140,16 @@ def index_vault(
         "errors": errors,
         "scan_errors": scan_errors,
         "rebuild": True,
+        "change_status": dict(Counter(change_status.values())),
+        "ocr_provider": ocr_provider.name,
+        "ocr_pending": sum(1 for document in documents if document.needs_ocr),
+        "metadata_coverage": {
+            field: sum(
+                bool(document.metadata.get(field))
+                for document in documents
+            )
+            for field in METADATA_FIELDS
+        },
     }
     if len(all_chunks) > settings.max_local_chunks:
         report["status"] = "blocked_requires_qdrant_server"

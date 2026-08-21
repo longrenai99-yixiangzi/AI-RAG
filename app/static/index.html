@@ -10,10 +10,11 @@
     <main class="shell">
       <header>
         <div>
-          <p class="eyebrow">本地只读 RAG · V0.1</p>
+          <p class="eyebrow">本地只读 RAG · V0.2</p>
           <h1>AI设计管理知识库</h1>
           <p id="status" class="status">正在检查服务状态…</p>
           <p id="health-details" class="status"></p>
+          <p id="index-details" class="status"></p>
         </div>
         <button id="health" type="button" class="secondary">重新检查</button>
       </header>
@@ -54,8 +55,12 @@
           <h3>来源依据</h3>
           <div class="citation-list"></div>
         </section>
+        <details class="debug">
+          <summary>检索调试信息</summary>
+          <pre class="retrieval-debug"></pre>
+        </details>
       </article>
     </template>
-    <script src="/static/app.js?v=20260821-2"></script>
+    <script src="/static/app.js?v=20260821-3"></script>
   </body>
 </html>

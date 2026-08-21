@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -12,6 +12,7 @@ class SourceBlock:
     text: str
     heading_path: str = ""
     location: dict[str, Any] | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -24,6 +25,7 @@ class Chunk:
     text: str
     heading_path: str
     location: dict[str, Any]
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -38,6 +40,8 @@ class ParsedDocument:
     blocks: list[SourceBlock]
     parse_status: str
     error: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    needs_ocr: bool = False
 
 
 @dataclass(slots=True)

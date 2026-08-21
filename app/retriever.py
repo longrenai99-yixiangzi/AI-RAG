@@ -39,6 +39,7 @@ class Retriever:
         self.reranker = reranker
         self.settings = settings
         self.routing_rules = self._load_routing_rules(settings)
+        self.project_aliases = self._load_project_aliases(settings)
 
     @staticmethod
     def _load_routing_rules(settings: Settings | None) -> dict[str, dict[str, object]]:
@@ -58,6 +59,22 @@ class Retriever:
             if (query and query in folded) or any(item in folded for item in expansions):
                 return route_id, rule
         return None, {}
+
+    @staticmethod
+    def _load_project_aliases(settings: Settings | None) -> list[dict[str, object]]:
+        if settings is None or not settings.routing_policy_path.exists():
+            return []
+        payload = yaml.safe_load(settings.routing_policy_path.read_text(encoding="utf-8")) or {}
+        return payload.get("project_aliases", [])
+
+    def _expand_project_aliases(self, question: str) -> list[str]:
+        folded = question.casefold()
+        expansion: list[str] = []
+        for item in self.project_aliases:
+            aliases = [str(value) for value in item.get("aliases", [])]
+            if any(alias.casefold() in folded for alias in aliases):
+                expansion.extend([str(item.get("canonical", "")), *aliases])
+        return [value for value in expansion if value]
 
     @staticmethod
     def _routing_tier(hit: SearchHit, rule: dict[str, object]) -> int:
@@ -93,10 +110,13 @@ class Retriever:
         self, question: str, dense_limit: int = 20, bm25_limit: int = 20, final_limit: int = 8
     ) -> tuple[list[SearchHit], dict[str, int | bool]]:
         route_id, route = self._route(question)
-        expansion = " ".join(str(item) for item in route.get("query_expansion", []))
-        bm25_query = f"{question} {expansion}".strip()
+        expansion = [str(item) for item in route.get("query_expansion", [])]
+        expansion.extend(self._expand_project_aliases(question))
+        expansion_text = " ".join(expansion)
+        dense_query = f"{question} {expansion_text}".strip()
+        bm25_query = dense_query
         dense_pairs = self.vector_store.query(
-            self.embedding_service.embed_query(question), limit=dense_limit
+            self.embedding_service.embed_query(dense_query), limit=dense_limit
         )
         bm25_pairs = self.bm25.search(bm25_query, limit=bm25_limit)
         dense_ids = [chunk_id for chunk_id, _ in dense_pairs]

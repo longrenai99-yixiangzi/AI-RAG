@@ -84,6 +84,28 @@ h3 {
   padding: 24px 28px;
 }
 
+.question-block {
+  padding: 14px 16px;
+  border-left: 4px solid #247f79;
+  border-radius: 6px;
+  background: #f1f8f7;
+}
+
+.question-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #17645f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.question-text {
+  margin-bottom: 0;
+  color: #193b50;
+  font-weight: 700;
+  white-space: pre-wrap;
+}
+
 form {
   padding: 24px 28px;
 }
@@ -139,6 +161,7 @@ button.secondary {
 }
 
 .answer-body {
+  margin-top: 18px;
   line-height: 1.75;
   white-space: normal;
 }

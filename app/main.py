@@ -99,6 +99,7 @@ def create_app() -> FastAPI:
             "embedding_device": services.embedding.device,
             "reranker_mode": services.settings.reranker_mode,
             "reranker_ready": services.reranker.ready,
+            "reranker_model_available": services.settings.reranker_model_path.joinpath("model.safetensors").is_file(),
             "index": services.database.stats(),
         }
 
@@ -121,6 +122,9 @@ def create_app() -> FastAPI:
             "embedding": services.embedding.ready,
             "vector_db": vector_ok,
             "vault": vault_ok,
+            "reranker": services.reranker.ready,
+            "reranker_model_available": services.settings.reranker_model_path.joinpath("model.safetensors").is_file(),
+            "reranker_mode": services.settings.reranker_mode,
             "index": services.database.stats(),
         }
         if services.embedding.error:

@@ -16,6 +16,7 @@ SUPPLEMENTAL_ROOTS = (
     Path(r"D:\工作\二公司技术部\2026\知识库\价值创造点清单"),
     Path(r"D:\工作\二公司技术部\2026\设计复盘"),
     Path(r"D:\工作\二公司技术部\2026\概算及策划评审\葛店新华中学"),
+    Path(r"D:\工作\二公司技术部\2026\示范工程"),
     PROJECT_ROOT / "data" / "supplemental",
 )
 

@@ -31,17 +31,22 @@ def classify_answer_status(
     hit_count: int,
     citation_valid: bool | None,
     answer: str | None,
+    query_term_coverage: float | None = None,
     error: Exception | None = None,
 ) -> tuple[str, str | None]:
     if error is not None:
         return "LLM_ERROR", f"问答模型或生成链路失败：{type(error).__name__}"
     if not hit_count:
         return "NO_RETRIEVAL", "未召回任何候选片段"
+    if query_term_coverage is not None and query_term_coverage < 0.4:
+        return "INSUFFICIENT_EVIDENCE", "检索结果覆盖的问题关键词不足"
     if citation_valid is False:
         return "CITATION_INVALID", "模型回答未通过来源引用校验"
     text = answer or ""
     if any(marker in text for marker in ("未检索到足够依据", "知识库未覆盖", "无法确定", "依据不足")):
         return "INSUFFICIENT_EVIDENCE", "回答明确表示证据不足"
+    if "未配置生成模型" in text:
+        return "EVIDENCE_ONLY", None
     return "ANSWERED", None
 
 
@@ -65,6 +70,10 @@ class GrowthManager:
             hit_count=int(retrieval.get("fused_hits", 0)),
             citation_valid=citation_valid,
             answer=answer,
+            query_term_coverage=(
+                float(retrieval["query_term_coverage"])
+                if retrieval.get("query_term_coverage") is not None else None
+            ),
             error=error,
         )
         normalized = normalize_topic(analysis, question)

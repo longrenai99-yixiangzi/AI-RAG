@@ -57,6 +57,7 @@ class Settings:
     embedding_model: str
     reranker_model: str
     reranker_mode: str
+    llm_enabled: bool
     max_local_chunks: int
     max_file_size_mb: int
 
@@ -106,7 +107,7 @@ class Settings:
 
     @property
     def api_ready(self) -> bool:
-        return bool(self.api_base_url and self.chat_model and self.api_key)
+        return self.llm_enabled and bool(self.api_base_url and self.chat_model and self.api_key)
 
     @classmethod
     def load(cls) -> "Settings":
@@ -123,6 +124,7 @@ class Settings:
             embedding_model="BAAI/bge-m3",
             reranker_model="BAAI/bge-reranker-v2-m3",
             reranker_mode=_setting("RAG_ENABLE_RERANKER", "auto").lower(),
+            llm_enabled=_setting("RAG_ENABLE_LLM", "1").lower() not in {"0", "false", "off", "no"},
             max_local_chunks=_positive_int("RAG_MAX_LOCAL_CHUNKS", 18_000),
             max_file_size_mb=_positive_int("RAG_MAX_FILE_SIZE_MB", 150),
         )

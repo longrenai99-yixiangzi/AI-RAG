@@ -473,6 +473,18 @@ class IndexDatabase:
             connection.execute(
                 "DELETE FROM facts WHERE evidence_chunk_id NOT IN (SELECT chunk_id FROM chunks)"
             )
+            connection.execute(
+                """
+                UPDATE facts
+                SET review_status = 'CONFLICT', updated_at = CURRENT_TIMESTAMP
+                WHERE (subject_entity_id, predicate) IN (
+                    SELECT subject_entity_id, predicate
+                    FROM facts
+                    GROUP BY subject_entity_id, predicate
+                    HAVING COUNT(DISTINCT object_text) > 1
+                )
+                """
+            )
 
     def lookup_facts(self, question: str) -> list[dict[str, Any]]:
         folded = question.casefold()
@@ -495,6 +507,54 @@ class IndexDatabase:
             item.pop("aliases_json", None)
             results.append(item)
         return results
+
+    def fact_conflicts(self) -> list[dict[str, Any]]:
+        with self._open() as connection:
+            groups = connection.execute(
+                """
+                SELECT f.subject_entity_id, f.predicate, e.canonical_name,
+                       COUNT(DISTINCT f.object_text) AS value_count
+                FROM facts f JOIN entities e ON e.entity_id = f.subject_entity_id
+                GROUP BY f.subject_entity_id, f.predicate
+                HAVING COUNT(DISTINCT f.object_text) > 1
+                ORDER BY e.canonical_name, f.predicate
+                """
+            ).fetchall()
+            result: list[dict[str, Any]] = []
+            for group in groups:
+                facts = connection.execute(
+                    """
+                    SELECT fact_id, object_text, evidence_chunk_id, confidence, review_status
+                    FROM facts WHERE subject_entity_id = ? AND predicate = ?
+                    ORDER BY updated_at DESC
+                    """,
+                    (group["subject_entity_id"], group["predicate"]),
+                ).fetchall()
+                result.append({**dict(group), "facts": [dict(row) for row in facts]})
+        return result
+
+    def get_growth_candidate(self, candidate_id: str) -> dict[str, Any] | None:
+        with self._open() as connection:
+            row = connection.execute(
+                """
+                SELECT g.*, c.candidate_id, c.path AS candidate_path, c.status AS candidate_status
+                FROM growth_candidates c JOIN knowledge_gaps g ON g.gap_id = c.gap_id
+                WHERE c.candidate_id = ?
+                """,
+                (candidate_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def update_candidate_status(self, candidate_id: str, status: str) -> dict[str, Any] | None:
+        with self._open() as connection:
+            connection.execute(
+                "UPDATE growth_candidates SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE candidate_id = ?",
+                (status, candidate_id),
+            )
+            row = connection.execute(
+                "SELECT * FROM growth_candidates WHERE candidate_id = ?", (candidate_id,)
+            ).fetchone()
+        return dict(row) if row else None
 
     def update_gap_status(self, gap_id: str, status: str) -> dict[str, Any] | None:
         allowed = {"OPEN", "REVIEWING", "RESOLVED", "IGNORED"}
@@ -598,6 +658,15 @@ class IndexDatabase:
             }
             entity_count = connection.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
             fact_count = connection.execute("SELECT COUNT(*) FROM facts").fetchone()[0]
+            conflict_count = connection.execute(
+                """
+                SELECT COUNT(*) FROM (
+                    SELECT subject_entity_id, predicate FROM facts
+                    GROUP BY subject_entity_id, predicate
+                    HAVING COUNT(DISTINCT object_text) > 1
+                )
+                """
+            ).fetchone()[0]
         return {
             "documents": document_count,
             "chunks": chunk_count,
@@ -606,4 +675,5 @@ class IndexDatabase:
             "parse_status": statuses,
             "entities": entity_count,
             "facts": fact_count,
+            "fact_conflicts": conflict_count,
         }

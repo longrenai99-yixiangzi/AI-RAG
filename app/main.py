@@ -163,6 +163,10 @@ def create_app() -> FastAPI:
     ) -> dict[str, object]:
         return {"items": _services(app).database.list_documents(query, limit)}
 
+    @app.get("/api/facts/conflicts")
+    async def fact_conflicts() -> dict[str, object]:
+        return {"items": _services(app).database.fact_conflicts()}
+
     @app.post("/api/growth/gaps/{gap_id}/status")
     async def update_gap_status(gap_id: str, request: GapStatusRequest) -> dict[str, object]:
         updated = _services(app).database.update_gap_status(gap_id, request.status)
@@ -182,6 +186,13 @@ def create_app() -> FastAPI:
         path = Path(str(item.get("candidate_path", "")))
         content = path.read_text(encoding="utf-8") if path.is_file() else ""
         return {"candidate": item, "content": content}
+
+    @app.post("/api/growth/candidates/{candidate_id}/formal-draft")
+    async def formal_draft(candidate_id: str) -> dict[str, object]:
+        try:
+            return _services(app).growth.create_formal_draft(candidate_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
 
     @app.post("/api/chat")
     async def chat(request: ChatRequest) -> dict[str, object]:

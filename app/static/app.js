@@ -43,7 +43,8 @@ async function loadGrowth() {
       .join("") || '<span class="status">暂无知识缺口</span>';
     growthList.innerHTML = (data.gaps || []).map((gap) => {
       const candidate = gap.candidate_id
-        ? `<button class="candidate-button secondary" data-candidate="${escapeHtml(gap.candidate_id)}">查看候选</button>`
+        ? `<button class="candidate-button secondary" data-candidate="${escapeHtml(gap.candidate_id)}">查看候选</button>
+           <button class="draft-button secondary" data-candidate="${escapeHtml(gap.candidate_id)}">生成正式草稿</button>`
         : "";
       return `<article class="growth-item">
         <div><strong>${escapeHtml(gap.latest_query || "未命名问题")}</strong>
@@ -68,6 +69,17 @@ async function loadGrowth() {
         const result = await fetch(`/api/growth/candidates/${button.dataset.candidate}`).then((response) => response.json());
         candidateView.hidden = false;
         candidateView.textContent = result.content || "候选文件不存在。";
+      });
+    });
+    growthList.querySelectorAll(".draft-button").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const response = await fetch(`/api/growth/candidates/${button.dataset.candidate}/formal-draft`, { method: "POST" });
+        const result = await response.json();
+        candidateView.hidden = false;
+        candidateView.textContent = response.ok
+          ? `已生成待审批草稿：${result.path}\n\n正式写回仍被禁止。`
+          : (result.detail || "草稿生成失败。");
+        await loadGrowth();
       });
     });
   } catch (error) {

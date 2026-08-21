@@ -149,3 +149,32 @@ class GrowthManager:
             )
             path.write_text(content, encoding="utf-8")
         return self.database.attach_growth_candidate(gap_id, str(path))
+
+    def create_formal_draft(self, candidate_id: str) -> dict[str, Any]:
+        candidate = self.database.get_growth_candidate(candidate_id)
+        if not candidate:
+            raise ValueError("候选知识不存在。")
+        source = Path(str(candidate["candidate_path"]))
+        if not source.is_file():
+            raise ValueError("候选知识文件不存在，无法生成草稿。")
+        draft_root = self.candidate_root.parent / "formal-drafts"
+        draft_root.mkdir(parents=True, exist_ok=True)
+        draft_path = draft_root / f"{candidate_id}.md"
+        body = source.read_text(encoding="utf-8")
+        if not body.startswith("---"):
+            body = "---\n"
+        draft = (
+            "---\n"
+            "type: formal_knowledge_draft\n"
+            f"candidate_id: {candidate_id}\n"
+            "review_status: pending_approval\n"
+            "formal_write: forbidden\n"
+            "---\n\n"
+            "# 正式知识草稿（待审批）\n\n"
+            "以下内容由候选知识生成，仅供人工编辑和审批，不代表已生效的正式知识。\n\n"
+            "## 候选内容\n\n"
+            f"{body}\n"
+        )
+        draft_path.write_text(draft, encoding="utf-8")
+        self.database.update_candidate_status(candidate_id, "DRAFT_READY")
+        return {"candidate_id": candidate_id, "path": str(draft_path), "status": "DRAFT_READY"}

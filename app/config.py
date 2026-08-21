@@ -14,6 +14,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SUPPLEMENTAL_ROOTS = (
     Path(r"[LOCAL_PATH_REDACTED]��中心\局制度文件"),
     Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\知识库\价值创造点清单"),
+    Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\设计复盘"),
+    Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\葛店新华中学"),
+    PROJECT_ROOT / "data" / "supplemental",
 )
 
 

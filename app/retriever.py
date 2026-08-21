@@ -103,6 +103,14 @@ class Retriever:
                 break
         return selected
 
+    @staticmethod
+    def _evidence_score(hit: SearchHit, rule: dict[str, object]) -> int:
+        terms = [str(item).casefold() for item in rule.get("evidence_terms", []) if str(item).strip()]
+        if not terms:
+            return 0
+        haystack = " ".join((hit.chunk.text, hit.chunk.heading_path)).casefold()
+        return sum(term in haystack for term in terms)
+
     def ready(self) -> bool:
         return bool(self.database.stats()["chunks"] and self.bm25.ready)
 
@@ -125,6 +133,13 @@ class Retriever:
         bm25_rank = {chunk_id: rank for rank, chunk_id in enumerate(bm25_ids, start=1)}
         fused = reciprocal_rank_fusion([dense_ids, bm25_ids])
         candidate_ids = [chunk_id for chunk_id, _ in fused[: max(dense_limit, bm25_limit)]]
+        forced_ids = self.database.find_chunk_ids(
+            source_terms=[str(item) for item in route.get("preferred", [])],
+            text_terms=[str(item) for item in route.get("evidence_terms", [])],
+        )
+        for chunk_id in forced_ids:
+            if chunk_id not in candidate_ids:
+                candidate_ids.append(chunk_id)
         chunks = self.database.get_chunks(candidate_ids)
         fused_scores = dict(fused)
         hits = [
@@ -146,6 +161,7 @@ class Retriever:
         hits.sort(
             key=lambda hit: (
                 self._routing_tier(hit, route),
+                self._evidence_score(hit, route),
                 hit.reranker_score if hit.reranker_score is not None else hit.score,
             ),
             reverse=True,

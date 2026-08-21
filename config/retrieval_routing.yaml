@@ -77,6 +77,29 @@ questions:
       - "各类型项目的设计策划书"
       - "典型案例汇编"
 
+  q_project_company:
+    query: "葛店新华中学项目由哪个分公司实施？"
+    preferred:
+      - "华中公司葛店新华中学EPC设计管理示范项目打造实施方案1.0.doc"
+      - "华中公司葛店新华中学EPC设计管理示范项目打造实施方案1.0.docx"
+    acceptable:
+      - "EPC设计管理经验总结(葛店新华中学项目)"
+      - "葛店新华中学-设计管理策划"
+    not_primary:
+      - "设计管理检查情况通报"
+      - "二季度EPC项目设计管理检查情况通报"
+    query_expansion:
+      - "华中公司"
+      - "示范项目工作小组"
+      - "分公司层面"
+      - "分公司责任人"
+    evidence_terms:
+      - "华中公司"
+      - "示范项目工作小组"
+      - "组织架构"
+      - "分公司总工程师"
+    note: "该问题优先检索项目示范实施方案；只有当原始方案明确归属时才回答分公司，不能用相似项目推断。"
+
 source_validation:
   project_design_management_manual:
     status: "found"

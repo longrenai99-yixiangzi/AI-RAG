@@ -137,6 +137,30 @@ class IndexDatabase:
         }
         return [by_id[chunk_id] for chunk_id in chunk_ids if chunk_id in by_id]
 
+    def find_chunk_ids(
+        self,
+        *,
+        source_terms: list[str] | None = None,
+        text_terms: list[str] | None = None,
+    ) -> list[str]:
+        """Return deterministic evidence candidates for a routed question."""
+        source_terms = [term for term in (source_terms or []) if term]
+        text_terms = [term for term in (text_terms or []) if term]
+        clauses: list[str] = []
+        parameters: list[str] = []
+        if source_terms:
+            clauses.append("(" + " OR ".join("source_path LIKE ?" for _ in source_terms) + ")")
+            parameters.extend(f"%{term}%" for term in source_terms)
+        if text_terms:
+            clauses.append("(" + " OR ".join("text LIKE ?" for _ in text_terms) + ")")
+            parameters.extend(f"%{term}%" for term in text_terms)
+        if not clauses:
+            return []
+        query = "SELECT chunk_id FROM chunks WHERE " + " AND ".join(clauses)
+        with self._open() as connection:
+            rows = connection.execute(query, parameters).fetchall()
+        return [str(row[0]) for row in rows]
+
     def stats(self) -> dict[str, int]:
         with self._open() as connection:
             document_count = connection.execute("SELECT COUNT(*) FROM documents").fetchone()[0]

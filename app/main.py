@@ -214,7 +214,12 @@ def create_app() -> FastAPI:
                     )
                     return None, retrieval, growth, error
                 try:
-                    answer = generate_answer(request.question, hits, services.llm)
+                    answer = generate_answer(
+                        request.question,
+                        hits,
+                        services.llm,
+                        retrieval.get("query_analysis"),
+                    )
                     error = None
                 except (ModelUnavailable, LLMError) as caught:
                     answer = None

@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .answer import generate_answer
+from .answer import evidence_only_answer, generate_answer
 from .bm25 import BM25Index
 from .config import Settings
 from .database import IndexDatabase
@@ -192,7 +192,7 @@ def create_app() -> FastAPI:
                 detail="尚未建立可用索引。请先停止服务并运行 python -m scripts.index_vault。",
             )
 
-        def answer_in_worker() -> tuple[object | None, dict[str, object], dict[str, object], Exception | None]:
+        def answer_in_worker() -> tuple[object | None, dict[str, object], dict[str, object], str | None, Exception | None]:
             with services.query_lock:
                 try:
                     hits, retrieval = services.retriever.search(request.question)
@@ -212,7 +212,7 @@ def create_app() -> FastAPI:
                         citation_valid=None,
                         error=error,
                     )
-                    return None, retrieval, growth, error
+                    return None, retrieval, growth, None, error
                 try:
                     answer = generate_answer(
                         request.question,
@@ -222,8 +222,11 @@ def create_app() -> FastAPI:
                     )
                     error = None
                 except (ModelUnavailable, LLMError) as caught:
-                    answer = None
-                    error = caught
+                    answer = evidence_only_answer(hits, str(caught))
+                    warning = str(caught)
+                    error = None
+                else:
+                    warning = None
                 growth = services.growth.record(
                     question=request.question,
                     retrieval=retrieval,
@@ -232,10 +235,10 @@ def create_app() -> FastAPI:
                     citation_valid=answer.citation_valid if answer else None,
                     error=error,
                 )
-                return answer, retrieval, growth, error
+                return answer, retrieval, growth, warning, error
 
         try:
-            answer, retrieval, growth_result, error = await asyncio.to_thread(answer_in_worker)
+            answer, retrieval, growth_result, warning, error = await asyncio.to_thread(answer_in_worker)
         except Exception as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
         if error is not None:
@@ -249,6 +252,7 @@ def create_app() -> FastAPI:
             "request_id": answer.request_id,
             "elapsed_ms": answer.elapsed_ms,
             "reranker_warning": services.reranker.error if not retrieval["reranker_used"] else None,
+            "llm_warning": warning,
             "growth": growth_result,
         }
 

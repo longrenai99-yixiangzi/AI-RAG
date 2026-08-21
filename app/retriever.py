@@ -123,6 +123,7 @@ class Retriever:
             self.settings.metadata_rules_path if self.settings else None,
         )
         route_id, route = self._route(question)
+        fact_records = self.database.lookup_facts(question)
         expansion = [str(item) for item in route.get("query_expansion", [])]
         expansion.extend(self._expand_project_aliases(question))
         expansion_text = " ".join(expansion)
@@ -165,7 +166,10 @@ class Retriever:
         dense_rank = {chunk_id: rank for rank, chunk_id in enumerate(dense_ids, start=1)}
         bm25_rank = {chunk_id: rank for rank, chunk_id in enumerate(bm25_ids, start=1)}
         fused = reciprocal_rank_fusion([dense_ids, bm25_ids])
-        candidate_ids = [chunk_id for chunk_id, _ in fused[: max(dense_limit, bm25_limit)]]
+        fact_ids = [str(record["evidence_chunk_id"]) for record in fact_records]
+        candidate_ids = list(dict.fromkeys(
+            [*fact_ids, *[chunk_id for chunk_id, _ in fused[: max(dense_limit, bm25_limit)]]]
+        ))
         forced_ids = self.database.find_chunk_ids(
             source_terms=[str(item) for item in route.get("preferred", [])],
             text_terms=[str(item) for item in route.get("evidence_terms", [])],
@@ -175,6 +179,8 @@ class Retriever:
                 candidate_ids.append(chunk_id)
         chunks = self.database.get_chunks(candidate_ids)
         fused_scores = dict(fused)
+        for fact_id in fact_ids:
+            fused_scores.setdefault(fact_id, 1.0)
         hits = [
             SearchHit(
                 chunk=chunk,
@@ -216,6 +222,7 @@ class Retriever:
             "metadata_candidates": len(metadata_allowed),
             "metadata_fallback": metadata_fallback,
             "query_analysis": analysis.to_dict(),
+            "facts": fact_records,
             "pre_rerank_ids": pre_rerank_ids,
             "post_rerank_ids": post_rerank_ids,
         }

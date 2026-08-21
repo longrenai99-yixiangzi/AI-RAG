@@ -128,7 +128,9 @@ async function refreshHealth() {
       label + " · 索引 " + status.index.documents + " 个文件 / " +
       status.index.chunks + " 个切片" +
       (status.embedding_device ? " · " + status.embedding_device.toUpperCase() : "") +
-      " · OCR待处理 " + (status.index.ocr_pending ?? 0);
+      " · OCR待处理 " + (status.index.ocr_pending ?? 0) +
+      " · 实体 " + (status.index.entities ?? 0) +
+      " / 事实 " + (status.index.facts ?? 0);
     healthDetailsElement.textContent =
       "LLM: " + (health.llm ? "可用" : "不可用") +
       " · Embedding: " + (health.embedding ? "已加载" : "未加载") +

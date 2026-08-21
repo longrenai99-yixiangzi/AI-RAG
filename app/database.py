@@ -110,6 +110,42 @@ class IndexDatabase:
                     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY(gap_id) REFERENCES knowledge_gaps(gap_id)
                 );
+                CREATE TABLE IF NOT EXISTS entities (
+                    entity_id TEXT PRIMARY KEY,
+                    entity_type TEXT NOT NULL,
+                    canonical_name TEXT NOT NULL UNIQUE,
+                    aliases_json TEXT NOT NULL DEFAULT '[]',
+                    description TEXT NOT NULL DEFAULT '',
+                    source_document_id TEXT,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE TABLE IF NOT EXISTS facts (
+                    fact_id TEXT PRIMARY KEY,
+                    subject_entity_id TEXT NOT NULL,
+                    predicate TEXT NOT NULL,
+                    object_text TEXT NOT NULL,
+                    object_entity_id TEXT,
+                    evidence_chunk_id TEXT NOT NULL,
+                    confidence REAL,
+                    review_status TEXT NOT NULL DEFAULT 'AUTO',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(subject_entity_id) REFERENCES entities(entity_id),
+                    FOREIGN KEY(evidence_chunk_id) REFERENCES chunks(chunk_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_facts_subject ON facts(subject_entity_id);
+                CREATE INDEX IF NOT EXISTS idx_facts_evidence ON facts(evidence_chunk_id);
+                CREATE TABLE IF NOT EXISTS relationships (
+                    relationship_id TEXT PRIMARY KEY,
+                    subject_entity_id TEXT NOT NULL,
+                    predicate TEXT NOT NULL,
+                    object_entity_id TEXT NOT NULL,
+                    evidence_chunk_id TEXT NOT NULL,
+                    confidence REAL,
+                    review_status TEXT NOT NULL DEFAULT 'AUTO',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
                 """
             )
             self._ensure_columns(connection, "documents", {
@@ -142,6 +178,9 @@ class IndexDatabase:
 
     def reset(self) -> None:
         with self._open() as connection:
+            connection.execute("DELETE FROM facts")
+            connection.execute("DELETE FROM relationships")
+            connection.execute("DELETE FROM entities")
             connection.execute("DELETE FROM chunks")
             connection.execute("DELETE FROM documents")
 
@@ -381,6 +420,82 @@ class IndexDatabase:
             ).fetchone()
         return dict(row) if row else {"candidate_id": candidate_id, "gap_id": gap_id, "path": path}
 
+    def store_knowledge_graph(
+        self,
+        entities: list[dict[str, Any]],
+        facts: list[dict[str, Any]],
+    ) -> None:
+        if not entities and not facts:
+            return
+        with self._open() as connection:
+            for entity in entities:
+                connection.execute(
+                    """
+                    INSERT INTO entities (
+                        entity_id, entity_type, canonical_name, aliases_json,
+                        description, source_document_id, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(entity_id) DO UPDATE SET
+                        canonical_name = excluded.canonical_name,
+                        aliases_json = excluded.aliases_json,
+                        description = excluded.description,
+                        source_document_id = excluded.source_document_id,
+                        updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (
+                        entity["entity_id"],
+                        entity.get("entity_type", "ENTITY"),
+                        entity["canonical_name"],
+                        json.dumps(entity.get("aliases", []), ensure_ascii=False),
+                        entity.get("description", ""),
+                        entity.get("source_document_id"),
+                    ),
+                )
+            for fact in facts:
+                connection.execute(
+                    """
+                    INSERT OR REPLACE INTO facts (
+                        fact_id, subject_entity_id, predicate, object_text,
+                        object_entity_id, evidence_chunk_id, confidence, review_status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        fact["fact_id"],
+                        fact["subject_entity_id"],
+                        fact["predicate"],
+                        fact["object_text"],
+                        fact.get("object_entity_id"),
+                        fact["evidence_chunk_id"],
+                        fact.get("confidence"),
+                        fact.get("review_status", "AUTO"),
+                    ),
+                )
+            connection.execute(
+                "DELETE FROM facts WHERE evidence_chunk_id NOT IN (SELECT chunk_id FROM chunks)"
+            )
+
+    def lookup_facts(self, question: str) -> list[dict[str, Any]]:
+        folded = question.casefold()
+        with self._open() as connection:
+            rows = connection.execute(
+                """
+                SELECT f.*, e.canonical_name, e.aliases_json
+                FROM facts f JOIN entities e ON e.entity_id = f.subject_entity_id
+                ORDER BY f.updated_at DESC
+                """
+            ).fetchall()
+        results: list[dict[str, Any]] = []
+        for row in rows:
+            aliases = json.loads(row["aliases_json"] or "[]")
+            names = [row["canonical_name"], *aliases]
+            if not any(str(name).casefold() in folded for name in names if name):
+                continue
+            item = dict(row)
+            item["aliases"] = aliases
+            item.pop("aliases_json", None)
+            results.append(item)
+        return results
+
     def update_gap_status(self, gap_id: str, status: str) -> dict[str, Any] | None:
         allowed = {"OPEN", "REVIEWING", "RESOLVED", "IGNORED"}
         if status not in allowed:
@@ -481,10 +596,14 @@ class IndexDatabase:
                     "SELECT parse_status, COUNT(*) AS count FROM documents GROUP BY parse_status"
                 ).fetchall()
             }
+            entity_count = connection.execute("SELECT COUNT(*) FROM entities").fetchone()[0]
+            fact_count = connection.execute("SELECT COUNT(*) FROM facts").fetchone()[0]
         return {
             "documents": document_count,
             "chunks": chunk_count,
             "ocr_pending": ocr_count,
             "file_types": file_types,
             "parse_status": statuses,
+            "entities": entity_count,
+            "facts": fact_count,
         }

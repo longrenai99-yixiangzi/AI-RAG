@@ -1,6 +1,7 @@
 - question: EPC项目设计策划有哪些主要管理动作？
   expected_files:
-    - 项目设计管理手册
+    - EPC项目设计管理流程
+    - 设计管理策划书
   expected_keywords:
     - 设计策划
     - EPC
@@ -9,7 +10,11 @@
       - 设计策划
 
 - question: 设计评审的主要检查内容是什么？
-  expected_files: []
+  # Current Vault has evaluation/quality sources rather than one canonical file.
+  # The evaluator accepts these paths when they are present in the top results.
+  expected_files:
+    - 设计评估
+    - 设计质量
   expected_keywords:
     - 设计评审
   expected_metadata:
@@ -17,7 +22,10 @@
       - 设计评审
 
 - question: 医院项目施工图设计如何开展？
-  expected_files: []
+  expected_files:
+    - 医院项目
+    - 丽水医院
+    - 淮安四院
   expected_keywords:
     - 医院
     - 施工图

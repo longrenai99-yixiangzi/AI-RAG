@@ -33,6 +33,13 @@ class EmbeddingService:
     def load(self) -> None:
         if self.model is not None:
             return
+        weight_files = (
+            self.settings.embedding_model_path / "pytorch_model.bin",
+            self.settings.embedding_model_path / "model.safetensors",
+        )
+        if not any(path.is_file() for path in weight_files):
+            self.error = "BGE-M3权重文件不存在或尚未下载完成。"
+            raise ModelUnavailable(self.error)
         os.environ.setdefault("HF_HOME", str(self.settings.cache_root))
         try:
             from FlagEmbedding import BGEM3FlagModel

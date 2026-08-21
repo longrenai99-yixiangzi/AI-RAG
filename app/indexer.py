@@ -80,6 +80,7 @@ def index_vault(
     file_paths: list[Path] | None = None,
     source_aliases: dict[str, str] | None = None,
     file_size_overrides: dict[str, int] | None = None,
+    lexical_only: bool = False,
 ) -> dict[str, object]:
     """Build in a staging directory, verify it, then publish it as the active local index."""
     settings.ensure_runtime_directories()
@@ -146,6 +147,7 @@ def index_vault(
         "errors": errors,
         "scan_errors": scan_errors,
         "rebuild": True,
+        "mode": "lexical_only" if lexical_only else "dense",
         "change_status": dict(Counter(change_status.values())),
         "ocr_provider": ocr_provider.name,
         "ocr_pending": sum(1 for document in documents if document.needs_ocr),
@@ -181,31 +183,34 @@ def index_vault(
         return report
 
     # A model or download failure must not clear an existing usable index.
-    try:
-        embedding_service.load()
-    except Exception as error:
-        report["status"] = "model_load_failed"
-        report["model_error"] = f"{type(error).__name__}: {error}"
-        report["report_path"] = str(_write_report(settings, report))
-        raise
+    if not lexical_only:
+        try:
+            embedding_service.load()
+        except Exception as error:
+            report["status"] = "model_load_failed"
+            report["model_error"] = f"{type(error).__name__}: {error}"
+            report["report_path"] = str(_write_report(settings, report))
+            raise
     staging_root = settings.data_root / f".build-{uuid.uuid4().hex}"
     staging_root.mkdir(parents=True, exist_ok=False)
     database = IndexDatabase(staging_root / "index.sqlite3")
     vector_store = VectorStore(staging_root / "qdrant")
     build_error: Exception | None = None
     try:
-        for start in range(0, len(all_chunks), 8):
-            batch = all_chunks[start : start + 8]
-            vectors = embedding_service.embed_documents([chunk.text for chunk in batch])
-            vector_store.upsert(batch, vectors)
+        if not lexical_only:
+            for start in range(0, len(all_chunks), 8):
+                batch = all_chunks[start : start + 8]
+                vectors = embedding_service.embed_documents([chunk.text for chunk in batch])
+                vector_store.upsert(batch, vectors)
         for document in documents:
             database.store_document(document, chunks_by_document[document.document_id])
         database.store_knowledge_graph(entities, facts)
         bm25 = BM25Index(staging_root / "bm25.json")
         bm25.build(all_chunks)
         bm25.save()
+        vector_count = vector_store.count()
         if (
-            vector_store.count() != len(all_chunks)
+            (not lexical_only and vector_count != len(all_chunks))
             or database.stats()["chunks"] != len(all_chunks)
             or (all_chunks and not bm25.ready)
         ):
@@ -214,7 +219,7 @@ def index_vault(
         report["indexed_documents"] = sum(
             1 for document in documents if chunks_by_document[document.document_id]
         )
-        report["vector_points"] = vector_store.count()
+        report["vector_points"] = vector_count
         report["entities"] = len(entities)
         report["facts"] = len(facts)
     except Exception as error:

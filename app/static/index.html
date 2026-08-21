@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AI设计管理知识库</title>
-    <link rel="stylesheet" href="/static/style.css?v=20260821-2" />
+    <link rel="stylesheet" href="/static/style.css?v=20260821-3" />
   </head>
   <body>
     <main class="shell">
@@ -41,8 +41,12 @@
     </main>
     <template id="answer-template">
       <article class="answer-card">
+        <div class="question-block">
+          <span class="question-label">问题 <span class="question-number"></span></span>
+          <p class="question-text"></p>
+        </div>
         <div class="answer-header">
-          <h2>回答</h2>
+          <h2>回答 <span class="answer-number"></span></h2>
           <span class="meta"></span>
         </div>
         <div class="answer-body"></div>

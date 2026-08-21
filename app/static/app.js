@@ -5,6 +5,7 @@ const questionElement = document.querySelector("#question");
 const submitElement = document.querySelector("#submit");
 const conversation = document.querySelector("#conversation");
 const template = document.querySelector("#answer-template");
+let questionCount = 0;
 
 function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -55,8 +56,12 @@ async function refreshHealth() {
   }
 }
 
-function showAnswer(data) {
+function showAnswer(data, question) {
+  questionCount += 1;
   const node = template.content.cloneNode(true);
+  node.querySelector(".question-number").textContent = "#" + questionCount;
+  node.querySelector(".answer-number").textContent = "#" + questionCount;
+  node.querySelector(".question-text").textContent = question;
   node.querySelector(".answer-body").innerHTML = formatAnswer(data.answer);
   node.querySelector(".meta").textContent =
     (data.elapsed_ms ?? 0) + " ms · " +
@@ -90,7 +95,8 @@ form.addEventListener("submit", async (event) => {
     });
     const body = await response.json();
     if (!response.ok) throw new Error(body.detail || "请求失败");
-    showAnswer(body);
+    showAnswer(body, question);
+    questionElement.value = "";
   } catch (error) {
     const warning = document.createElement("p");
     warning.className = "error";

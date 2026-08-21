@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -83,6 +84,12 @@ def _services(app: FastAPI) -> Services:
 
 def create_app() -> FastAPI:
     app = FastAPI(title="AI设计管理知识库", version="0.1.0", lifespan=lifespan)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["http://127.0.0.1:8000", "http://localhost:8000"],
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type"],
+    )
     app.mount("/static", StaticFiles(directory=str(STATIC_ROOT)), name="static")
 
     @app.get("/", include_in_schema=False)

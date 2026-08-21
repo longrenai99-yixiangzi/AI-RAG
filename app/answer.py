@@ -117,6 +117,21 @@ def generate_answer(
             request_id=None,
             elapsed_ms=0,
         )
+    if not client.settings.api_ready:
+        evidence = "\n".join(
+            f"[{source_id}] {record['file_name']} / {record['heading_path']} / {record['location']}"
+            for source_id, record in records.items()
+        )
+        return AnswerResult(
+            answer=(
+                "当前未配置生成模型，以下仅返回可核查证据，不能视为自动生成的确定性结论。\n\n"
+                f"{evidence}"
+            ),
+            citations=list(records.values()),
+            citation_valid=True,
+            request_id=None,
+            elapsed_ms=0,
+        )
     intent = str((query_analysis or {}).get("intent", "GENERAL_RAG"))
     sections = _answer_sections(intent)
     user_prompt = f"问题：{question}\n\n问题类型：{intent}\n\n知识库证据：\n{context}\n\n请按以下结构回答：\n{sections}"

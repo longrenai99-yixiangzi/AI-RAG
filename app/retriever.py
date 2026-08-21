@@ -8,7 +8,7 @@ from .bm25 import BM25Index
 from .config import Settings
 from .database import IndexDatabase
 from .domain import SearchHit
-from .embeddings import EmbeddingService, RerankerService
+from .embeddings import EmbeddingService, ModelUnavailable, RerankerService
 from .query_analyzer import analyze_question
 from .vector_store import VectorStore
 
@@ -134,15 +134,20 @@ class Retriever:
         raw_limit = max(dense_limit, bm25_limit)
         if metadata_requested:
             raw_limit = max(raw_limit * 4, 80)
-        query_vector = self.embedding_service.embed_query(dense_query)
+        dense_error: str | None = None
+        try:
+            query_vector = self.embedding_service.embed_query(dense_query)
+        except ModelUnavailable as error:
+            # BM25 remains usable while the optional local dense model is unavailable.
+            query_vector = None
+            dense_error = str(error)
         dense_pairs_raw: list[tuple[str, float]] = []
         bm25_pairs_raw: list[tuple[str, float]] = []
         metadata_fallback = False
         if metadata_requested and metadata_allowed:
-            dense_pairs = self.vector_store.query(
-                query_vector,
-                limit=raw_limit,
-                allowed_ids=metadata_allowed,
+            dense_pairs = (
+                self.vector_store.query(query_vector, limit=raw_limit, allowed_ids=metadata_allowed)
+                if query_vector is not None else []
             )
             bm25_pairs = self.bm25.search(
                 bm25_query,
@@ -150,11 +155,11 @@ class Retriever:
                 allowed_ids=metadata_allowed,
             )
         else:
-            dense_pairs = self.vector_store.query(query_vector, limit=raw_limit)
+            dense_pairs = self.vector_store.query(query_vector, limit=raw_limit) if query_vector is not None else []
             bm25_pairs = self.bm25.search(bm25_query, limit=raw_limit)
         if metadata_requested and (not metadata_allowed or not (dense_pairs or bm25_pairs)):
             # Soft filter: a wrong or incomplete tag must never cause zero recall.
-            dense_pairs_raw = self.vector_store.query(query_vector, limit=raw_limit)
+            dense_pairs_raw = self.vector_store.query(query_vector, limit=raw_limit) if query_vector is not None else []
             bm25_pairs_raw = self.bm25.search(bm25_query, limit=raw_limit)
             dense_pairs = dense_pairs_raw
             bm25_pairs = bm25_pairs_raw
@@ -213,6 +218,8 @@ class Retriever:
             "bm25_hits": len(bm25_pairs),
             "dense_hits_fallback": len(dense_pairs_raw),
             "bm25_hits_fallback": len(bm25_pairs_raw),
+            "dense_available": query_vector is not None,
+            "dense_error": dense_error,
             "fused_hits": len(hits),
             "reranker_used": rerank_scores is not None,
             "routing_rule": route_id or "none",

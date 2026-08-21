@@ -83,6 +83,19 @@ Metadata 规则位于 `config/metadata_rules.yaml`，由路径、文件名、标
 
 页面和 `/api/chat` 返回中会显示当前问题的意图、Metadata 过滤、Dense/BM25 命中数、RRF 后结果、重排是否启用和过滤回退状态。
 
+## 受控知识生长
+
+当问题没有召回、引用校验失败或回答明确表示证据不足时，系统会：
+
+1. 将问题、意图、检索数量和回答状态写入 SQLite；
+2. 用规则归一化相同主题，累计重复问题频次；
+3. 在 `data/growth/candidates/` 生成待审核候选草稿和当前证据清单；
+4. 通过页面“知识生长”查看、审核中标记和解决标记。
+
+候选草稿带有 `formal_write: forbidden`，系统不会自动改写 `D:\设计管理` 或正式知识。正式知识写回仍需人工审核和明确目标。
+
+“知识管理”页面通过 `/api/documents` 只读展示索引文件、解析/索引状态、OCR状态和主要 Metadata；它不提供源文件移动、删除或改写操作。
+
 ## 检索质量评估
 
 Golden Questions 位于 `tests/golden_questions.yaml`，只评价可验证的文件命中、关键词和 Metadata，不使用 LLM-as-Judge：

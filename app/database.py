@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import uuid
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator
@@ -75,6 +76,40 @@ class IndexDatabase:
                     FOREIGN KEY(document_id) REFERENCES documents(document_id)
                 );
                 CREATE INDEX IF NOT EXISTS idx_chunks_document_id ON chunks(document_id);
+                CREATE TABLE IF NOT EXISTS query_logs (
+                    query_id TEXT PRIMARY KEY,
+                    query TEXT NOT NULL,
+                    intent TEXT NOT NULL,
+                    analysis_json TEXT NOT NULL DEFAULT '{}',
+                    retrieval_count INTEGER NOT NULL DEFAULT 0,
+                    answer_status TEXT NOT NULL,
+                    confidence REAL,
+                    answer TEXT,
+                    citations_json TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_query_logs_created_at ON query_logs(created_at);
+                CREATE TABLE IF NOT EXISTS knowledge_gaps (
+                    gap_id TEXT PRIMARY KEY,
+                    normalized_topic TEXT NOT NULL UNIQUE,
+                    latest_query TEXT NOT NULL,
+                    reason TEXT NOT NULL,
+                    frequency INTEGER NOT NULL DEFAULT 1,
+                    status TEXT NOT NULL DEFAULT 'OPEN',
+                    candidate_count INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_knowledge_gaps_status ON knowledge_gaps(status);
+                CREATE TABLE IF NOT EXISTS growth_candidates (
+                    candidate_id TEXT PRIMARY KEY,
+                    gap_id TEXT NOT NULL UNIQUE,
+                    path TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'PENDING_REVIEW',
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(gap_id) REFERENCES knowledge_gaps(gap_id)
+                );
                 """
             )
             self._ensure_columns(connection, "documents", {
@@ -252,6 +287,180 @@ class IndexDatabase:
         expected_values = expected if isinstance(expected, list) else [expected]
         actual_values = actual if isinstance(actual, list) else [actual]
         return any(value and value in expected_values for value in actual_values)
+
+    def record_query(
+        self,
+        *,
+        query: str,
+        analysis: dict[str, Any],
+        retrieval_count: int,
+        answer_status: str,
+        answer: str | None,
+        citations: list[dict[str, Any]],
+        confidence: float | None,
+        normalized_topic: str | None = None,
+        gap_reason: str | None = None,
+    ) -> dict[str, Any]:
+        query_id = str(uuid.uuid4())
+        gap: dict[str, Any] | None = None
+        with self._open() as connection:
+            connection.execute(
+                """
+                INSERT INTO query_logs (
+                    query_id, query, intent, analysis_json, retrieval_count,
+                    answer_status, confidence, answer, citations_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    query_id,
+                    query,
+                    str(analysis.get("intent", "GENERAL_RAG")),
+                    json.dumps(analysis, ensure_ascii=False),
+                    retrieval_count,
+                    answer_status,
+                    confidence,
+                    answer,
+                    json.dumps(citations, ensure_ascii=False),
+                ),
+            )
+            if normalized_topic and gap_reason:
+                row = connection.execute(
+                    "SELECT * FROM knowledge_gaps WHERE normalized_topic = ?",
+                    (normalized_topic,),
+                ).fetchone()
+                if row:
+                    connection.execute(
+                        """
+                        UPDATE knowledge_gaps
+                        SET latest_query = ?, reason = ?, frequency = frequency + 1,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE gap_id = ?
+                        """,
+                        (query, gap_reason, row["gap_id"]),
+                    )
+                    gap_id = row["gap_id"]
+                else:
+                    gap_id = str(uuid.uuid4())
+                    connection.execute(
+                        """
+                        INSERT INTO knowledge_gaps (
+                            gap_id, normalized_topic, latest_query, reason
+                        ) VALUES (?, ?, ?, ?)
+                        """,
+                        (gap_id, normalized_topic, query, gap_reason),
+                    )
+                gap_row = connection.execute(
+                    "SELECT * FROM knowledge_gaps WHERE normalized_topic = ?",
+                    (normalized_topic,),
+                ).fetchone()
+                gap = dict(gap_row) if gap_row else {"gap_id": gap_id}
+        return {"query_id": query_id, "gap": gap}
+
+    def attach_growth_candidate(self, gap_id: str, path: str) -> dict[str, Any]:
+        candidate_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"knowledge-gap:{gap_id}"))
+        with self._open() as connection:
+            connection.execute(
+                """
+                INSERT INTO growth_candidates (candidate_id, gap_id, path)
+                VALUES (?, ?, ?)
+                ON CONFLICT(gap_id) DO UPDATE SET path = excluded.path,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (candidate_id, gap_id, path),
+            )
+            connection.execute(
+                """
+                UPDATE knowledge_gaps
+                SET candidate_count = 1, updated_at = CURRENT_TIMESTAMP
+                WHERE gap_id = ?
+                """,
+                (gap_id,),
+            )
+            row = connection.execute(
+                "SELECT * FROM growth_candidates WHERE gap_id = ?", (gap_id,)
+            ).fetchone()
+        return dict(row) if row else {"candidate_id": candidate_id, "gap_id": gap_id, "path": path}
+
+    def update_gap_status(self, gap_id: str, status: str) -> dict[str, Any] | None:
+        allowed = {"OPEN", "REVIEWING", "RESOLVED", "IGNORED"}
+        if status not in allowed:
+            raise ValueError(f"不支持的知识缺口状态：{status}")
+        with self._open() as connection:
+            connection.execute(
+                "UPDATE knowledge_gaps SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE gap_id = ?",
+                (status, gap_id),
+            )
+            connection.execute(
+                "UPDATE growth_candidates SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE gap_id = ?",
+                ("RESOLVED" if status == "RESOLVED" else "PENDING_REVIEW", gap_id),
+            )
+            row = connection.execute(
+                """
+                SELECT g.*, c.candidate_id, c.path AS candidate_path, c.status AS candidate_status
+                FROM knowledge_gaps g LEFT JOIN growth_candidates c ON c.gap_id = g.gap_id
+                WHERE g.gap_id = ?
+                """,
+                (gap_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def growth_snapshot(self, limit: int = 50) -> dict[str, Any]:
+        with self._open() as connection:
+            gaps = [
+                dict(row)
+                for row in connection.execute(
+                    """
+                    SELECT g.*, c.candidate_id, c.path AS candidate_path, c.status AS candidate_status
+                    FROM knowledge_gaps g LEFT JOIN growth_candidates c ON c.gap_id = g.gap_id
+                    ORDER BY g.updated_at DESC LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+            ]
+            logs = [
+                dict(row)
+                for row in connection.execute(
+                    "SELECT * FROM query_logs ORDER BY created_at DESC LIMIT ?", (limit,)
+                ).fetchall()
+            ]
+            counts = {
+                str(row["status"]): int(row["count"])
+                for row in connection.execute(
+                    "SELECT status, COUNT(*) AS count FROM knowledge_gaps GROUP BY status"
+                ).fetchall()
+            }
+        for row in gaps + logs:
+            for key in ("analysis_json", "citations_json"):
+                if key in row:
+                    try:
+                        row[key.removesuffix("_json")] = json.loads(row.pop(key) or "{}")
+                    except json.JSONDecodeError:
+                        row[key.removesuffix("_json")] = {}
+        return {"stats": counts, "gaps": gaps, "query_logs": logs}
+
+    def list_documents(self, query: str = "", limit: int = 200) -> list[dict[str, Any]]:
+        pattern = f"%{query.strip()}%"
+        with self._open() as connection:
+            rows = connection.execute(
+                """
+                SELECT document_id, source_path, file_name, file_type, file_size,
+                       mtime_ns, parse_status, index_status, error, needs_ocr,
+                       metadata_json, indexed_at
+                FROM documents
+                WHERE (? = '' OR file_name LIKE ? OR source_path LIKE ?)
+                ORDER BY mtime_ns DESC LIMIT ?
+                """,
+                (query.strip(), pattern, pattern, limit),
+            ).fetchall()
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["metadata"] = json.loads(item.pop("metadata_json") or "{}")
+            except json.JSONDecodeError:
+                item["metadata"] = {}
+            result.append(item)
+        return result
 
     def stats(self) -> dict[str, Any]:
         with self._open() as connection:

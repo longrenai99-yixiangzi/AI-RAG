@@ -32,13 +32,20 @@ def classify_answer_status(
     citation_valid: bool | None,
     answer: str | None,
     query_term_coverage: float | None = None,
+    dense_available: bool | None = None,
+    reranker_used: bool = False,
     error: Exception | None = None,
 ) -> tuple[str, str | None]:
     if error is not None:
         return "LLM_ERROR", f"问答模型或生成链路失败：{type(error).__name__}"
     if not hit_count:
         return "NO_RETRIEVAL", "未召回任何候选片段"
-    if query_term_coverage is not None and query_term_coverage < 0.4:
+    if (
+        dense_available is False
+        and not reranker_used
+        and query_term_coverage is not None
+        and query_term_coverage < 0.4
+    ):
         return "INSUFFICIENT_EVIDENCE", "检索结果覆盖的问题关键词不足"
     if citation_valid is False:
         return "CITATION_INVALID", "模型回答未通过来源引用校验"
@@ -74,6 +81,11 @@ class GrowthManager:
                 float(retrieval["query_term_coverage"])
                 if retrieval.get("query_term_coverage") is not None else None
             ),
+            dense_available=(
+                bool(retrieval["dense_available"])
+                if "dense_available" in retrieval else None
+            ),
+            reranker_used=bool(retrieval.get("reranker_used", False)),
             error=error,
         )
         normalized = normalize_topic(analysis, question)

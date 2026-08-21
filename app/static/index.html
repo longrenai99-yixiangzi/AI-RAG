@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI设计管理知识库</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <div>
+          <p class="eyebrow">本地只读 RAG · V0.1</p>
+          <h1>AI设计管理知识库</h1>
+          <p id="status" class="status">正在检查服务状态…</p>
+        </div>
+        <button id="health" type="button" class="secondary">重新检查</button>
+      </header>
+
+      <section id="conversation" aria-live="polite">
+        <article class="welcome">
+          <h2>从已有资料中找依据，再回答</h2>
+          <p>回答会给出可追溯的文件、章节和页码/行号。没有依据时，系统会明确说明。</p>
+        </article>
+      </section>
+
+      <form id="question-form">
+        <label for="question">请输入设计管理问题</label>
+        <textarea
+          id="question"
+          rows="4"
+          placeholder="例如：EPC 项目设计策划有哪些关键动作？"
+          required
+        ></textarea>
+        <div class="form-row">
+          <span id="hint">知识源：D:\设计管理（只读）</span>
+          <button id="submit" type="submit">提问</button>
+        </div>
+      </form>
+    </main>
+    <template id="answer-template">
+      <article class="answer-card">
+        <div class="answer-header">
+          <h2>回答</h2>
+          <span class="meta"></span>
+        </div>
+        <div class="answer-body"></div>
+        <section class="citations">
+          <h3>来源依据</h3>
+          <div class="citation-list"></div>
+        </section>
+      </article>
+    </template>
+    <script src="/static/app.js"></script>
+  </body>
+</html>

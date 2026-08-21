@@ -1,0 +1,92 @@
+# User-confirmed source-routing rules for V0.1.
+# This file is policy metadata only; it does not write to D:\设计管理.
+version: 1
+
+questions:
+  q1_epc_design_planning:
+    query: "EPC项目设计策划有哪些主要管理动作？"
+    preferred:
+      - "《项目设计管理手册》"
+      - "D:\\工作\\设计支持中心\\局制度文件\\《项目设计管理手册》.pdf"
+    acceptable:
+      - "EPC项目设计管理流程"
+      - "设计策划书"
+    not_primary:
+      - "设计管理检查情况通报"
+      - "设计创效策划总结交流"
+
+  q2_3262_design_actions:
+    query: "3262设计管理动作有哪些关键要求？"
+    preferred:
+      - "《项目设计管理手册》"
+      - "D:\\工作\\设计支持中心\\局制度文件\\《项目设计管理手册》.pdf"
+      - "明确的3262原始资料"
+    acceptable:
+      - "EPC项目设计管理流程"
+    not_primary:
+      - "设计管理检查情况通报"
+    query_expansion:
+      - "设计评估管理"
+      - "设计相关方沟通机制建立"
+      - "限额设计管理"
+      - "设计管理策划"
+      - "设计计划管理"
+      - "设计招采管理"
+      - "设计任务书管理"
+      - "方案比选管理"
+      - "设计质量管理"
+      - "设计报批报建管理"
+      - "设计风险管理"
+      - "设计管理成果总结"
+      - "设计资源库管理"
+    note: "3262是对手册13个设计管理动作的人工简称，不应只按数字检索。"
+
+  q3_design_review:
+    query: "设计评审的主要检查内容是什么？"
+    clarification_required: true
+    not_primary:
+      - "设计管理检查情况通报"
+      - "二季度EPC项目设计管理检查情况通报"
+    subtypes:
+      - "设计策划评审"
+      - "设计质量评审"
+      - "设计计划评审"
+      - "阶段性成果管理评审"
+    note: "宽泛问题不得直接作为最终验收题；先追问评审类型。"
+
+  q4_design_plan_progress:
+    query: "设计计划和设计进度如何管理？"
+    preferred:
+      - "设计计划书"
+      - "项目设计计划"
+      - "管理经验"
+    acceptable:
+      - "EPC项目设计管理流程"
+      - "项目复盘"
+    not_primary:
+      - "设计管理策划书"
+      - "设计管理检查情况通报"
+
+  q5_design_value_creation:
+    query: "设计价值创造有哪些常见做法？"
+    preferred:
+      - "《设计价值创造点清单0819》"
+      - "D:\\工作\\二公司技术部\\2026\\知识库\\价值创造点清单\\设计价值创造点清单0819.xlsx"
+      - "对应价值创造清单"
+    acceptable:
+      - "各类型项目的设计策划书"
+      - "典型案例汇编"
+
+source_validation:
+  project_design_management_manual:
+    status: "found"
+    authoritative_path: "D:\\工作\\设计支持中心\\局制度文件\\《项目设计管理手册》.pdf"
+    note: "用户确认该71页PDF为局制度权威版本；Vault内同名Markdown仅作本地检索副本/辅助来源。"
+  source_3262:
+    status: "content_matches_found_filename_match_not_confirmed"
+    note: "当前按文件名未发现明确的3262原始资料；正文搜索发现若干包含3262的设计计划/任务书/总结。"
+  design_value_creation_list_0819:
+    status: "external_authoritative_current_but_not_latest"
+    authoritative_path: "D:\\工作\\二公司技术部\\2026\\知识库\\价值创造点清单\\设计价值创造点清单0819.xlsx"
+    version_policy: "用户确认该文件为局汇总版本但不是最新版本；后续出现新版本时替换此路径并保留版本关系。"
+    note: "该工作簿含多个专业表，水务表达到1,048,570行且存在错误单元格；需按Sheet/有效行筛选，禁止无审查全量灌入。"

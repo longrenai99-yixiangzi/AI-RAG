@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/qdrant/
+data/indexes/
+data/reports/
+data/cache/
+data/supplemental/
+data/*.sqlite3
+models/
+.build-*/
+backup-index-*/
+failed-publish-*/
+*.log
+.env
+.env.local

@@ -5,6 +5,7 @@ from app.bm25 import BM25Index
 from app.config import Settings
 from app.database import IndexDatabase
 from app.domain import Chunk, ParsedDocument
+from app.embeddings import ModelUnavailable
 from app.retriever import Retriever, reciprocal_rank_fusion
 
 
@@ -18,6 +19,11 @@ def test_rrf_remains_the_fusion_stage() -> None:
 class FakeEmbedding:
     def embed_query(self, query: str) -> list[float]:
         return [0.0]
+
+
+class MissingEmbedding:
+    def embed_query(self, query: str) -> list[float]:
+        raise ModelUnavailable("test model unavailable")
 
 
 class FakeReranker:
@@ -35,6 +41,15 @@ class FakeVectorStore:
         self.allowed_calls.append(allowed_ids)
         pairs = [("c1", 0.99), ("c2", 0.98)]
         return [pair for pair in pairs if allowed_ids is None or pair[0] in allowed_ids]
+
+
+class FakeBM25:
+    ready = True
+
+    def search(self, query: str, limit: int = 20, allowed_ids: set[str] | None = None):
+        if allowed_ids is not None and "c" not in allowed_ids:
+            return []
+        return [("c", 1.0)]
 
 
 def test_metadata_filter_is_soft_and_reaches_both_retrievers(tmp_path: Path) -> None:
@@ -69,3 +84,24 @@ def test_metadata_filter_is_soft_and_reaches_both_retrievers(tmp_path: Path) -> 
     assert [hit.chunk.chunk_id for hit in hits] == ["c1"]
     assert retrieval["metadata_filter_used"] is True
     assert any(call == {"c1"} for call in vector.allowed_calls)
+
+
+def test_bm25_fallback_remains_available_without_dense_model(tmp_path: Path) -> None:
+    settings = replace(
+        Settings.load(),
+        project_root=Path(__file__).parents[1],
+        data_root=tmp_path / "data",
+    )
+    database = IndexDatabase(settings.database_path)
+    metadata = {"board": "设计管理", "topic": ["设计策划"]}
+    document = ParsedDocument("d", "d.md", "d.md", ".md", "hash", 1, 1, [], "parsed", metadata=metadata)
+    chunk = Chunk("c", "d", 0, "d.md", "d.md", "设计策划应形成管理文件", "", {}, metadata=metadata)
+    database.store_document(document, [chunk])
+    vector = FakeVectorStore()
+    retriever = Retriever(database, vector, MissingEmbedding(), FakeBM25(), FakeReranker(), settings)
+
+    hits, retrieval = retriever.search("设计策划")
+
+    assert [hit.chunk.chunk_id for hit in hits] == ["c"]
+    assert retrieval["dense_available"] is False
+    assert retrieval["bm25_hits"] == 1

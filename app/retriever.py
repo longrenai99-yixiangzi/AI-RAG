@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from .bm25 import BM25Index
+from .bm25 import BM25Index, tokenize
 from .config import Settings
 from .database import IndexDatabase
 from .domain import SearchHit
@@ -213,6 +213,19 @@ class Retriever:
         )
         hits = self._deduplicate_by_file(hits, final_limit)
         post_rerank_ids = [hit.chunk.chunk_id for hit in hits]
+        coverage_stop_words = {
+            "一个", "这个", "问题", "如何", "哪些", "什么", "由", "哪个", "哪个公司",
+            "项目", "公司", "实施", "是谁", "请问", "是否", "可以", "进行",
+        }
+        query_terms = {
+            term for term in tokenize(question)
+            if len(term) > 1 and term not in coverage_stop_words
+        }
+        hit_terms = set(tokenize("\n".join(hit.chunk.text for hit in hits[:3])))
+        query_term_coverage = (
+            sum(term in hit_terms for term in query_terms) / len(query_terms)
+            if query_terms else 0.0
+        )
         return hits, {
             "dense_hits": len(dense_pairs),
             "bm25_hits": len(bm25_pairs),
@@ -230,6 +243,7 @@ class Retriever:
             "metadata_fallback": metadata_fallback,
             "query_analysis": analysis.to_dict(),
             "facts": fact_records,
+            "query_term_coverage": round(query_term_coverage, 3),
             "pre_rerank_ids": pre_rerank_ids,
             "post_rerank_ids": post_rerank_ids,
         }

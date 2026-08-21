@@ -36,6 +36,9 @@ def test_unanswered_queries_merge_and_create_reviewable_candidate(tmp_path: Path
     candidate_path = Path(first["candidate"]["path"])
     assert candidate_path.is_file()
     assert "formal_write: forbidden" in candidate_path.read_text(encoding="utf-8")
+    draft = manager.create_formal_draft(first["candidate"]["candidate_id"])
+    assert Path(draft["path"]).is_file()
+    assert "formal_write: forbidden" in Path(draft["path"]).read_text(encoding="utf-8")
 
     snapshot = database.growth_snapshot()
     assert snapshot["stats"]["OPEN"] == 1

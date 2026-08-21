@@ -26,8 +26,14 @@ async function refreshHealth() {
   statusElement.textContent = "正在检查服务状态…";
   try {
     const results = await Promise.all([
-      fetch("/api/health").then((response) => response.json()),
-      fetch("/api/status").then((response) => response.json()),
+      fetch("/api/health", { cache: "no-store" }).then((response) => {
+        if (!response.ok) throw new Error("health " + response.status);
+        return response.json();
+      }),
+      fetch("/api/status", { cache: "no-store" }).then((response) => {
+        if (!response.ok) throw new Error("status " + response.status);
+        return response.json();
+      }),
     ]);
     const health = results[0];
     const status = results[1];

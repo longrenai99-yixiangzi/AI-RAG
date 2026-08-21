@@ -96,6 +96,8 @@ Metadata 规则位于 `config/metadata_rules.yaml`，由路径、文件名、标
 
 “知识管理”页面通过 `/api/documents` 只读展示索引文件、解析/索引状态、OCR状态和主要 Metadata；它不提供源文件移动、删除或改写操作。
 
+索引时会识别 `wiki/entities` 下的实体页，并只从明确的“实施单位、设计单位、项目经理”等字段抽取 `AUTO` 事实；每条事实必须绑定 evidence Chunk。没有明确字段时不会猜测，V0.2 预检会单独报告实体数和事实数。
+
 ## 检索质量评估
 
 Golden Questions 位于 `tests/golden_questions.yaml`，只评价可验证的文件命中、关键词和 Metadata，不使用 LLM-as-Judge：

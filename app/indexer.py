@@ -15,6 +15,7 @@ from .database import IndexDatabase
 from .domain import Chunk, ParsedDocument
 from .embeddings import EmbeddingService
 from .index_state import detect_changes
+from .knowledge_graph import extract_entity_facts
 from .metadata import METADATA_FIELDS, infer_metadata, metadata_for_block
 from .ocr import build_ocr_provider
 from .parsers import iter_source_files, parse_file
@@ -98,6 +99,8 @@ def index_vault(
     documents: list[ParsedDocument] = []
     chunks_by_document: dict[str, list[Chunk]] = {}
     all_chunks: list[Chunk] = []
+    entities: list[dict[str, object]] = []
+    facts: list[dict[str, object]] = []
     statuses: Counter[str] = Counter()
     file_types: Counter[str] = Counter()
     errors: list[dict[str, str]] = []
@@ -122,6 +125,9 @@ def index_vault(
         for block in document.blocks:
             block.metadata = metadata_for_block(document.metadata)
         document_chunks = chunk_blocks(document.blocks) if document.parse_status == "parsed" else []
+        document_entities, document_facts = extract_entity_facts(document, document_chunks)
+        entities.extend(document_entities)
+        facts.extend(document_facts)
         documents.append(document)
         chunks_by_document[document.document_id] = document_chunks
         all_chunks.extend(document_chunks)
@@ -150,6 +156,8 @@ def index_vault(
             )
             for field in METADATA_FIELDS
         },
+        "entities": len(entities),
+        "facts": len(facts),
     }
     if len(all_chunks) > settings.max_local_chunks:
         report["status"] = "blocked_requires_qdrant_server"
@@ -192,6 +200,7 @@ def index_vault(
             vector_store.upsert(batch, vectors)
         for document in documents:
             database.store_document(document, chunks_by_document[document.document_id])
+        database.store_knowledge_graph(entities, facts)
         bm25 = BM25Index(staging_root / "bm25.json")
         bm25.build(all_chunks)
         bm25.save()
@@ -206,6 +215,8 @@ def index_vault(
             1 for document in documents if chunks_by_document[document.document_id]
         )
         report["vector_points"] = vector_store.count()
+        report["entities"] = len(entities)
+        report["facts"] = len(facts)
     except Exception as error:
         report["status"] = "build_failed"
         report["build_error"] = f"{type(error).__name__}: {error}"

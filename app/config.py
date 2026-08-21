@@ -114,7 +114,7 @@ class Settings:
         return cls(
             project_root=PROJECT_ROOT,
             data_root=data_root,
-            model_root=PROJECT_ROOT / "models",
+            model_root=Path(_setting("RAG_MODEL_ROOT", str(PROJECT_ROOT / "models"))),
             vault_root=Path(_setting("RAG_VAULT_PATH", r"D:\设计管理")),
             api_base_url=_setting("RAG_API_BASE_URL").rstrip("/"),
             chat_model=_setting("RAG_CHAT_MODEL"),

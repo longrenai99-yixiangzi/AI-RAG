@@ -92,7 +92,22 @@ SYSTEM_PROMPT = """你是“AI设计管理知识助手”。
 每一项重要结论后必须使用唯一允许的来源标记，例如 [S1]。不要创造其他标记。"""
 
 
-def generate_answer(question: str, hits: list[SearchHit], client: LLMClient) -> AnswerResult:
+def _answer_sections(intent: str) -> str:
+    return {
+        "FACT_LOOKUP": "【结论】\n【依据】\n【来源】",
+        "POLICY_QUERY": "【管理要求】\n【具体规定】\n【适用范围】\n【来源】",
+        "METHOD_GUIDANCE": "【结论】\n【主要做法】\n【实施建议】\n【案例参考】\n【来源】",
+        "CASE_QUERY": "【项目/案例】\n【主要做法】\n【实施效果】\n【可借鉴点】\n【来源】",
+        "COMPARISON": "【主要差异】\n【分析】\n【建议】\n【来源】",
+    }.get(intent, "【结论】\n【依据】\n【实施建议】\n【来源】")
+
+
+def generate_answer(
+    question: str,
+    hits: list[SearchHit],
+    client: LLMClient,
+    query_analysis: dict[str, object] | None = None,
+) -> AnswerResult:
     context, records = _context(hits)
     if not context:
         return AnswerResult(
@@ -102,7 +117,9 @@ def generate_answer(question: str, hits: list[SearchHit], client: LLMClient) -> 
             request_id=None,
             elapsed_ms=0,
         )
-    user_prompt = f"问题：{question}\n\n知识库证据：\n{context}\n\n请按以下结构回答：\n【结论】\n【制度/管理依据】\n【实施建议】\n【案例参考】\n【来源】"
+    intent = str((query_analysis or {}).get("intent", "GENERAL_RAG"))
+    sections = _answer_sections(intent)
+    user_prompt = f"问题：{question}\n\n问题类型：{intent}\n\n知识库证据：\n{context}\n\n请按以下结构回答：\n{sections}"
     response = client.complete(SYSTEM_PROMPT, user_prompt)
     valid, used, invalid = validate_citations(response.content, set(records))
     if not valid:

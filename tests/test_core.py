@@ -1,4 +1,4 @@
-from app.answer import _context, validate_citations
+from app.answer import _answer_sections, _context, validate_citations
 from app.chunker import _tail_within_budget, estimate_tokens, split_text
 from app.domain import Chunk, SearchHit
 from app.retriever import reciprocal_rank_fusion
@@ -44,3 +44,9 @@ def test_context_only_accepts_sources_that_were_sent_to_the_model() -> None:
     context, records = _context(hits)
     assert len(context) <= 12_000
     assert len(records) < len(hits)
+
+
+def test_answer_sections_follow_query_intent() -> None:
+    assert "【依据】" in _answer_sections("FACT_LOOKUP")
+    assert "【适用范围】" in _answer_sections("POLICY_QUERY")
+    assert "【可借鉴点】" in _answer_sections("CASE_QUERY")

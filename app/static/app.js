@@ -14,6 +14,15 @@ const candidateView = document.querySelector("#candidate-view");
 const documentsPanel = document.querySelector("#documents-panel");
 const documentsList = document.querySelector("#documents-list");
 const documentQuery = document.querySelector("#document-query");
+const fileMode = window.location.protocol === "file:";
+
+if (fileMode) {
+  statusElement.textContent = "当前以文件直开方式打开，未连接知识库服务";
+  healthDetailsElement.textContent = "请运行“启动知识库.bat”，再访问 http://127.0.0.1:8000；不要直接双击 index.html。";
+  indexDetailsElement.textContent = "文件直开模式不能访问 /api/health、/api/status 等后端接口。";
+  submitElement.disabled = true;
+  document.querySelector("#health").disabled = true;
+}
 
 function escapeHtml(value) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -240,4 +249,4 @@ document.querySelector("#growth-refresh").addEventListener("click", loadGrowth);
 document.querySelector("#documents-nav").addEventListener("click", () => showMode("documents"));
 document.querySelector("#documents-refresh").addEventListener("click", loadDocuments);
 documentQuery.addEventListener("keydown", (event) => { if (event.key === "Enter") loadDocuments(); });
-refreshHealth();
+if (!fileMode) refreshHealth();

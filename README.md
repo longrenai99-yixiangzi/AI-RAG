@@ -85,6 +85,8 @@ Metadata 规则位于 `config/metadata_rules.yaml`，由路径、文件名、标
 
 ## 启动问答页面
 
+Windows 用户优先双击仓库根目录的 `启动知识库.bat`。它会启动 FastAPI，并打开 `http://127.0.0.1:8000/`。不要直接双击 `app/static/index.html`，否则浏览器会使用 `file:///`，无法访问后端 API。
+
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```

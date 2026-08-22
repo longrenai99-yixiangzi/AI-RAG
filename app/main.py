@@ -122,21 +122,34 @@ def create_app() -> FastAPI:
         }
 
     @app.get("/api/health")
-    async def health() -> dict[str, object]:
+    async def health(probe_llm: bool = Query(default=False)) -> dict[str, object]:
         services = _services(app)
-        llm_ok = (
-            await asyncio.to_thread(services.llm.health_check)
-            if services.settings.api_ready
-            else False
-        )
+        llm_probe = "skipped"
+        llm_ok: bool | None = None
+        if not services.settings.api_ready:
+            llm_ok = False
+            llm_probe = "not_configured"
+        elif probe_llm:
+            llm_probe = "completed"
+            try:
+                llm_ok = await asyncio.wait_for(
+                    asyncio.to_thread(services.llm.health_check, 5.0),
+                    timeout=6.0,
+                )
+            except (asyncio.TimeoutError, LLMError):
+                llm_ok = False
+                llm_probe = "timeout_or_failed"
         try:
             vector_ok = services.vector_store.count() >= 0
         except Exception:
             vector_ok = False
         vault_ok = services.settings.vault_root.is_dir()
+        infrastructure_ok = all((services.embedding.ready, vector_ok, vault_ok))
         payload = {
-            "status": "ok" if all((llm_ok, services.embedding.ready, vector_ok, vault_ok)) else "degraded",
+            "status": "ok" if infrastructure_ok and (llm_ok is not False or not probe_llm) else "degraded",
             "llm": llm_ok,
+            "llm_configured": services.settings.api_ready,
+            "llm_probe": llm_probe,
             "embedding": services.embedding.ready,
             "vector_db": vector_ok,
             "vault": vault_ok,

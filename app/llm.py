@@ -25,7 +25,13 @@ class LLMClient:
         self.last_error: str | None = None
 
     def complete(
-        self, system_prompt: str, user_prompt: str, temperature: float = 0.1, max_tokens: int = 2_048
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float = 0.1,
+        max_tokens: int = 2_048,
+        request_timeout: float = 60.0,
+        retries: int = 3,
     ) -> LLMResponse:
         if not self.settings.api_ready:
             raise LLMError("未发现完整的 RAG API 配置。请检查 Windows 用户环境变量。")
@@ -44,9 +50,11 @@ class LLMClient:
         }
         last_error: Exception | None = None
         started = time.perf_counter()
-        for attempt in range(3):
+        for attempt in range(max(1, retries)):
             try:
-                with httpx.Client(timeout=httpx.Timeout(60.0, connect=15.0)) as client:
+                with httpx.Client(
+                    timeout=httpx.Timeout(request_timeout, connect=min(15.0, request_timeout))
+                ) as client:
                     response = client.post(
                         f"{self.settings.api_base_url}/chat/completions",
                         headers=headers,
@@ -75,18 +83,20 @@ class LLMClient:
                 )
             except (httpx.HTTPError, KeyError, TypeError, ValueError, IndexError, AttributeError) as error:
                 last_error = error
-                if attempt < 2:
+                if attempt < max(1, retries) - 1:
                     time.sleep(attempt + 1)
         self.last_error = type(last_error).__name__ if last_error else "UnknownError"
         raise LLMError("生成模型请求失败；请检查内网连接、模型权限和服务状态。") from last_error
 
-    def health_check(self) -> bool:
+    def health_check(self, timeout: float = 5.0) -> bool:
         try:
             response = self.complete(
                 "",
                 "只回复：OK",
                 temperature=0,
                 max_tokens=512,
+                request_timeout=timeout,
+                retries=1,
             )
             return response.content.upper().startswith("OK")
         except LLMError:

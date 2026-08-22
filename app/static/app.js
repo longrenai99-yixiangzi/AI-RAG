@@ -35,6 +35,18 @@ function formatGrowthStatus(status) {
   return ({ OPEN: "待补充", REVIEWING: "审核中", RESOLVED: "已解决", IGNORED: "已忽略" })[status] || status;
 }
 
+async function fetchJson(url, timeoutMs = 7000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+    if (!response.ok) throw new Error(`${url} ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function loadGrowth() {
   try {
     const data = await fetch("/api/growth", { cache: "no-store" }).then((response) => response.json());
@@ -120,22 +132,23 @@ function showMode(mode) {
   if (documents) loadDocuments();
 }
 
-async function refreshHealth() {
+async function refreshHealth(probeLlm = false) {
   statusElement.textContent = "正在检查服务状态…";
-  try {
-    const results = await Promise.all([
-      fetch("/api/health", { cache: "no-store" }).then((response) => {
-        if (!response.ok) throw new Error("health " + response.status);
-        return response.json();
-      }),
-      fetch("/api/status", { cache: "no-store" }).then((response) => {
-        if (!response.ok) throw new Error("status " + response.status);
-        return response.json();
-      }),
-    ]);
-    const health = results[0];
-    const status = results[1];
-    const label = health.status === "ok" ? "服务就绪" : "服务部分不可用";
+  const results = await Promise.allSettled([
+    fetchJson(`/api/health${probeLlm ? "?probe_llm=true" : ""}`, probeLlm ? 8000 : 3000),
+    fetchJson("/api/status", 3000),
+  ]);
+  const healthResult = results[0];
+  const statusResult = results[1];
+  const health = healthResult.status === "fulfilled" ? healthResult.value : null;
+  const status = statusResult.status === "fulfilled" ? statusResult.value : null;
+  if (!health && !status) {
+    statusElement.textContent = "无法连接本地服务。请确认服务已启动。";
+    statusElement.classList.add("error");
+    return;
+  }
+  if (status) {
+    const label = health?.status === "ok" ? "服务就绪" : "服务可用（部分状态待确认）";
     statusElement.textContent =
       label + " · 索引 " + status.index.documents + " 个文件 / " +
       status.index.chunks + " 个切片" +
@@ -143,21 +156,25 @@ async function refreshHealth() {
       " · OCR待处理 " + (status.index.ocr_pending ?? 0) +
       " · 实体 " + (status.index.entities ?? 0) +
       " / 事实 " + (status.index.facts ?? 0);
-    healthDetailsElement.textContent =
-      "LLM: " + (health.llm ? "可用" : "不可用") +
-      " · Embedding: " + (health.embedding ? "已加载" : "未加载") +
-      " · Reranker文件: " + (health.reranker_model_available ? "可用" : "缺失") +
-      " · Reranker运行: " + (health.reranker ? "已加载" : "未加载") +
-      " · Qdrant: " + (health.vector_db ? "可用" : "不可用");
     const types = Object.entries(status.index.file_types || {})
       .map(([type, count]) => type + " " + count)
       .join(" · ");
     indexDetailsElement.textContent = "文件类型: " + (types || "暂无") +
       " · OCR Provider: " + (status.ocr_provider || "disabled");
-    statusElement.classList.toggle("error", health.status !== "ok");
-  } catch {
-    statusElement.textContent = "无法连接本地服务。请确认服务已启动。";
-    statusElement.classList.add("error");
+  }
+  if (health) {
+    const availability = (value) => value === true ? "可用" : value === false ? "不可用" : "未探测";
+    healthDetailsElement.textContent =
+      "LLM: " + availability(health.llm) +
+      " · Embedding: " + availability(health.embedding) +
+      " · Reranker文件: " + (health.reranker_model_available ? "可用" : "缺失") +
+      " · Reranker运行: " + availability(health.reranker) +
+      " · Qdrant: " + availability(health.vector_db) +
+      (health.llm_probe ? " · LLM探测: " + health.llm_probe : "");
+    statusElement.classList.toggle("error", health.status === "degraded" && !status);
+  } else {
+    healthDetailsElement.textContent = "网络状态探测超时，但索引状态仍可用；点击“重新检查”可再次探测。";
+    statusElement.classList.remove("error");
   }
 }
 
@@ -216,7 +233,7 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-document.querySelector("#health").addEventListener("click", refreshHealth);
+document.querySelector("#health").addEventListener("click", () => refreshHealth(true));
 document.querySelector("#qa-nav").addEventListener("click", () => showMode("qa"));
 document.querySelector("#growth-nav").addEventListener("click", () => showMode("growth"));
 document.querySelector("#growth-refresh").addEventListener("click", loadGrowth);

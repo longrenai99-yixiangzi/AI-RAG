@@ -14,6 +14,10 @@ const candidateView = document.querySelector("#candidate-view");
 const documentsPanel = document.querySelector("#documents-panel");
 const documentsList = document.querySelector("#documents-list");
 const documentQuery = document.querySelector("#document-query");
+const filterBoard = document.querySelector("#filter-board");
+const filterKnowledgeType = document.querySelector("#filter-knowledge-type");
+const filterBuildingType = document.querySelector("#filter-building-type");
+const filterProjectStage = document.querySelector("#filter-project-stage");
 const fileMode = window.location.protocol === "file:";
 
 if (fileMode) {
@@ -44,6 +48,11 @@ function formatGrowthStatus(status) {
   return ({ OPEN: "待补充", REVIEWING: "审核中", RESOLVED: "已解决", IGNORED: "已忽略" })[status] || status;
 }
 
+function displayText(value, fallback = "历史记录（原始文本编码损坏）") {
+  const text = String(value ?? "");
+  return /\?{3,}|�{2,}/.test(text) ? fallback : text;
+}
+
 async function fetchJson(url, timeoutMs = 7000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -65,11 +74,11 @@ async function loadGrowth() {
     growthList.innerHTML = (data.gaps || []).map((gap) => {
       const candidate = gap.candidate_id
         ? `<button class="candidate-button secondary" data-candidate="${escapeHtml(gap.candidate_id)}">查看候选</button>
-           <button class="draft-button secondary" data-candidate="${escapeHtml(gap.candidate_id)}">生成正式草稿</button>`
+           <button class="draft-button secondary" title="只生成待审批草稿，不写回正式知识" data-candidate="${escapeHtml(gap.candidate_id)}">生成待审批草稿</button>`
         : "";
       return `<article class="growth-item">
-        <div><strong>${escapeHtml(gap.latest_query || "未命名问题")}</strong>
-        <p>${escapeHtml(gap.reason || "证据不足")} · 频次 ${escapeHtml(String(gap.frequency || 1))}</p>
+        <div><strong>${escapeHtml(displayText(gap.latest_query, "历史问题（原始文本编码损坏，请重新提问）"))}</strong>
+        <p>${escapeHtml(displayText(gap.reason || "证据不足"))} · 频次 ${escapeHtml(String(gap.frequency || 1))}</p>
         <small>${escapeHtml(formatGrowthStatus(gap.status))}</small></div>
         <div class="growth-actions">${candidate}
         <button class="status-button" data-gap="${escapeHtml(gap.gap_id)}" data-status="REVIEWING">审核中</button>
@@ -110,9 +119,22 @@ async function loadGrowth() {
 
 async function loadDocuments() {
   try {
-    const query = encodeURIComponent(documentQuery.value.trim());
-    const data = await fetch(`/api/documents?query=${query}`, { cache: "no-store" }).then((response) => response.json());
-    documentsList.innerHTML = (data.items || []).map((item) => {
+    const params = new URLSearchParams({
+      query: documentQuery.value.trim(),
+      board: filterBoard.value,
+      knowledge_type: filterKnowledgeType.value,
+      building_type: filterBuildingType.value,
+      project_stage: filterProjectStage.value,
+    });
+    const data = await fetch(`/api/documents?${params.toString()}`, { cache: "no-store" }).then((response) => response.json());
+    const groups = new Map();
+    for (const item of data.items || []) {
+      const metadata = item.metadata || {};
+      const group = `${metadata.board || "待核实板块"} / ${metadata.knowledge_type || "待核实类型"}`;
+      if (!groups.has(group)) groups.set(group, []);
+      groups.get(group).push(item);
+    }
+    documentsList.innerHTML = [...groups.entries()].map(([group, items]) => `<section class="document-group"><h3>${escapeHtml(group)} <small>(${items.length})</small></h3>${items.map((item) => {
       const metadata = item.metadata || {};
       const tags = [metadata.board, metadata.knowledge_type, metadata.building_type, metadata.project_stage]
         .filter(Boolean).map((value) => `<span>${escapeHtml(String(value))}</span>`).join("");
@@ -121,7 +143,7 @@ async function loadDocuments() {
         <div class="document-meta"><span>${escapeHtml(item.file_type)}</span><span>解析: ${escapeHtml(item.parse_status)}</span>
         <span>索引: ${escapeHtml(item.index_status)}</span><span>OCR: ${item.needs_ocr ? "待处理" : "否"}</span><div>${tags}</div></div>
       </article>`;
-    }).join("") || '<p class="status">当前没有已发布索引文件。</p>';
+    }).join("")}</section>`).join("") || '<p class="status">当前没有符合筛选条件的索引文件。</p>';
   } catch (error) {
     documentsList.innerHTML = `<p class="error">知识管理读取失败：${escapeHtml(error.message)}</p>`;
   }
@@ -249,4 +271,7 @@ document.querySelector("#growth-refresh").addEventListener("click", loadGrowth);
 document.querySelector("#documents-nav").addEventListener("click", () => showMode("documents"));
 document.querySelector("#documents-refresh").addEventListener("click", loadDocuments);
 documentQuery.addEventListener("keydown", (event) => { if (event.key === "Enter") loadDocuments(); });
+[filterBoard, filterKnowledgeType, filterBuildingType, filterProjectStage].forEach((select) => {
+  select.addEventListener("change", loadDocuments);
+});
 if (!fileMode) refreshHealth();

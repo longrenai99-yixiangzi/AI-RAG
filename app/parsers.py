@@ -25,6 +25,14 @@ EXCLUDED_XLSX_SHEETS = {
     "WpsReserved_CellImgList",
 }
 DEFAULT_EXCLUDED_DIRECTORIES = {
+    "00_ai系统",
+    "00_inbox",
+    "06_索引",
+    "07_ai候选知识",
+    "08_ai日报",
+    "90_系统数据",
+    "99_archive",
+    "知识库",
     ".agents",
     ".ai-growth",
     ".claude",

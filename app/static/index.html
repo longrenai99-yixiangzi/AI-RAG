@@ -37,6 +37,7 @@
           <div>
             <h2>知识生长</h2>
             <p class="status">系统只生成待审核候选，不自动写入正式知识。</p>
+            <p class="growth-help">查看候选：查看问题和证据；生成待审批草稿：生成可编辑草稿但不发布；审核中：标记正在核对；解决：确认该缺口已处理。</p>
           </div>
           <button id="growth-refresh" type="button">刷新</button>
         </div>
@@ -55,6 +56,12 @@
         </div>
         <div class="form-row document-search">
           <input id="document-query" type="search" placeholder="按文件名或路径搜索" />
+        </div>
+        <div class="document-filters">
+          <label>板块<select id="filter-board"><option value="">全部</option><option>设计管理</option><option>技术管理</option><option>科技管理</option></select></label>
+          <label>知识类型<select id="filter-knowledge-type"><option value="">全部</option><option>制度</option><option>标准</option><option>指南</option><option>手册</option><option>模板</option><option>项目案例</option><option>经验总结</option><option>会议纪要</option><option>培训资料</option><option>其他</option></select></label>
+          <label>业态<select id="filter-building-type"><option value="">全部</option><option>住宅</option><option>公建</option><option>医院</option><option>学校</option><option>厂房</option><option>数据中心</option><option>商业</option><option>办公</option><option>城市更新</option></select></label>
+          <label>阶段<select id="filter-project-stage"><option value="">全部</option><option>投标</option><option>设计策划</option><option>方案设计</option><option>初步设计</option><option>施工图设计</option><option>深化设计</option><option>施工实施</option><option>竣工总结</option></select></label>
         </div>
         <div id="documents-list" class="documents-list"></div>
       </section>

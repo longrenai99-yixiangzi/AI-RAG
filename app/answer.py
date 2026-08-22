@@ -170,14 +170,16 @@ def generate_answer(
 
 def evidence_only_answer(hits: list[SearchHit], warning: str) -> AnswerResult:
     context, records = _context(hits)
-    evidence = "\n".join(
-        f"[{source_id}] {record['file_name']} / {record['heading_path']} / {record['location']}"
+    evidence = "\n\n".join(
+        f"[{source_id}] {record['file_name']} / {record['heading_path']} / {record['location']}\n"
+        f"摘要：{record['excerpt'][:360]}"
         for source_id, record in records.items()
     )
     return AnswerResult(
         answer=(
             "当前未配置生成模型或生成服务暂时不可用，以下仅返回可核查证据，"
             "不能视为自动生成的确定性结论。\n\n"
+            "【最相关依据】\n"
             f"{evidence or context}\n\n模型提示：{warning}"
         ),
         citations=list(records.values()),

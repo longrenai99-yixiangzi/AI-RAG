@@ -613,7 +613,17 @@ class IndexDatabase:
                         row[key.removesuffix("_json")] = {}
         return {"stats": counts, "gaps": gaps, "query_logs": logs}
 
-    def list_documents(self, query: str = "", limit: int = 200) -> list[dict[str, Any]]:
+    def list_documents(
+        self,
+        query: str = "",
+        limit: int = 200,
+        *,
+        board: str | None = None,
+        knowledge_type: str | None = None,
+        building_type: str | None = None,
+        project_stage: str | None = None,
+        document_level: str | None = None,
+    ) -> list[dict[str, Any]]:
         pattern = f"%{query.strip()}%"
         with self._open() as connection:
             rows = connection.execute(
@@ -623,9 +633,22 @@ class IndexDatabase:
                        metadata_json, indexed_at
                 FROM documents
                 WHERE (? = '' OR file_name LIKE ? OR source_path LIKE ?)
+                  AND (? IS NULL OR board = ?)
+                  AND (? IS NULL OR knowledge_type = ?)
+                  AND (? IS NULL OR building_type = ?)
+                  AND (? IS NULL OR project_stage = ?)
+                  AND (? IS NULL OR document_level = ?)
                 ORDER BY mtime_ns DESC LIMIT ?
                 """,
-                (query.strip(), pattern, pattern, limit),
+                (
+                    query.strip(), pattern, pattern,
+                    board, board,
+                    knowledge_type, knowledge_type,
+                    building_type, building_type,
+                    project_stage, project_stage,
+                    document_level, document_level,
+                    limit,
+                ),
             ).fetchall()
         result: list[dict[str, Any]] = []
         for row in rows:

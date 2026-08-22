@@ -173,8 +173,23 @@ def create_app() -> FastAPI:
     async def documents(
         query: str = Query(default="", max_length=200),
         limit: int = Query(default=200, ge=1, le=500),
+        board: str | None = Query(default=None, max_length=40),
+        knowledge_type: str | None = Query(default=None, max_length=40),
+        building_type: str | None = Query(default=None, max_length=40),
+        project_stage: str | None = Query(default=None, max_length=40),
+        document_level: str | None = Query(default=None, max_length=40),
     ) -> dict[str, object]:
-        return {"items": _services(app).database.list_documents(query, limit)}
+        return {
+            "items": _services(app).database.list_documents(
+                query,
+                limit,
+                board=board,
+                knowledge_type=knowledge_type,
+                building_type=building_type,
+                project_stage=project_stage,
+                document_level=document_level,
+            )
+        }
 
     @app.get("/api/facts/conflicts")
     async def fact_conflicts() -> dict[str, object]:

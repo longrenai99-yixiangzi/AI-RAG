@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>AI设计管理知识库</title>
-    <link rel="stylesheet" href="./style.css?v=20260821-3" />
+    <link id="app-style" rel="stylesheet" />
   </head>
   <body>
     <main class="shell">
@@ -94,6 +94,14 @@
         </details>
       </article>
     </template>
-    <script src="./app.js?v=20260821-3"></script>
+    <script>
+      (() => {
+        const base = window.location.protocol === "file:" ? "./" : "/static/";
+        document.querySelector("#app-style").href = `${base}style.css?v=20260821-4`;
+        const script = document.createElement("script");
+        script.src = `${base}app.js?v=20260821-4`;
+        document.body.appendChild(script);
+      })();
+    </script>
   </body>
 </html>

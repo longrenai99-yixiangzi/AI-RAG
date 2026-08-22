@@ -1,0 +1,191 @@
+:root {
+  color-scheme: light;
+  font-family: "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  color: #17253a;
+  background: #eef3f6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+.shell {
+  width: min(960px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 48px 0 64px;
+}
+
+header,
+.welcome,
+.answer-card,
+form {
+  background: #fff;
+  border: 1px solid #d8e2e8;
+  border-radius: 14px;
+  box-shadow: 0 6px 20px rgb(15 40 62 / 7%);
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: start;
+  padding: 26px 30px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 8px;
+  font-size: 28px;
+}
+
+h2 {
+  font-size: 19px;
+}
+
+h3 {
+  margin-bottom: 10px;
+  font-size: 15px;
+}
+
+.eyebrow {
+  margin-bottom: 5px;
+  color: #17716c;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.status,
+.meta,
+#hint {
+  color: #5c6d78;
+  font-size: 13px;
+}
+
+#conversation {
+  display: grid;
+  gap: 16px;
+  margin: 22px 0;
+}
+
+.welcome,
+.answer-card {
+  padding: 24px 28px;
+}
+
+form {
+  padding: 24px 28px;
+}
+
+label {
+  display: block;
+  margin-bottom: 9px;
+  font-weight: 700;
+}
+
+textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid #b9c9d3;
+  border-radius: 9px;
+  font: inherit;
+  line-height: 1.55;
+}
+
+.form-row,
+.answer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+button {
+  cursor: pointer;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 17px;
+  background: #126f69;
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+}
+
+button:hover {
+  background: #0c5753;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+button.secondary {
+  background: #edf3f6;
+  color: #1b3f54;
+}
+
+.answer-body {
+  line-height: 1.75;
+  white-space: normal;
+}
+
+.citations {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #dbe4e9;
+}
+
+.citation-list {
+  display: grid;
+  gap: 10px;
+}
+
+.citation {
+  padding: 13px;
+  border-left: 4px solid #42a49b;
+  background: #f5faf9;
+  border-radius: 5px;
+}
+
+.citation strong,
+.citation span {
+  display: block;
+}
+
+.citation span {
+  margin-top: 3px;
+  color: #4d606b;
+  font-size: 13px;
+}
+
+.error {
+  color: #a93226;
+}
+
+@media (max-width: 620px) {
+  .shell {
+    width: min(100% - 20px, 960px);
+    padding-top: 18px;
+  }
+
+  header,
+  .form-row,
+  .answer-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

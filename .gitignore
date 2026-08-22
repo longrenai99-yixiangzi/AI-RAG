@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/qdrant/
+data/indexes/
+data/reports/
+data/*.sqlite3
+*.log
+.env
+.env.local

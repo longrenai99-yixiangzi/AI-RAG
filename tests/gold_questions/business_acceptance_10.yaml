@@ -1,0 +1,102 @@
+version: 1
+status: business_acceptance_questions
+description: ??????????????? Shadow Answer Engine ??????????
+questions:
+- id: BA-001
+  topic: business_acceptance
+  question: 设计任务书需要包含哪些内容？
+  expected_files: []
+  expected_topics:
+  - ?????
+  - ????
+  - ????
+  difficulty: business_review
+- id: BA-002
+  topic: business_acceptance
+  question: 设计效益增量的计算方式？
+  expected_files: []
+  expected_topics:
+  - ????
+  - ????
+  - ??
+  difficulty: business_review
+- id: BA-003
+  topic: business_acceptance
+  question: 厂房产品线的方案比选案例包含哪些专业？
+  expected_files: []
+  expected_topics:
+  - ??
+  - ???
+  - ????
+  - ??
+  difficulty: business_review
+- id: BA-004
+  topic: business_acceptance
+  question: 自动喷淋系统管材方案比选可采用哪几种方案进行比选？
+  expected_files: []
+  expected_topics:
+  - ????
+  - ??
+  - ????
+  difficulty: business_review
+- id: BA-005
+  topic: business_acceptance
+  question: 特殊环境条件下集电线路电气设计的图审要点有哪些？
+  expected_files: []
+  expected_topics:
+  - ????
+  - ????
+  - ????
+  - ??
+  difficulty: business_review
+- id: BA-006
+  topic: business_acceptance
+  question: 2026年局设计与技术系统的责任状要求DOP平台电子图形文件数据中心上传数量是多少？
+  expected_files: []
+  expected_topics:
+  - '2026'
+  - ???
+  - DOP
+  - ??????
+  - ????
+  difficulty: business_review
+- id: BA-007
+  topic: business_acceptance
+  question: 2026年设计示范项目的打造要求是什么？
+  expected_files: []
+  expected_topics:
+  - '2026'
+  - ??????
+  - ????
+  difficulty: business_review
+- id: BA-008
+  topic: business_acceptance
+  question: 2025年公司设计创效金额是多少元？
+  expected_files: []
+  expected_topics:
+  - '2025'
+  - ????
+  - ??
+  difficulty: business_review
+- id: BA-009
+  topic: business_acceptance
+  question: 2026年4月EPC项目双周推进会上，给土木公司的督办是什么？
+  expected_files: []
+  expected_topics:
+  - 2026?4?
+  - EPC
+  - ?????
+  - ????
+  - ??
+  difficulty: business_review
+- id: BA-010
+  topic: business_acceptance
+  question: 星谷科创中心项目，设计策划中的设计价值创造清单，包含了哪几个专业，每个专业分别有多少条，增加效益的有多少条？
+  expected_files: []
+  expected_topics:
+  - ??????
+  - ????
+  - ????????
+  - ??
+  - ??
+  difficulty: business_review

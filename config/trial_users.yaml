@@ -1,0 +1,10 @@
+users:
+  - user_id: reviewer-001
+    display_name: '业务负责人 1'
+    role: BUSINESS_REVIEWER
+  - user_id: reviewer-002
+    display_name: '业务负责人 2'
+    role: BUSINESS_REVIEWER
+  - user_id: reviewer-003
+    display_name: '业务负责人 3'
+    role: BUSINESS_REVIEWER

@@ -1,0 +1,30 @@
+trial_mode: true
+read_only: true
+formal_cutover: false
+host: '127.0.0.1'
+port: 8010
+root001_enabled: true
+root001_path: 'D:\设计管理'
+root002_mode: 'frozen_shadow_pending_approval'
+root002_governance: 'PENDING_APPROVAL'
+root003_enabled: false
+auto_root_discovery: false
+auto_ocr: false
+knowledge_writeback: false
+provider_claim_answer_enabled: false
+deterministic_answer_enabled: true
+safe_refusal_enabled: true
+V2_VERIFIED_RAG_ENABLED: true
+v2_verified_rag_8010_only: true
+audit_logging_enabled: true
+formal_port: 8000
+formal_qdrant_path: 'data/qdrant'
+formal_sqlite_path: 'data/index.sqlite3'
+shadow_index_path: 'data/shadow/full_corpus_qdrant'
+atomic_evidence_path: 'data/shadow/atomic_evidence/records.jsonl'
+trial_feedback_path: 'data/trial_feedback'
+trial_audit_path: 'logs/trial/trial_audit.jsonl'
+trial_pid_path: 'logs/trial/trial_service.pid'
+approved_shadow_sources:
+  - path: 'D:\工作\二公司技术部\2025\设计知识库\设计风险清单\二公司\能源环保\2.高频设计风险清单编制模板(能源环保）.docx'
+    approval_status: 'USER_APPROVED_SHADOW_READ'

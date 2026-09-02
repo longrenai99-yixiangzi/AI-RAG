@@ -1,0 +1,352 @@
+version: 1
+description: "AI设计管理知识库 V1 Retriever 基准问题集；expected_files 需后续人工核验补充。"
+questions:
+  - id: GQ-001
+    category: POLICY_QUERY
+    question: "设计管理制度中，项目启动阶段如何开展设计策划并形成任务书？"
+    expected_keywords: [设计管理, 设计策划, 任务书, 项目启动]
+    expected_metadata: {board: 设计管理, knowledge_type: 制度}
+    expected_files: []
+
+  - id: GQ-002
+    category: POLICY_QUERY
+    question: "设计变更和设计评审制度应如何形成闭环管理？"
+    expected_keywords: [设计变更, 设计评审, 闭环, 制度]
+    expected_metadata: {board: 设计管理, knowledge_type: 制度}
+    expected_files: []
+
+  - id: GQ-003
+    category: POLICY_QUERY
+    question: "EPC项目设计管理制度对设计接口、评审和交付有哪些要求？"
+    expected_keywords: [EPC, 设计接口, 评审, 交付]
+    expected_metadata: {board: 设计管理, discipline: EPC}
+    expected_files: []
+
+  - id: GQ-004
+    category: CASE_QUERY
+    question: "从医院项目经验总结中，可以提炼出哪些设计管理问题和改进经验？"
+    expected_keywords: [医院, 项目经验, 设计管理, 改进]
+    expected_metadata: {board: 设计管理, knowledge_type: 案例}
+    expected_files: []
+
+  - id: GQ-005
+    category: CASE_QUERY
+    question: "方案比选案例通常如何组织多方案评价，并形成最终决策依据？"
+    expected_keywords: [方案比选, 多方案, 评价, 决策依据]
+    expected_metadata: {board: 设计管理, knowledge_type: 案例}
+    expected_files: []
+
+  - id: GQ-006
+    category: METHOD_QUERY
+    question: "施工图设计任务书应如何编制，至少需要明确哪些内容？"
+    expected_keywords: [施工图, 设计任务书, 编制, 内容]
+    expected_metadata: {board: 设计管理, knowledge_type: 方法}
+    expected_files: []
+
+  - id: GQ-007
+    category: METHOD_QUERY
+    question: "EPC项目设计策划如何按阶段拆解关键动作和交付成果？"
+    expected_keywords: [EPC, 设计策划, 阶段, 交付成果]
+    expected_metadata: {board: 设计管理, knowledge_type: 方法, discipline: EPC}
+    expected_files: []
+
+  - id: GQ-008
+    category: TEMPLATE_QUERY
+    question: "设计管理任务书或管理模板应包含哪些栏目，如何保证后续可检查？"
+    expected_keywords: [设计管理, 任务书, 模板, 栏目, 检查]
+    expected_metadata: {board: 设计管理, knowledge_type: 模板}
+    expected_files: []
+
+  - id: GQ-009
+    category: DISCIPLINE_QUERY
+    question: "建筑专业从方案设计到施工图设计阶段，重点设计管理接口有哪些？"
+    expected_keywords: [建筑, 方案设计, 施工图设计, 接口]
+    expected_metadata: {board: 设计管理, discipline: 建筑}
+    expected_files: []
+
+  - id: GQ-010
+    category: DISCIPLINE_QUERY
+    question: "机电和结构专业在EPC项目中如何开展协同、审查和问题闭环？"
+    expected_keywords: [机电, 结构, EPC, 协同, 审查, 闭环]
+    expected_metadata: {board: 设计管理, discipline: 机电}
+    expected_files: []
+
+  - id: GQ-011
+    category: POLICY_QUERY
+    question: "设计目标和产品定位评审制度应关注哪些关键内容？"
+    expected_keywords: [设计目标, 产品定位, 评审, 制度]
+    expected_metadata: {board: 设计管理, knowledge_type: 制度}
+    expected_files: []
+
+  - id: GQ-012
+    category: POLICY_QUERY
+    question: "设计成果审查制度如何规定成果提交、审查和反馈？"
+    expected_keywords: [设计成果, 审查, 提交, 反馈, 制度]
+    expected_metadata: {board: 设计管理, knowledge_type: 制度}
+    expected_files: []
+
+  - id: GQ-013
+    category: POLICY_QUERY
+    question: "设计质量责任和问题闭环制度有哪些要求？"
+    expected_keywords: [设计质量, 责任, 问题闭环, 制度]
+    expected_metadata: {board: 设计管理, knowledge_type: 制度}
+    expected_files: []
+
+  - id: GQ-014
+    category: POLICY_QUERY
+    question: "设计进度计划管理制度如何控制关键节点和交付成果？"
+    expected_keywords: [设计进度, 计划, 关键节点, 交付成果]
+    expected_metadata: {board: 设计管理, knowledge_type: 制度}
+    expected_files: []
+
+  - id: GQ-015
+    category: POLICY_QUERY
+    question: "设计接口管理制度如何明确专业协同和责任边界？"
+    expected_keywords: [设计接口, 专业协同, 责任边界, 制度]
+    expected_metadata: {board: 设计管理, knowledge_type: 制度}
+    expected_files: []
+
+  - id: GQ-016
+    category: POLICY_QUERY
+    question: "外部资料接入设计管理体系时需要遵守哪些制度要求？"
+    expected_keywords: [外部资料, 接入, 设计管理, 管理要求]
+    expected_metadata: {board: 设计管理, knowledge_type: 制度}
+    expected_files: []
+
+  - id: GQ-017
+    category: POLICY_QUERY
+    question: "设计管理制度如何规定设计文件归档和版本控制？"
+    expected_keywords: [设计文件, 归档, 版本控制, 制度]
+    expected_metadata: {board: 设计管理, knowledge_type: 制度}
+    expected_files: []
+
+  - id: GQ-018
+    category: CASE_QUERY
+    question: "住宅项目设计管理经验中，常见的协同问题和改进措施有哪些？"
+    expected_keywords: [住宅项目, 设计管理经验, 协同问题, 改进措施]
+    expected_metadata: {board: 设计管理, knowledge_type: 案例}
+    expected_files: []
+
+  - id: GQ-019
+    category: CASE_QUERY
+    question: "学校项目案例中，设计策划和专业协调有哪些经验？"
+    expected_keywords: [学校项目, 案例, 设计策划, 专业协调]
+    expected_metadata: {board: 设计管理, knowledge_type: 案例}
+    expected_files: []
+
+  - id: GQ-020
+    category: CASE_QUERY
+    question: "医院项目设计复盘中，哪些问题对后续项目最有参考价值？"
+    expected_keywords: [医院项目, 设计复盘, 问题, 参考价值]
+    expected_metadata: {board: 设计管理, knowledge_type: 案例}
+    expected_files: []
+
+  - id: GQ-021
+    category: CASE_QUERY
+    question: "厂房项目设计管理案例中，设计接口和施工配合有哪些教训？"
+    expected_keywords: [厂房项目, 设计管理案例, 设计接口, 施工配合]
+    expected_metadata: {board: 设计管理, knowledge_type: 案例}
+    expected_files: []
+
+  - id: GQ-022
+    category: CASE_QUERY
+    question: "物流园项目经验总结中，设计变更主要由哪些原因引起？"
+    expected_keywords: [物流园项目, 经验总结, 设计变更, 原因]
+    expected_metadata: {board: 设计管理, knowledge_type: 案例}
+    expected_files: []
+
+  - id: GQ-023
+    category: CASE_QUERY
+    question: "综合体项目案例中，方案阶段如何平衡功能、成本和进度？"
+    expected_keywords: [综合体项目, 案例, 方案阶段, 成本, 进度]
+    expected_metadata: {board: 设计管理, knowledge_type: 案例}
+    expected_files: []
+
+  - id: GQ-024
+    category: CASE_QUERY
+    question: "设计价值创造案例中，如何识别可以优化的设计机会？"
+    expected_keywords: [设计价值创造, 案例, 设计优化, 机会]
+    expected_metadata: {board: 设计管理, knowledge_type: 案例}
+    expected_files: []
+
+  - id: GQ-025
+    category: CASE_QUERY
+    question: "年度设计管理总结中，通常应复盘哪些管理指标和问题？"
+    expected_keywords: [年度总结, 设计管理, 复盘, 指标, 问题]
+    expected_metadata: {board: 设计管理, knowledge_type: 案例}
+    expected_files: []
+
+  - id: GQ-026
+    category: METHOD_QUERY
+    question: "设计策划的编制方法是什么，如何形成可执行的成果清单？"
+    expected_keywords: [设计策划, 编制方法, 可执行, 成果清单]
+    expected_metadata: {board: 设计管理, knowledge_type: 方法}
+    expected_files: []
+
+  - id: GQ-027
+    category: METHOD_QUERY
+    question: "方案设计阶段如何组织设计输入、评审和优化？"
+    expected_keywords: [方案设计, 设计输入, 评审, 优化]
+    expected_metadata: {board: 设计管理, knowledge_type: 方法}
+    expected_files: []
+
+  - id: GQ-028
+    category: METHOD_QUERY
+    question: "初步设计阶段如何开展专业协调和成果审查？"
+    expected_keywords: [初步设计, 专业协调, 成果审查]
+    expected_metadata: {board: 设计管理, knowledge_type: 方法}
+    expected_files: []
+
+  - id: GQ-029
+    category: METHOD_QUERY
+    question: "施工图设计阶段如何组织校审、会签和问题闭环？"
+    expected_keywords: [施工图设计, 校审, 会签, 问题闭环]
+    expected_metadata: {board: 设计管理, knowledge_type: 方法}
+    expected_files: []
+
+  - id: GQ-030
+    category: METHOD_QUERY
+    question: "深化设计阶段如何管理设计输入和专业接口？"
+    expected_keywords: [深化设计, 设计输入, 专业接口, 管理]
+    expected_metadata: {board: 设计管理, knowledge_type: 方法}
+    expected_files: []
+
+  - id: GQ-031
+    category: METHOD_QUERY
+    question: "设计评审会议如何准备议题、证据和跟踪事项？"
+    expected_keywords: [设计评审会议, 议题, 证据, 跟踪事项]
+    expected_metadata: {board: 设计管理, knowledge_type: 方法}
+    expected_files: []
+
+  - id: GQ-032
+    category: METHOD_QUERY
+    question: "设计风险识别和风险清单应如何建立与更新？"
+    expected_keywords: [设计风险, 风险识别, 风险清单, 更新]
+    expected_metadata: {board: 设计管理, knowledge_type: 方法}
+    expected_files: []
+
+  - id: GQ-033
+    category: METHOD_QUERY
+    question: "设计变更管理的申请、评估、审批和关闭步骤是什么？"
+    expected_keywords: [设计变更, 申请, 评估, 审批, 关闭]
+    expected_metadata: {board: 设计管理, knowledge_type: 方法}
+    expected_files: []
+
+  - id: GQ-034
+    category: TEMPLATE_QUERY
+    question: "设计策划模板应包含哪些基础信息和交付节点？"
+    expected_keywords: [设计策划, 模板, 基础信息, 交付节点]
+    expected_metadata: {board: 设计管理, knowledge_type: 模板}
+    expected_files: []
+
+  - id: GQ-035
+    category: TEMPLATE_QUERY
+    question: "设计评审记录模板需要保留哪些问题、责任人和关闭信息？"
+    expected_keywords: [设计评审, 记录模板, 问题, 责任人, 关闭]
+    expected_metadata: {board: 设计管理, knowledge_type: 模板}
+    expected_files: []
+
+  - id: GQ-036
+    category: TEMPLATE_QUERY
+    question: "设计变更单模板应设置哪些字段以便追溯？"
+    expected_keywords: [设计变更单, 模板, 字段, 追溯]
+    expected_metadata: {board: 设计管理, knowledge_type: 模板}
+    expected_files: []
+
+  - id: GQ-037
+    category: TEMPLATE_QUERY
+    question: "设计接口清单模板应如何记录专业、输入和输出责任？"
+    expected_keywords: [设计接口清单, 模板, 专业, 输入, 输出, 责任]
+    expected_metadata: {board: 设计管理, knowledge_type: 模板}
+    expected_files: []
+
+  - id: GQ-038
+    category: TEMPLATE_QUERY
+    question: "设计任务书模板应包含哪些范围、深度和成果要求？"
+    expected_keywords: [设计任务书, 模板, 范围, 深度, 成果要求]
+    expected_metadata: {board: 设计管理, knowledge_type: 模板}
+    expected_files: []
+
+  - id: GQ-039
+    category: TEMPLATE_QUERY
+    question: "设计质量检查表模板如何覆盖各阶段检查点？"
+    expected_keywords: [设计质量, 检查表, 模板, 阶段, 检查点]
+    expected_metadata: {board: 设计管理, knowledge_type: 模板}
+    expected_files: []
+
+  - id: GQ-040
+    category: TEMPLATE_QUERY
+    question: "设计交付清单模板应如何记录文件、版本和接收确认？"
+    expected_keywords: [设计交付, 清单, 模板, 文件, 版本, 接收确认]
+    expected_metadata: {board: 设计管理, knowledge_type: 模板}
+    expected_files: []
+
+  - id: GQ-041
+    category: TEMPLATE_QUERY
+    question: "设计进度计划模板应如何设置节点、责任人和完成状态？"
+    expected_keywords: [设计进度, 计划模板, 节点, 责任人, 完成状态]
+    expected_metadata: {board: 设计管理, knowledge_type: 模板}
+    expected_files: []
+
+  - id: GQ-042
+    category: TEMPLATE_QUERY
+    question: "设计管理会议纪要模板应包含哪些决策和待办字段？"
+    expected_keywords: [设计管理, 会议纪要, 模板, 决策, 待办]
+    expected_metadata: {board: 设计管理, knowledge_type: 模板}
+    expected_files: []
+
+  - id: GQ-043
+    category: DISCIPLINE_QUERY
+    question: "结构专业在方案和施工图阶段应重点关注哪些设计接口？"
+    expected_keywords: [结构专业, 方案, 施工图, 设计接口]
+    expected_metadata: {board: 设计管理, discipline: 结构}
+    expected_files: []
+
+  - id: GQ-044
+    category: DISCIPLINE_QUERY
+    question: "机电专业在EPC设计管理中如何进行综合协调？"
+    expected_keywords: [机电专业, EPC, 设计管理, 综合协调]
+    expected_metadata: {board: 设计管理, discipline: 机电}
+    expected_files: []
+
+  - id: GQ-045
+    category: DISCIPLINE_QUERY
+    question: "BIM专业如何支持设计协同、碰撞检查和成果交付？"
+    expected_keywords: [BIM, 设计协同, 碰撞检查, 成果交付]
+    expected_metadata: {board: 设计管理, discipline: BIM}
+    expected_files: []
+
+  - id: GQ-046
+    category: DISCIPLINE_QUERY
+    question: "EPC项目中总承包设计管理的专业接口有哪些？"
+    expected_keywords: [EPC, 总承包, 设计管理, 专业接口]
+    expected_metadata: {board: 设计管理, discipline: EPC}
+    expected_files: []
+
+  - id: GQ-047
+    category: DISCIPLINE_QUERY
+    question: "建筑专业如何配合结构和机电完成方案深化？"
+    expected_keywords: [建筑专业, 结构, 机电, 方案深化]
+    expected_metadata: {board: 设计管理, discipline: 建筑}
+    expected_files: []
+
+  - id: GQ-048
+    category: DISCIPLINE_QUERY
+    question: "建筑设计成果审查应重点关注哪些专业协同问题？"
+    expected_keywords: [建筑设计, 成果审查, 专业协同]
+    expected_metadata: {board: 设计管理, discipline: 建筑}
+    expected_files: []
+
+  - id: GQ-049
+    category: DISCIPLINE_QUERY
+    question: "暖通专业设计评审和施工图校审应关注哪些内容？"
+    expected_keywords: [暖通专业, 设计评审, 施工图, 校审]
+    expected_metadata: {board: 设计管理, discipline: 机电}
+    expected_files: []
+
+  - id: GQ-050
+    category: DISCIPLINE_QUERY
+    question: "给排水专业在项目设计交付阶段如何完成接口确认？"
+    expected_keywords: [给排水专业, 设计交付, 接口确认]
+    expected_metadata: {board: 设计管理, discipline: 机电}
+    expected_files: []

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>总体施组｜独立审查稿</title>
+  <style>
+    :root{font-family:"Microsoft YaHei",system-ui,sans-serif;color:#17304a;background:#f4f7f8}*{box-sizing:border-box}body{margin:0;min-width:980px}.head{padding:28px 48px;background:#fff;border-bottom:1px solid #dbe5ea}.eyebrow{color:#17836f;font-size:12px;font-weight:800;letter-spacing:.12em}.head h1{margin:7px 0;font-size:28px}.head p,.intro{margin:0;color:#688194;font-size:13px;line-height:1.7}.wrap{max-width:1180px;margin:auto;padding:30px}.path{margin-bottom:18px;padding:13px 16px;border:1px solid #b9dfd5;border-radius:10px;color:#176b5b;background:#ecf9f5;font-size:13px;font-weight:700}.hero,.section{margin-bottom:17px;padding:22px;border:1px solid #dbe5ea;border-radius:13px;background:#fff;box-shadow:0 7px 20px #17304a08}.hero h2,.section h2{margin:7px 0 12px}.stats{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}.stats span{padding:7px 9px;border-radius:6px;color:#176b5b;background:#e4f4ef;font-size:12px;font-weight:700}.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}.card{padding:16px;border:1px solid #dbe5ea;border-radius:10px;background:#fbfcfd}.kind{color:#168572;font-size:11px;font-weight:800}.card h3,.source h3{margin:7px 0;font-size:15px}.card p,.card li,.source p{color:#627d90;font-size:12px;line-height:1.7}.card ul{margin:9px 0;padding-left:18px}.card small{color:#899aa6;font-size:11px}.source{display:flex;justify-content:space-between;gap:20px;padding:13px 0;border-bottom:1px solid #e7eef1}.source:last-child{border:0}.source p{margin:0}.source>small{min-width:120px;color:#8397a5;font-size:11px;text-align:right}.note{padding:13px 16px;border-left:4px solid #d19731;border-radius:7px;color:#75613e;background:#fff7e8;font-size:12px;line-height:1.7}.footer{padding:4px 0 20px;color:#8194a1;text-align:center;font-size:11px}
+  </style>
+</head>
+<body>
+  <header class="head"><span class="eyebrow">KNOWLEDGE OS · STANDALONE REVIEW SNAPSHOT</span><h1>技术管理｜总体施组完整样板</h1><p>用于内容验收的只读快照。数据源为主系统样板对象；本文件不接入服务端、不参与知识库运行。</p></header>
+  <main class="wrap">
+    <div class="path">Domain：技术管理　→　Category：施工组织设计　→　KnowledgeNode：总体施组</div>
+    <section class="hero"><span class="eyebrow">KNOWLEDGE SPACE</span><h2>总体施组</h2><p class="intro">总体施组是项目级施工组织基线，用于把工期、资源、场地与风险控制要求组织成可执行方案。</p><div class="stats"><span id="card-count"></span><span id="source-count"></span><span id="case-count"></span></div></section>
+    <section class="section"><h2>概览</h2><p class="intro">本样板保留 KnowledgeCard、Source 和 Case 的引用关系；后续接入正式数据时，应替换主系统数据对象后再重新导出审查稿。</p></section>
+    <section class="section"><h2>核心知识</h2><div class="grid" id="cards"></div></section>
+    <section class="section"><h2>管理要点</h2><ol id="points"></ol></section>
+    <section class="section"><h2>模板工具</h2><div id="templates"></div></section>
+    <section class="section"><h2>项目案例</h2><div class="grid" id="cases"></div></section>
+    <section class="section"><h2>知识来源</h2><div id="sources"></div></section>
+    <div class="note">边界说明：本审查稿中的资料、案例和内容均为 Mock 样板，不代表已入库、已审核或可用于企业业务决策的正式知识。</div>
+    <p class="footer">当前快照版本：V1.0 Mock Sample · 总体施组</p>
+  </main>
+  <script>
+    const sources=[
+      ['S01','施工组织设计编制管理指引（Mock）','制度','正式','第 2 章 / 第 4—8 条','总体施工组织设计应在项目实施策划阶段完成编制、评审与动态更新。'],
+      ['S02','总体施工组织设计编制模板（Mock）','模板','正式','目录 / 表单 1—9','模板包括工程概况、施工部署、进度计划、资源配置、总平面布置与风险控制。'],
+      ['S03','总体施工组织设计审查要点清单（Mock）','清单','正式','审查项 01—24','审查施工部署与合同工期、资源能力、现场条件和重大风险是否匹配。'],
+      ['S04','施工总进度计划编制要点（Mock）','指南','正式','第 3 节 / 关键线路','进度计划应明确里程碑、关键线路、资源约束及纠偏机制。'],
+      ['S05','项目施工部署与现场总平面布置指引（Mock）','指南','正式','第 2 节 / 场地组织','现场总平面应统筹运输组织、临建设施、材料堆场、机械布置与消防通道。'],
+      ['S06','项目资源配置计划表（Mock）','模板','正式','人工 / 材料 / 机械表','资源计划应按阶段匹配劳动力、主要材料、周转料具和机械设备需求。'],
+      ['S07','产业园项目总体施组编制案例（Mock）','案例','参考','第 3 章 / 施工部署','案例采用分区、分段、穿插施工组织，并以关键线路控制工期风险。'],
+      ['S08','总体施组风险与动态纠偏记录（Mock）','计划','参考','风险台账 / R-01—R-12','对资源供应、雨季施工、交叉作业和场地转换设置预警及纠偏责任人。']
+    ].map(([id,name,type,authority,location,excerpt])=>({id,name,type,authority,location,excerpt}));
+    const cards=[
+      ['C01','总体施组的编制边界','明确总体施组要解决的项目级组织问题，以及与专项方案、进度计划的衔接关系。',['以合同、图纸、现场条件为输入','覆盖部署、进度、资源、总平面和风险','专项方案不得替代总体施组'],['S01','S02']],
+      ['C02','施工部署与组织原则','用分区、分段、流水、穿插等方式把工期目标转化为可执行的施工组织。',['确定施工区段和施工顺序','识别关键线路与控制节点','明确总包与专业分包界面'],['S01','S04','S07']],
+      ['C03','资源与总平面统筹','将人、材、机、临建和运输组织放在同一张项目级资源配置图中校核。',['资源计划按阶段配置','总平面满足安全与消防要求','场地转换应有时序安排'],['S05','S06']],
+      ['C04','评审、实施与动态纠偏','总体施组经评审后作为组织实施基线，并在条件变化时保留动态调整依据。',['按审查清单逐项校核','里程碑偏差触发纠偏','风险台账明确责任人与时限'],['S03','S08']]
+    ].map(([id,title,summary,keyPoints,sourceIds])=>({id,title,summary,keyPoints,sourceIds}));
+    const cases=[
+      ['Case01','产业园多单体分区穿插案例（Mock）','多单体同步开工、场地狭窄，需统筹塔吊、运输与材料堆场。','以分区流水和总平面分期转换组织施工，减少交叉干扰。',['S07','S05']],
+      ['Case02','公共建筑工期压缩案例（Mock）','合同工期紧，机电、装饰与土建需要穿插施工。','通过关键线路复核和资源峰值平衡形成纠偏方案。',['S04','S08']],
+      ['Case03','复杂场地临建转换案例（Mock）','施工阶段变化导致临建、道路和堆场需多次调整。','在总体施组中设置场地转换节点和责任清单。',['S05','S03']]
+    ].map(([id,name,scenario,outcome,sourceIds])=>({id,name,scenario,outcome,sourceIds}));
+    const points=['编制前核实合同边界、现场条件、图纸成熟度与资源约束。','评审重点是施工部署、关键线路、资源峰值、总平面和重大风险的一致性。','实施期间发生工期、场地、资源或重大方案变化时，应形成动态调整记录。'];
+    const nameOf=ids=>ids.map(id=>sources.find(x=>x.id===id).name).join('；');
+    document.getElementById('card-count').textContent=`${cards.length} 张知识卡片`;document.getElementById('source-count').textContent=`${sources.length} 条资料来源`;document.getElementById('case-count').textContent=`${cases.length} 个项目案例`;
+    document.getElementById('cards').innerHTML=cards.map(x=>`<article class="card"><span class="kind">KnowledgeCard</span><h3>${x.title}</h3><p>${x.summary}</p><ul>${x.keyPoints.map(p=>`<li>${p}</li>`).join('')}</ul><small>依据：${nameOf(x.sourceIds)}</small></article>`).join('');
+    document.getElementById('points').innerHTML=points.map(x=>`<li>${x}</li>`).join('');
+    const sourceHtml=x=>`<article class="source"><div><span class="kind">${x.type} · ${x.authority}</span><h3>${x.name}</h3><p>${x.excerpt}</p></div><small>${x.location}</small></article>`;
+    document.getElementById('templates').innerHTML=sources.filter(x=>x.type==='模板').map(sourceHtml).join('');document.getElementById('sources').innerHTML=sources.map(sourceHtml).join('');
+    document.getElementById('cases').innerHTML=cases.map(x=>`<article class="card"><span class="kind">Case · Mock</span><h3>${x.name}</h3><p><b>场景：</b>${x.scenario}</p><p><b>做法：</b>${x.outcome}</p><small>来源：${nameOf(x.sourceIds)}</small></article>`).join('');
+  </script>
+</body>
+</html>

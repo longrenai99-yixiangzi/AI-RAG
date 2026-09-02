@@ -86,8 +86,15 @@ class Settings:
             chat_model=_setting("RAG_CHAT_MODEL"),
             api_key=_setting("RAG_API_KEY"),
             # V0.1 locks vector dimensions to BGE-M3's 1024 dimensions.
-            embedding_model="BAAI/bge-m3",
-            reranker_model="BAAI/bge-reranker-v2-m3",
+            # Local defaults keep model loading offline; environment variables
+            # remain available for an explicitly different model location.
+            embedding_model=_setting(
+                "RAG_EMBEDDING_MODEL_PATH", str(PROJECT_ROOT / "models" / "bge-m3")
+            ),
+            reranker_model=_setting(
+                "RAG_RERANKER_MODEL_PATH",
+                str(PROJECT_ROOT / "models" / "bge-reranker-v2-m3"),
+            ),
             reranker_mode=_setting("RAG_ENABLE_RERANKER", "auto").lower(),
             max_local_chunks=_positive_int("RAG_MAX_LOCAL_CHUNKS", 18_000),
             max_file_size_mb=_positive_int("RAG_MAX_FILE_SIZE_MB", 150),

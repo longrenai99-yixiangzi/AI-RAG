@@ -1,8 +1,10 @@
 .venv/
+models/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 data/qdrant/
+data/shadow/
 data/indexes/
 data/reports/
 data/*.sqlite3

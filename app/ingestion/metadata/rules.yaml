@@ -1,0 +1,89 @@
+version: 1
+review:
+  auto_min_confidence: 0.8
+fields:
+  board:
+    values:
+      - 设计管理
+      - 技术管理
+      - 科技管理
+    front_matter_keys: [board, 板块, board_name, tags]
+    source_priority: [front_matter, path, file_name, title, headers]
+    rules:
+      - id: board_design_management
+        value: 设计管理
+        keywords: [设计管理, 设计支持, 报批报建, 方案比选, 设计任务书, 设计策划, 设计价值创造]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+      - id: board_technical_management
+        value: 技术管理
+        keywords: [技术管理, 技术部, 技术工作计划]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+      - id: board_science_management
+        value: 科技管理
+        keywords: [科技管理, 科技创新, 研发]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+  knowledge_type:
+    values:
+      - 制度
+      - 案例
+      - 方法
+      - 模板
+      - 会议资料
+      - 培训资料
+    front_matter_keys: [knowledge_type, knowledge-type, knowledgeType, 知识类型, tags]
+    source_priority: [front_matter, file_name, title, path, headers]
+    rules:
+      - id: knowledge_policy
+        value: 制度
+        keywords: [制度, 规则, 管理办法]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+      - id: knowledge_case
+        value: 案例
+        keywords: [案例, 经验总结, 项目经验, 成果总结, 工作总结, 年度总结, 方案比选]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+      - id: knowledge_method
+        value: 方法
+        keywords: [方法, 指南, 手册, 设计任务书, 设计策划]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+      - id: knowledge_template
+        value: 模板
+        keywords: [模板, 范本, 示范文本]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+      - id: knowledge_meeting
+        value: 会议资料
+        keywords: [会议, 纪要]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+      - id: knowledge_training
+        value: 培训资料
+        keywords: [培训, 课件, 题库, 考试]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+  discipline:
+    values:
+      - 建筑
+      - 结构
+      - 机电
+      - BIM
+      - EPC
+    front_matter_keys: [discipline, 专业, discipline_name, tags]
+    source_priority: [front_matter, file_name, title, path, headers]
+    rules:
+      - id: discipline_architecture
+        value: 建筑
+        keywords: [建筑, 建筑设计]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+      - id: discipline_structure
+        value: 结构
+        keywords: [结构, 结构设计, 钢结构, 桩基]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+      - id: discipline_mep
+        value: 机电
+        keywords: [机电, 电气, 暖通, 给排水, 机电安装]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+      - id: discipline_bim
+        value: BIM
+        keywords: [BIM, 建筑信息模型]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}
+      - id: discipline_epc
+        value: EPC
+        keywords: [EPC, 工程总承包]
+        confidence: {path: 0.98, file_name: 0.9, title: 0.82, headers: 0.76, body: 0.62}

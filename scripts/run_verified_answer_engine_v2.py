@@ -128,20 +128,31 @@ def _runtime_bundle(question: str, plan: dict[str, Any], result: dict[str, Any],
     subquestions = plan.get("subquestions") or ["回答原始问题"]
     direct = [candidate for candidate in candidates if candidate["role"] == "DIRECT"]
     source_scope_missing = (bool(plan.get("scope_constraints")) or any("file://" in candidate["text"] or "[[" in candidate["text"] for candidate in candidates)) and not direct and not conflicts
-    coverage = _coverage(subquestions, plan, candidates)
+    matched_structured = _matched_structured_rows(candidates, structured_rows)
+    coverage = _coverage(subquestions, plan, candidates, matched_structured)
     if source_scope_missing:
         coverage = [{"subquestion_id": f"SQ{index}", "subquestion": value, "coverage_status": "NOT_COVERED", "evidence_ids": [], "coverage_reason": "No candidate satisfies the query scope constraints."} for index, value in enumerate(subquestions, start=1)]
     status = "SOURCE_SCOPE_MISSING" if source_scope_missing else "CONFLICTING_EVIDENCE" if conflicts else "VERIFIED_PARTIAL" if any(item["coverage_status"] == "EVIDENCE_INSUFFICIENT" for item in coverage) else "VERIFIED" if direct else "INSUFFICIENT_EVIDENCE"
-    matched_structured = _matched_structured_rows(candidates, structured_rows)
-    structured_completion = bool(matched_structured) if structured_rows and plan.get("query_type") == "AGGREGATION_QUERY" else None
+    has_structured_candidate = any(
+        candidate.get("table_id")
+        or (candidate.get("location") or {}).get("table") is not None
+        or (candidate.get("location") or {}).get("sheet_name")
+        for candidate in candidates
+        if candidate.get("role") == "DIRECT"
+    )
+    structured_completion = bool(matched_structured) if structured_rows and has_structured_candidate and plan.get("query_type") == "AGGREGATION_QUERY" else None
     return {"query_id": plan["query_id"], "question": question, "query_plan": plan, "subquestions": subquestions, "bundle_status": status, "candidate_evidence": candidates, "verified_evidence": direct, "supporting_evidence": [candidate for candidate in candidates if candidate["role"] == "SUPPORTING"], "context_only_evidence": [candidate for candidate in candidates if candidate["role"] == "CONTEXT_ONLY"], "conflicting_evidence": [candidate for candidate in candidates if candidate["role"] == "CONFLICTING"], "excluded_evidence": [candidate for candidate in candidates if candidate["role"] == "EXCLUDED"], "coverage_map": coverage, "conflict_map": conflicts, "scope_map": [], "authority_map": [], "lineage_map": [], "structured_rows": matched_structured, "structured_evidence_complete": structured_completion, "structured_fact_map": _structured_facts(plan, candidates, coverage), "evidence_sufficiency": _sufficiency(coverage, conflicts), "verification_trace": {"fresh_runtime_bundle": True, "gold_runtime_injection": 0, "lineage_auto_join": False}}
 
 
 def _answer_relevant(candidate: dict[str, Any], question: str, plan: dict[str, Any]) -> bool:
     text = candidate["text"]
-    project_phrases = [re.sub(r"^20\d{2}年", "", phrase) for phrase in re.findall(r"([\u4e00-\u9fff]{2,}项目)", question)]
+    project_phrases = [
+        phrase
+        for phrase in (re.sub(r"^20\d{2}年", "", value) for value in re.findall(r"([\u4e00-\u9fff]{2,}项目)", question))
+        if not ("设计示范" in phrase and phrase.endswith("项目"))
+    ]
     identity = " ".join(str(candidate.get(field) or "") for field in ("file_name", "source_path", "heading_path"))
-    if project_phrases and not any(len(phrase) >= 4 and (phrase in text or phrase in identity or re.sub(r"项目$", "", phrase) in identity) for phrase in project_phrases):
+    if project_phrases and candidate.get("scope", {}).get("project") != "MATCH" and not any(len(phrase) >= 4 and (phrase in text or phrase in identity or re.sub(r"项目$", "", phrase) in identity) for phrase in project_phrases):
         return False
     terms = [term for term in query_terms(question) if len(term) >= 2]
     if sum(term in text for term in terms) >= 2:
@@ -216,7 +227,7 @@ def _load_structured_rows() -> tuple[list[dict[str, Any]], dict[str, Any]]:
 
 
 def _matched_structured_rows(candidates: list[dict[str, Any]], structured_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [row for row in structured_rows if any(_same_structured_source(candidate, row) for candidate in candidates)]
+    return [row for row in structured_rows if any(candidate.get("role") == "DIRECT" and _same_structured_source(candidate, row) for candidate in candidates)]
 
 
 def _attach_structured_rows(candidates: list[dict[str, Any]], structured_rows: list[dict[str, Any]]) -> None:

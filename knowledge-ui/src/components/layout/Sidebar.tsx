@@ -6,6 +6,7 @@ const primary = [
   ['/topics', '专题知识'],
   ['/projects', '项目知识'],
   ['/ai', 'AI问答'],
+  ['/batch', '批量验收'],
   ['/sources', '知识资产'],
 ]
 

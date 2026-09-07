@@ -7,6 +7,7 @@ import { KnowledgeSources } from './pages/KnowledgeSources'
 import { KnowledgeSpace } from './pages/KnowledgeSpace'
 import { PlaceholderPage } from './pages/PlaceholderPage'
 import { AIChat } from './pages/AIChat'
+import { BatchWorkbench } from './pages/BatchWorkbench'
 import { TopicKnowledge } from './pages/TopicKnowledge'
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
       <Route path="/topics/:id" element={<TopicKnowledge />} />
       <Route path="/projects" element={<PlaceholderPage title="项目知识" description="V0.1 保留入口，项目知识将在下一阶段关联项目页、项目案例与知识节点。" />} />
       <Route path="/ai" element={<AIChat />} />
+      <Route path="/batch" element={<BatchWorkbench />} />
       <Route path="/sources" element={<KnowledgeSources />} />
       <Route path="/favorites" element={<PlaceholderPage title="我的收藏" description="V0.1 先保留个人入口，后续接入收藏关系。" />} />
       <Route path="/recent" element={<PlaceholderPage title="最近浏览" description="V0.1 先保留个人入口，后续接入最近浏览记录。" />} />

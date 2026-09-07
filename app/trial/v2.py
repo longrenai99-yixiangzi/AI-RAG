@@ -8,17 +8,22 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import numpy as np
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
+from openpyxl import load_workbook
 from pydantic import BaseModel, Field
 
+from app.chunker import chunk_blocks
+from app.domain import SourceBlock
 from app.knowledge_growth_v1 import candidate_for_trace
 from app.config import Settings
 from app.ingestion.atomic_search import search_atomic_evidence
 from app.ingestion.pipeline import run_document_pipeline
+from app.ingestion.loaders.pdf_loader import extract_value_creation_rows, extract_value_creation_summary
 from app.retrieval.dense_provider import BGEM3DenseProvider
 from app.retrieval.hierarchical_v1 import HierarchicalIndex
 from app.retrieval.query_planner_v1 import plan_query
@@ -40,6 +45,11 @@ FEEDBACK_CASES = GROWTH / "feedback_regression_cases.jsonl"
 FEEDBACK_RUNS = GROWTH / "feedback_regression_runs.jsonl"
 SOURCE_CLOSURE_REGISTER = PROJECT_ROOT / "data" / "shadow" / "trial_cycle_01" / "source_closure_register.jsonl"
 TRIAL_FEEDBACK_QUESTIONS = PROJECT_ROOT / "data" / "shadow" / "trial_cycle_01" / "trial_feedback_questions.jsonl"
+BATCH_ROOT = PROJECT_ROOT / "data" / "shadow" / "batch_workflow"
+BATCH_SOURCE_REGISTER = BATCH_ROOT / "source_registry.jsonl"
+BATCH_CASES = BATCH_ROOT / "acceptance_cases.jsonl"
+BATCH_RUNS = BATCH_ROOT / "regression_runs.jsonl"
+LOADED_SHADOW_PATHS: set[str] = set()
 
 
 class V2QueryRequest(BaseModel):
@@ -79,20 +89,28 @@ class V2TrialEngine:
         self.index = HierarchicalIndex.load(INDEX)
         self.documents = {str(row["document_id"]): row for row in self.index.documents}
         self.atomic = {str(row.get("evidence_id")): row for row in self.index.atomic if row.get("evidence_id")}
-        self._load_approved_shadow_sources()
         self.structured_rows, self.structured_audit = _load_authorized_docx_rows()
+        self._load_approved_shadow_sources()
         self.dense = BGEM3DenseProvider(Settings.load().embedding_model, collection_name="v2_8010_query_embeddings", use_fp16=False, batch_size=1)
 
     def _load_approved_shadow_sources(self) -> None:
         """Overlay explicitly approved files in memory; never writes an index."""
-        for source in CONFIG.approved_shadow_sources:
+        for source in _approved_shadow_sources():
             path = Path(source["path"])
             if source["approval_status"] != "USER_APPROVED_SHADOW_READ" or not path.is_file():
                 continue
-            result = run_document_pipeline(path.parent, files=[path])
+            normalized_path = _normalize_source_path(path)
+            if normalized_path in LOADED_SHADOW_PATHS:
+                continue
+            document_id = "trial-approved-" + hashlib.sha256(str(path).encode("utf-8")).hexdigest()[:24]
+            result = self._load_approved_wps_read_only(path, document_id) if path.suffix.lower() == ".wps" else run_document_pipeline(path.parent, files=[path])
             for document in result.documents:
-                document_id = "trial-approved-" + hashlib.sha256(str(path).encode("utf-8")).hexdigest()[:24]
                 metadata = dict(document.metadata or {})
+                scope = {"organization": [], "project": [], "year": [], "specialty": []}
+                if path.suffix.lower() == ".docx":
+                    project_name = self._docx_project_name(document.chunks)
+                    if project_name:
+                        scope["project"] = [project_name]
                 self.documents[document_id] = {
                     "document_id": document_id,
                     "knowledge_root_id": "Root-002",
@@ -101,7 +119,7 @@ class V2TrialEngine:
                     "file_type": document.file_type,
                     "document_role": metadata.get("document_role"),
                     "authority_level": metadata.get("authority_level"),
-                    "scope": {"organization": [], "project": [], "year": [], "specialty": []},
+                    "scope": scope,
                 }
                 for ordinal, chunk in enumerate(document.chunks, start=1):
                     evidence_id = "approved-shadow-" + hashlib.sha256(f"{path}|{chunk.chunk_id}".encode("utf-8")).hexdigest()[:24]
@@ -120,8 +138,271 @@ class V2TrialEngine:
                         "approved_shadow_source": True,
                         "ordinal": ordinal,
                     }
+            if path.suffix.lower() == ".xlsx":
+                self._load_approved_xlsx_headers(path, document_id)
+                self._load_approved_xlsx_review_sections(path, document_id)
+            elif path.suffix.lower() == ".docx" and not any(row.get("source_path") == str(path) for row in self.structured_rows):
+                self.structured_rows.extend(self._load_approved_docx_value_rows(path, document_id))
+            LOADED_SHADOW_PATHS.add(normalized_path)
 
-    def answer(self, question: str, *, detect_growth: bool = True) -> dict[str, Any]:
+    def load_approved_sources(self) -> None:
+        self._load_approved_shadow_sources()
+
+
+    @staticmethod
+    def _load_approved_wps_read_only(path: Path, document_id: str) -> SimpleNamespace:
+        """Read a legacy WPS document through WPS COM without conversion or write-back."""
+        app = document = None
+        com_initialized = False
+        try:
+            import pythoncom
+            from win32com.client import DispatchEx
+
+            pythoncom.CoInitialize()
+            com_initialized = True
+            app = DispatchEx("Kwps.Application")
+            app.Visible = False
+            try:
+                app.DisplayAlerts = 0
+            except Exception:
+                pass
+            document = app.Documents.Open(str(path), ReadOnly=True, AddToRecentFiles=False, ConfirmConversions=False)
+            blocks: list[SourceBlock] = []
+            for table_number in range(1, int(document.Tables.Count) + 1):
+                table = document.Tables(table_number)
+                rows: list[str] = []
+                max_columns = 0
+                for row in table.Rows:
+                    cells = []
+                    for cell in row.Cells:
+                        text = str(cell.Range.Text or "").replace("\r", " ").replace("\x07", " ").strip()
+                        cells.append(text)
+                    max_columns = max(max_columns, len(cells))
+                    row_text = " | ".join(cells).strip(" |")
+                    if row_text:
+                        rows.append(row_text)
+                if rows:
+                    blocks.append(SourceBlock(
+                        document_id=document_id,
+                        source_path=str(path),
+                        file_name=path.name,
+                        heading_path="附件1 > 2026年公司设计示范工程计划",
+                        text="附件1\n2026年公司设计示范工程计划\n表格：\n" + "\n".join(rows),
+                        location={"table": table_number, "rows": len(rows), "columns": max_columns},
+                    ))
+            if not blocks:
+                raise RuntimeError("WPS文档未读取到表格正文")
+            return SimpleNamespace(documents=[SimpleNamespace(
+                file_type=".wps",
+                metadata={"document_role": "工作计划", "authority_level": "L3"},
+                chunks=chunk_blocks(blocks),
+            )])
+        except Exception as error:
+            raise RuntimeError(f"WPS只读解析失败：{type(error).__name__}: {error}") from error
+        finally:
+            if document is not None:
+                try:
+                    document.Close(SaveChanges=False)
+                except Exception:
+                    pass
+            if app is not None:
+                try:
+                    app.Quit(SaveChanges=False)
+                except Exception:
+                    pass
+            if com_initialized:
+                try:
+                    pythoncom.CoUninitialize()
+                except Exception:
+                    pass
+
+    @staticmethod
+    def _docx_project_name(chunks: list[Any]) -> str:
+        for chunk in chunks:
+            match = re.search(r"项目名称\s*\|\s*([^|\n]+)", str(chunk.text or ""))
+            if match:
+                return match.group(1).strip()
+        return ""
+
+    @staticmethod
+    def _load_approved_docx_value_rows(path: Path, document_id: str) -> list[dict[str, Any]]:
+        from docx import Document
+
+        document = Document(path)
+        try:
+            for table_number, table in enumerate(document.tables, start=1):
+                rows = [[" ".join(cell.text.split()) for cell in row.cells] for row in table.rows]
+                header_index = next(
+                    (
+                        index
+                        for index, values in enumerate(rows)
+                        if "专业类别" in values and "价值创造策划点" in values and "价值创造分析" in values
+                    ),
+                    None,
+                )
+                if header_index is None:
+                    continue
+                headers = rows[header_index]
+                table_id = "approved-shadow-table-" + hashlib.sha256(f"{path}|{table_number}".encode("utf-8")).hexdigest()[:24]
+                bundle_id = "SEB_" + hashlib.sha256(f"{document_id}:{table_id}".encode("utf-8")).hexdigest()[:16]
+                mapped = []
+                for row_number, values in enumerate(rows[header_index + 1 :], start=header_index + 2):
+                    if not values or not values[0] or values[0] == "专业类别":
+                        continue
+                    cells = [
+                        {
+                            "column_name": header or f"column_{index}",
+                            "normalized_column_name": header or f"column_{index}",
+                            "raw_value": values[index] if index < len(values) else "",
+                            "normalized_value": values[index] if index < len(values) else "",
+                            "cell_value": values[index] if index < len(values) else "",
+                        }
+                        for index, header in enumerate(headers)
+                    ]
+                    row_id = "SER_" + hashlib.sha256(f"{table_id}:{row_number}".encode("utf-8")).hexdigest()[:16]
+                    mapped.append({
+                        "document_id": document_id,
+                        "table_id": table_id,
+                        "section_id": None,
+                        "row_id": row_id,
+                        "row_number": row_number,
+                        "professional": values[0],
+                        "profit_numeric": None,
+                        "source_path": str(path),
+                        "file_name": path.name,
+                        "sheet_name": None,
+                        "source_location": {"table": table_number, "row_start": row_number, "row_end": row_number, "header_row": header_index + 1},
+                        "cells": cells,
+                        "bundle_evidence_id": bundle_id,
+                        "lineage_status": "LINEAGE_CONFIRMED",
+                        "source_artifact": "approved-shadow-docx-table",
+                    })
+                return mapped
+        finally:
+            document = None
+        return []
+
+    def _load_approved_xlsx_headers(self, path: Path, document_id: str) -> None:
+        """Create precise in-memory evidence for multi-row XLSX professional headers."""
+        workbook = load_workbook(path, read_only=True, data_only=True)
+        try:
+            for worksheet in workbook.worksheets:
+                rows = [
+                    [str(value).strip() if value is not None else "" for value in row]
+                    for row in worksheet.iter_rows(values_only=True)
+                ]
+                for group_row_index, values in enumerate(rows):
+                    groups = [
+                        (column, value)
+                        for column, value in enumerate(values, start=1)
+                        if re.fullmatch(r"[\u3400-\u9fff]{1,8}专业设计参数", value)
+                    ]
+                    if not groups:
+                        continue
+                    header_row_index = next(
+                        (
+                            index
+                            for index in range(group_row_index, min(len(rows), group_row_index + 3))
+                            if sum(bool(item) for item in rows[index]) >= len(groups)
+                            and not any("专业设计参数" in item for item in rows[index] if item)
+                        ),
+                        None,
+                    )
+                    if header_row_index is None:
+                        continue
+                    for group_index, (start_column, group) in enumerate(groups):
+                        end_column = groups[group_index + 1][0] if group_index + 1 < len(groups) else len(rows[header_row_index]) + 1
+                        fields = [
+                            value
+                            for value in rows[header_row_index][start_column - 1 : end_column - 1]
+                            if value
+                        ]
+                        if len(fields) < 2:
+                            continue
+                        evidence_id = "approved-shadow-header-" + hashlib.sha256(
+                            f"{path}|{worksheet.title}|{group}".encode("utf-8")
+                        ).hexdigest()[:24]
+                        self.atomic[evidence_id] = {
+                            "evidence_id": evidence_id,
+                            "document_id": document_id,
+                            "section_id": None,
+                            "source_path": str(path),
+                            "file_name": path.name,
+                            "file_type": ".xlsx",
+                            "heading_path": f"{worksheet.title} > {group}",
+                            "location": {
+                                "sheet_name": worksheet.title,
+                                "row_start": header_row_index + 1,
+                                "row_end": header_row_index + 1,
+                                "column_start": start_column,
+                                "column_end": end_column - 1,
+                                "header_row": header_row_index + 1,
+                            },
+                            "text": f"工作表：{worksheet.title}\n{group}包括：{'、'.join(fields)}。",
+                            "granularity": "xlsx_header",
+                            "lineage_status": "LINEAGE_CONFIRMED",
+                            "approved_shadow_source": True,
+                        }
+        finally:
+            workbook.close()
+
+    def _load_approved_xlsx_review_sections(self, path: Path, document_id: str) -> None:
+        """Create row-preserving evidence for numbered review-point sections."""
+        workbook = load_workbook(path, read_only=True, data_only=True)
+        try:
+            for worksheet in workbook.worksheets:
+                rows = [
+                    [str(value).strip() if value is not None else "" for value in row]
+                    for row in worksheet.iter_rows(values_only=True)
+                ]
+                section_starts = []
+                for index, values in enumerate(rows):
+                    first = next((value.replace("\n", "") for value in values if value), "")
+                    match = re.match(r"^(\d+)[.、]\s*(.+)$", first)
+                    if match and not re.match(r"^\d+\.\d+", first):
+                        section_starts.append((index, match.group(1), first))
+                for position, (start, section_number, title) in enumerate(section_starts):
+                    end = section_starts[position + 1][0] if position + 1 < len(section_starts) else len(rows)
+                    points = []
+                    categories = []
+                    for row_number in range(start, end):
+                        values = rows[row_number]
+                        point = next(
+                            (value.replace("\n", "") for value in values if re.match(rf"^{re.escape(section_number)}\.\d+", value.replace("\n", ""))),
+                            None,
+                        )
+                        if point:
+                            points.append(point)
+                            categories.append(next((value.replace("\n", "") for value in values[2:] if value), ""))
+                    if len(points) < 2:
+                        continue
+                    profession = max(set(categories), key=categories.count, default="")
+                    evidence_id = "approved-shadow-section-" + hashlib.sha256(
+                        f"{path}|{worksheet.title}|{title}|{start + 1}|{end}|{profession}".encode("utf-8")
+                    ).hexdigest()[:24]
+                    self.atomic[evidence_id] = {
+                        "evidence_id": evidence_id,
+                        "document_id": document_id,
+                        "section_id": None,
+                        "source_path": str(path),
+                        "file_name": path.name,
+                        "file_type": ".xlsx",
+                        "heading_path": f"{worksheet.title} > {title}",
+                        "location": {
+                            "sheet_name": worksheet.title,
+                            "row_start": start + 1,
+                            "row_end": end,
+                            "section": title,
+                        },
+                        "text": f"工作表：{worksheet.title}\n专业：{profession}\n{title}\n" + "\n".join(points),
+                        "granularity": "xlsx_section",
+                        "lineage_status": "LINEAGE_CONFIRMED",
+                        "approved_shadow_source": True,
+                    }
+        finally:
+            workbook.close()
+
+    def answer(self, question: str, *, detect_growth: bool = True, source_paths: list[str] | None = None) -> dict[str, Any]:
         started = time.perf_counter()
         planner_started = time.perf_counter()
         plan = plan_query(question)
@@ -136,7 +417,20 @@ class V2TrialEngine:
         embedding_ms = (time.perf_counter() - embedding_started) * 1000
         retrieval = self.index.retrieve(plan, query_vector)
         retrieval = _with_exact_atomic_rescue(retrieval, question, self.index.atomic)
-        approved_results = search_atomic_evidence(question, [item for item in self.atomic.values() if item.get("approved_shadow_source")], limit=10)
+        wanted_sources = {_normalize_source_path(path).casefold() for path in (source_paths or []) if str(path).strip()}
+        if wanted_sources:
+            retrieval = {
+                **retrieval,
+                "atomic_candidates": [
+                    item for item in retrieval["atomic_candidates"]
+                    if _normalize_source_path(item.get("source_path")).casefold() in wanted_sources
+                ],
+            }
+        approved_records = [
+            item for item in self.atomic.values()
+            if item.get("approved_shadow_source") and (not wanted_sources or _normalize_source_path(item.get("source_path")).casefold() in wanted_sources)
+        ]
+        approved_results = search_atomic_evidence(question, approved_records, limit=10)
         if approved_results:
             approved_candidates = []
             for rank, item in enumerate(approved_results, start=1):
@@ -156,6 +450,78 @@ class V2TrialEngine:
                     "text": record.get("text", "")[:900],
                     "lineage_status": record.get("lineage_status"),
                 })
+            compact_question = re.sub(r"\s+", "", question)
+            existing_ids = {item["evidence_id"] for item in approved_candidates}
+            for record in self.atomic.values():
+                location = record.get("location") or {}
+                section = re.sub(r"^\d+[.、]", "", str(location.get("section") or ""))
+                profession = str(record.get("text") or "").split("专业：", 1)[-1].split("\n", 1)[0].strip()
+                if (
+                    record.get("approved_shadow_source")
+                    and record.get("granularity") == "xlsx_section"
+                    and (not wanted_sources or _normalize_source_path(record.get("source_path")).casefold() in wanted_sources)
+                    and record.get("evidence_id") not in existing_ids
+                    and section
+                    and section in compact_question
+                    and profession in plan.specialty
+                ):
+                    approved_candidates.insert(0, {
+                        "evidence_id": record["evidence_id"],
+                        "document_id": record["document_id"],
+                        "section_id": record.get("section_id"),
+                        "candidate_origin": "APPROVED_SECTION_RESCUE",
+                        "rank": 1,
+                        "score": 100.0,
+                        "location": location,
+                        "evidence_type": record.get("granularity"),
+                        "source_path": record.get("source_path"),
+                        "file_name": record.get("file_name"),
+                        "facet_reasons": ["exact_section_and_profession"],
+                        "text": record.get("text", "")[:900],
+                        "lineage_status": record.get("lineage_status"),
+                    })
+                if (
+                    record.get("approved_shadow_source")
+                    and record.get("file_type") == ".pdf"
+                    and (not wanted_sources or _normalize_source_path(record.get("source_path")).casefold() in wanted_sources)
+                    and "设计价值创造点" in question
+                    and (
+                        extract_value_creation_summary(str(record.get("text") or ""))
+                        and (
+                            "多少个专业" in question
+                            or ("各专业" in question and "多少条" in question)
+                            or ("方案设计" in question and "施工图设计" in question)
+                        )
+                        or any(
+                            row["professional"] in question
+                            and row["stage"] in question
+                            and f"第{row['number']}条" in question
+                            and ("是什么" in question or "适用条件" in question)
+                            for row in extract_value_creation_rows(str(record.get("text") or ""))
+                        )
+                    )
+                ):
+                    rescued = {
+                        "evidence_id": record["evidence_id"],
+                        "document_id": record["document_id"],
+                        "section_id": record.get("section_id"),
+                        "candidate_origin": "APPROVED_PDF_SUMMARY_RESCUE",
+                        "rank": 1,
+                        "score": 100.0,
+                        "location": location,
+                        "evidence_type": record.get("granularity"),
+                        "source_path": record.get("source_path"),
+                        "file_name": record.get("file_name"),
+                        "facet_reasons": ["exact_value_creation_summary"],
+                        "text": record.get("text", "")[:900],
+                        "lineage_status": record.get("lineage_status"),
+                    }
+                    existing = next((item for item in approved_candidates if item["evidence_id"] == record["evidence_id"]), None)
+                    if existing is None:
+                        approved_candidates.insert(0, rescued)
+                        existing_ids.add(record["evidence_id"])
+                    else:
+                        existing.update(rescued)
             retrieval = {**retrieval, "atomic_candidates": [*approved_candidates, *retrieval["atomic_candidates"]]}
         verification_started = time.perf_counter()
         bundle = _runtime_bundle(question, plan.to_dict(), retrieval, self.documents, self.atomic, self.structured_rows)
@@ -369,7 +735,10 @@ def _display_location(location: dict[str, Any]) -> str:
     if location.get("page"):
         return f"第{location['page']}页"
     if location.get("sheet_name"):
-        return f"{location['sheet_name']}，第{location.get('row_start', location.get('row', '?'))}行"
+        start = location.get("row_start", location.get("row", "?"))
+        end = location.get("row_end", start)
+        rows = f"第{start}-{end}行" if end != start else f"第{start}行"
+        return f"{location['sheet_name']}，{rows}"
     if location.get("table"):
         start, end = location.get("row_start"), location.get("row_end")
         return f"表{location['table']}" + (f"，第{start}-{end}行" if start else "")
@@ -510,13 +879,28 @@ def _declared_source_status(source_path: str) -> str:
 def _source_runtime_status(source_path: str) -> str:
     if not source_path:
         return "PENDING_OWNER_CONFIRMATION"
-    if any(_same_source_path(source_path, source.get("path")) for source in CONFIG.approved_shadow_sources if source.get("approval_status") == "USER_APPROVED_SHADOW_READ"):
-        return "INDEXED_SHADOW"
+    if any(_same_source_path(source_path, source.get("path")) for source in _approved_shadow_sources() if source.get("approval_status") == "USER_APPROVED_SHADOW_READ"):
+        return "INDEXED_SHADOW" if _normalize_source_path(source_path) in LOADED_SHADOW_PATHS else "SOURCE_IDENTIFIED"
     try:
         indexed = any(_same_source_path(source_path, row.get("source_path")) for row in _engine_instance().index.atomic)
     except Exception:
         indexed = False
     return "INDEXED_SHADOW" if indexed else _declared_source_status(source_path)
+
+
+def _approved_shadow_sources() -> list[dict[str, str]]:
+    sources = [dict(row) for row in CONFIG.approved_shadow_sources]
+    seen = {_normalize_source_path(row.get("path")) for row in sources}
+    for row in _read_jsonl(BATCH_SOURCE_REGISTER):
+        path = str(row.get("path") or row.get("source_path") or "")
+        if row.get("status") != "APPROVED" or not path:
+            continue
+        normalized = _normalize_source_path(path)
+        if normalized in seen:
+            continue
+        sources.append({"path": path, "approval_status": "USER_APPROVED_SHADOW_READ"})
+        seen.add(normalized)
+    return sources
 
 
 def _case_with_readiness(case: dict[str, Any]) -> dict[str, Any]:

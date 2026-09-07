@@ -1,8 +1,20 @@
-# AI设计管理知识库 · V0.1
+# AI设计管理知识库 · V1.0 / V2 内部试用
 
-这是一个本地运行、对 `D:\设计管理` 只读的 RAG 问答程序。
+这是一个本地运行、对 `D:\设计管理` 只读的 RAG 问答程序。当前唯一开发基线为 Git 分支 `rag-v1-refactor`；V2 仍处于 8010 内部试用，未切换正式 8000 服务。
 
-它的第一版只完成一个可验证闭环：
+## 当前状态
+
+- 开发目录：`D:\AI智能体\AI设计管理RAG-V1`
+- Git 基线：`rag-v1-refactor`，当前 HEAD 为 `0492754`
+- 知识源：`D:\设计管理`，只读
+- 正式服务：`127.0.0.1:8000`，保持未切换
+- 内部试用：`127.0.0.1:8010`，V2 Verified RAG 已启用
+- Provider 依赖的生成式回答：试用策略关闭；证据展示和确定性事实路径仍可用
+- 生产状态：`PRODUCTION_READY = FALSE`
+
+内部试用的冻结点、来源范围和安全边界见 [`docs/V2_INTERNAL_TRIAL_BASELINE.md`](docs/V2_INTERNAL_TRIAL_BASELINE.md)。
+
+当前基础检索闭环为：
 
 ```
 只读解析资料 → 章节/页码级切片 → BGE-M3 向量检索 + BM25 → RRF 融合
@@ -65,11 +77,25 @@ $python = "C:\Users\liu\AppData\Roaming\uv\python\cpython-3.12.13-windows-x86_64
 
 ## 启动问答页面
 
+正式 V1 服务（8000）沿用原入口：
+
 ```powershell
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
 然后在浏览器打开 `http://127.0.0.1:8000`。
+
+V2 内部试用服务（8010）使用：
+
+```powershell
+.\scripts\start_internal_trial.ps1
+```
+
+主试用页面：`http://127.0.0.1:8010/knowledge-os`；AI问答页面：`http://127.0.0.1:8010/ai`；批量验收工作台：`http://127.0.0.1:8010/batch`。停止服务使用 `scripts\stop_internal_trial.ps1`。启动前必须通过试用准备检查，且不得与索引任务同时运行。
+
+批量验收工作台按“来源目录只读预览 → 批准进入 Root-002 Shadow → 自动生成结构化验收题 → 批量回归 → 异常清单”运行。浏览器选择文件夹上传后会自动批准进入 Shadow、生成验收题并批量回归；服务器路径仍需手动点击一次批准。批处理登记、上传会话和结果保存在 `data/shadow/batch_workflow`，不会自动写入正式知识库。
+
+旧版 `/v2-trial` 仅作底层诊断备用入口，不作为日常提问入口。
 
 `/api/health` 会对生成模型发送一个不含业务数据的轻量健康检查；实际提问时，仅将最终检索到的少量证据发送到内网模型接口。
 
@@ -89,4 +115,5 @@ $python = "C:\Users\liu\AppData\Roaming\uv\python\cpython-3.12.13-windows-x86_64
 - Qdrant Local 仅限单进程：启动服务时只能用一个 worker；索引与服务不能同时运行。
 - `BGE-M3` 和可选 `bge-reranker-v2-m3` 首次加载需要较多内存。程序采用小批量，重排模型加载失败时自动退回 RRF 排序，并在接口中提示。
 - 不支持旧版 `.doc/.xls/.ppt`、RAR、图片与扫描件 OCR；这些会在索引报告中显式保留为后续处理项。
-- V0.1 仅重建索引，不做“在线增量索引”。这是为了避免 Qdrant Local 进程锁和部分写入风险。
+- 当前索引仍采用全量 staging 构建与发布，不做在线增量写入；这是为了避免 Qdrant Local 进程锁和部分写入风险。
+- `knowledge-ui` 当前仍主要使用 Mock 数据；真实知识接入要等 V2 试用和业务验收稳定后再做。

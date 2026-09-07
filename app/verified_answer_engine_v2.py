@@ -5,6 +5,7 @@ import uuid
 from typing import Any
 
 from app.ingestion.atomic_search import query_terms
+from app.ingestion.loaders.pdf_loader import extract_value_creation_rows, extract_value_creation_summary
 
 
 def render(bundle: dict[str, Any]) -> dict[str, Any]:
@@ -13,6 +14,12 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
         return _refusal(bundle, "SOURCE_SCOPE_MISSING", "当前已纳入的知识范围中没有足够来源支持该问题。")
     if status == "CONFLICTING_EVIDENCE":
         return _conflict_answer(bundle)
+    pdf_summary_claim = _pdf_summary_claim(bundle)
+    if pdf_summary_claim is not None:
+        return _answered(bundle, [pdf_summary_claim]) if status == "VERIFIED" else _partial_answer(bundle, [pdf_summary_claim])
+    pdf_detail_claim = _pdf_detail_claim(bundle)
+    if pdf_detail_claim is not None:
+        return _answered(bundle, [pdf_detail_claim]) if status == "VERIFIED" else _partial_answer(bundle, [pdf_detail_claim])
     if bundle.get("structured_evidence_complete") is False:
         return _partial_answer(bundle, _structured_incomplete_claim(bundle))
     claims = _structured_claims(bundle, bundle.get("structured_rows") or []) or _claims(bundle)
@@ -56,11 +63,22 @@ def _claims(bundle: dict[str, Any]) -> list[dict[str, Any]]:
     claims = []
     risk_table_claims = _risk_table_claims(bundle)
     role_claims = _role_claims(bundle)
+    review_point_claims = _review_point_claims(bundle)
+    xlsx_field_claim = _xlsx_field_claim(bundle)
+    project_plan_claim = _project_plan_claim(bundle)
     facet_claim = _same_document_facet_claim(bundle)
     if risk_table_claims:
         claims.extend(risk_table_claims)
     elif role_claims:
         claims.extend(role_claims)
+    elif review_point_claims is not None:
+        claims.append(review_point_claims)
+    elif xlsx_field_claim is not None:
+        claims.append(xlsx_field_claim)
+    elif project_plan_claim is not None:
+        claims.append(project_plan_claim)
+    elif (pdf_summary_claim := _pdf_summary_claim(bundle)) is not None:
+        claims.append(pdf_summary_claim)
     elif facet_claim is not None:
         claims.append(facet_claim)
     else:
@@ -77,12 +95,230 @@ def _claims(bundle: dict[str, Any]) -> list[dict[str, Any]]:
     return claims
 
 
+def _project_plan_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
+    """Render project names from an approved WPS project-plan table."""
+    question = str(bundle.get("question") or "")
+    if not ("设计示范" in question and "项目" in question and "哪些" in question):
+        return None
+    for evidence in bundle.get("verified_evidence", []):
+        if not str(evidence.get("file_name") or "").lower().endswith(".wps"):
+            continue
+        if "示范工程计划" not in "".join(str(evidence.get(field) or "") for field in ("file_name", "source_path", "text")):
+            continue
+        names = []
+        for line in str(evidence.get("text") or "").splitlines():
+            cells = [value.strip() for value in line.strip().strip("|").split("|")]
+            if len(cells) >= 2 and re.fullmatch(r"\d+", cells[0]) and cells[1] and cells[1] != "工程名称":
+                names.append(cells[1])
+        if not names:
+            continue
+        lines = [f"2026年公司设计示范工程计划共列出{len(names)}个项目："]
+        lines.extend(f"{index}. {name}" for index, name in enumerate(dict.fromkeys(names), start=1))
+        return _claim("C1", "DIRECT", "SQ1", "\n".join(lines), [evidence["evidence_id"]], raw_evidence_text="\n".join(names))
+    return None
+
+
+def _pdf_summary_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
+    """Render the verified stage-count summary from the value-creation PDF."""
+    question = str(bundle.get("question") or "")
+    if "设计价值创造点" not in question or "专业" not in question:
+        return None
+    for evidence in bundle.get("verified_evidence", []):
+        if not str(evidence.get("file_name") or "").lower().endswith(".pdf"):
+            continue
+        summary = extract_value_creation_summary(str(evidence.get("text") or ""))
+        total = summary.get("合计")
+        if not total:
+            continue
+        if all(marker in question for marker in ("方案设计", "施工图设计")):
+            values = [f"方案设计：{total[0]}条", f"初步设计：{total[1]}条", f"施工图设计：{total[2]}条", f"合计：{sum(total)}条"]
+            return _claim("C1", "DIRECT", "SQ1", "；".join(values) + "。", [evidence["evidence_id"]], raw_evidence_text=str(evidence.get("text") or ""))
+        if "各专业" in question and "多少条" in question:
+            values = [f"{name}：{sum(counts)}条" for name, counts in summary.items() if name != "合计"]
+            return _claim("C1", "DIRECT", "SQ1", "；".join(values) + "。", [evidence["evidence_id"]], raw_evidence_text=str(evidence.get("text") or ""))
+        if "多少个专业" in question:
+            return _claim("C1", "DIRECT", "SQ1", f"共包含{len(summary) - 1}个专业。", [evidence["evidence_id"]], raw_evidence_text=str(evidence.get("text") or ""))
+    return None
+
+
+def _pdf_detail_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
+    question = str(bundle.get("question") or "")
+    if "价值创造点" not in question or not any(marker in question for marker in ("是什么", "适用条件")):
+        return None
+    number_match = re.search(r"第(\d+)条", question)
+    for evidence in bundle.get("verified_evidence", []):
+        if not str(evidence.get("file_name") or "").lower().endswith(".pdf"):
+            continue
+        for row in extract_value_creation_rows(str(evidence.get("text") or "")):
+            if number_match and row["number"] != number_match.group(1):
+                continue
+            if row["professional"] not in question or row["stage"] not in question:
+                continue
+            if "适用条件" in question and row["applicability"]:
+                text = f"适用条件：{row['applicability']}。"
+            elif "是什么" in question and row["value_item"]:
+                text = f"价值创造点：{row['value_item']}。"
+            else:
+                continue
+            return _claim("C1", "DIRECT", "SQ1", text, [evidence["evidence_id"]], raw_evidence_text=str(evidence.get("text") or ""))
+    return None
+
+
+def _review_point_claims(bundle: dict[str, Any]) -> dict[str, Any] | None:
+    """Render a short list from a directly matched XLSX review section."""
+    question = str(bundle.get("question") or "")
+    if not any(marker in question for marker in ("审查要点", "审核要点", "图纸审查", "图审")):
+        return None
+    candidates = [
+        item
+        for item in bundle.get("verified_evidence", [])
+        if str(item.get("file_name") or "").lower().endswith(".xlsx")
+        and any(
+            marker in " ".join(
+                str(item.get(field) or "")
+                for field in ("file_name", "source_path", "heading_path", "text")
+            )
+            for marker in ("审查要点", "审核要点", "施工图")
+        )
+    ]
+    compact_question = re.sub(r"\s+", "", question)
+    def score(evidence: dict[str, Any]) -> tuple[int, int, int]:
+        location = evidence.get("location") or {}
+        section = re.sub(r"^\d+[.、]", "", str(location.get("section") or ""))
+        exact_section = int(bool(section) and section in compact_question)
+        profession = str(evidence.get("text") or "").split("专业：", 1)[-1].split("\n", 1)[0].strip()
+        exact_profession = int(profession == "电气" and "电气专业" in question)
+        return exact_section, exact_profession, -int(evidence.get("candidate_rank") or 10**6)
+
+    for evidence in sorted(candidates, key=score, reverse=True):
+        points = []
+        for number, text in re.findall(r"(?m)^\s*(\d+\.\d+)\s*(.+?)\s*$", str(evidence.get("text") or "")):
+            point = f"{number}{text.strip()}"
+            if point not in points:
+                points.append(point)
+        if len(points) < 5:
+            continue
+        selected = points[:5]
+        return _claim(
+            "C1",
+            "DIRECT",
+            "SQ1",
+            "该章节可核查的审查要点（列举5条）：\n" + "\n".join(selected),
+            [evidence["evidence_id"]],
+            raw_evidence_text="\n".join(selected),
+        )
+    return None
+
+
+def _xlsx_field_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
+    """Prefer approved XLSX header evidence for field-list questions."""
+    question = str(bundle.get("question") or "")
+    group_match = re.search(r"([\u3400-\u9fff]{1,8}专业设计参数)", question)
+    if not group_match:
+        return None
+    candidates = [
+        item
+        for item in bundle.get("candidate_evidence", [])
+        if str(item.get("file_name") or "").lower().endswith(".xlsx")
+    ]
+    if not candidates:
+        return None
+    group = group_match.group(1)
+    direct_candidates = [
+        item
+        for item in bundle.get("verified_evidence", [])
+        if str(item.get("file_name") or "").lower().endswith(".xlsx")
+    ]
+    if not direct_candidates:
+        return None
+    source_text_by_path = {
+        path: "\n".join(
+            str(item.get("text") or "")
+            for item in candidates
+            if str(item.get("source_path") or "") == path
+        )
+        for path in {str(item.get("source_path") or "") for item in candidates}
+    }
+    preferred = next(
+        (
+            item
+            for item in direct_candidates
+            if group in source_text_by_path.get(str(item.get("source_path") or ""), "")
+        ),
+        direct_candidates[0],
+    )
+    source_path = str(preferred.get("source_path") or "")
+    source_text = source_text_by_path.get(source_path, "")
+    summary = re.search(rf"{re.escape(group)}包括：(.+?)。", source_text)
+    if summary:
+        fields = [value.strip() for value in summary.group(1).split("、") if value.strip()]
+        if len(fields) >= 2:
+            return _claim(
+                "C1",
+                "DIRECT",
+                "SQ1",
+                f"{group}包括：{'、'.join(dict.fromkeys(fields))}。",
+                [preferred["evidence_id"]],
+                raw_evidence_text=summary.group(0),
+            )
+    pairs = [
+        (int(column), value.strip())
+        for column, value in re.findall(r"列(\d+)：([^|\r\n]*)", source_text)
+    ]
+    group_columns = sorted(column for column, value in pairs if value == group)
+    if not group_columns:
+        return None
+    start = group_columns[0]
+    next_group = min(
+        (column for column, value in pairs if column > start and "专业设计参数" in value),
+        default=max((column for column, _ in pairs), default=start + 1) + 1,
+    )
+    excluded = {
+        group,
+        "学校建筑产品线设计指标库",
+        "",
+        "设计参数查询范围设置/平均值",
+        "设计参数总体标准差【筛选后计算值自动更新】",
+        "设计参数范围值【筛选后计算值自动更新】",
+        "样本个数（个）【筛选后计算值自动更新】",
+    }
+    fields = []
+    for column in range(start, next_group):
+        values = [value for item_column, value in pairs if item_column == column]
+        field = next(
+            (
+                value
+                for value in values
+                if value not in excluded
+                and not value.startswith("#")
+                and not re.fullmatch(r"[-+]?\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?", value)
+                and not value.endswith("个样本")
+            ),
+            None,
+        )
+        if field and field not in fields:
+            fields.append(field)
+    if len(fields) < 2:
+        return None
+    return _claim(
+        "C1",
+        "DIRECT",
+        "SQ1",
+        f"{group}包括：{'、'.join(fields)}。",
+        [preferred["evidence_id"]],
+        raw_evidence_text=source_text,
+    )
+
+
 def _structured_claims(bundle: dict[str, Any], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if bundle["query_plan"].get("query_type") not in {"AGGREGATION_QUERY", "STRUCTURED_QUERY"}:
         return []
     if not rows:
         if bundle.get("structured_evidence_complete") is False:
             return []
+        xlsx_field_claim = _xlsx_field_claim(bundle)
+        if xlsx_field_claim is not None:
+            return [xlsx_field_claim]
         direct = [item for item in bundle["verified_evidence"] if item.get("table_id") or (item.get("location") or {}).get("table")]
         if not direct:
             return []
@@ -108,6 +344,25 @@ def _structured_claims(bundle: dict[str, Any], rows: list[dict[str, Any]]) -> li
         claims.append(_claim(f"C{index}", "DIRECT", "SQ2", f"{group}：{len(group_rows)}条。", [bundle_id], raw_evidence_text=f"{group}来源行：{','.join(map(str, row_numbers))}", source_rows=row_numbers, source_row_ids=[row["row_id"] for row in group_rows]))
     total_index = len(claims) + 1
     claims.append(_claim(f"C{total_index}", "DIRECT", "SQ2", f"合计：{len(rows)}条。", [bundle_id], raw_evidence_text=raw_text, source_rows=all_rows, source_row_ids=[row["row_id"] for row in rows]))
+    asks_benefit = any(marker in str(bundle.get("question") or "") for marker in ("增加效益", "增加收益", "增加利润", "提高利润", "提升利润", "增效", "收益"))
+    if asks_benefit:
+        benefit_markers = ("增加效益", "增加收益", "增加利润", "提高利润", "提高效益", "提升利润", "提高收益")
+        benefit_rows = [
+            row
+            for row in rows
+            if any(
+                marker in str(cell.get("normalized_value") or cell.get("raw_value") or "")
+                for cell in row.get("cells", [])
+                if cell.get("normalized_column_name") == "价值创造分析"
+                for marker in benefit_markers
+            )
+        ]
+        if benefit_rows:
+            claims.append(_claim(f"C{len(claims)+1}", "DIRECT", "SQ3", f"按“价值创造分析”中包含增效、收益或利润表述统计，共{len(benefit_rows)}条。", [bundle_id], raw_evidence_text=f"增效/收益/利润标记来源行：{','.join(str(row['row_number']) for row in benefit_rows)}", source_rows=[row["row_number"] for row in benefit_rows], source_row_ids=[row["row_id"] for row in benefit_rows]))
+            return claims
+        return claims
+    if not asks_benefit:
+        return claims
     profit_field = any("利润" in str(cell.get("normalized_column_name") or cell.get("column_name") or "") for row in rows for cell in row.get("cells", []))
     if not profit_field:
         claims.append(_claim(f"C{len(claims)+1}", "LIMITATION", "SQ3", "当前表格没有可逐行验证的利润字段，无法按“利润大于0”的口径统计增加效益条数。", [bundle_id], raw_evidence_text="No reliable profit column exists in the structured table rows.", source_rows=all_rows, source_row_ids=[row["row_id"] for row in rows]))

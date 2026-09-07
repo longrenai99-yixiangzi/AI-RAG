@@ -1,7 +1,8 @@
 import json
 
 import app.trial.v2 as v2
-from scripts.build_verified_evidence_bundle_v1 import _direct_candidate
+from openpyxl import Workbook
+from scripts.build_verified_evidence_bundle_v1 import _direct_candidate, _scope
 from app.trial.v2 import _closure_status, _core_phrases, _display_location, _evaluate_feedback_regression, _feedback_profile, _friendly_status, _with_exact_atomic_rescue
 
 
@@ -12,6 +13,34 @@ def test_v2_status_is_user_friendly():
 
 def test_v2_docx_table_citation_keeps_table_and_row_range():
     assert _display_location({"table": 11, "row_start": 4, "row_end": 37}) == "表11，第4-37行"
+
+
+def test_v2_xlsx_citation_keeps_sheet_and_row_range():
+    assert _display_location({"sheet_name": "施工图审核要点提示汇编正文", "row_start": 631, "row_end": 652}) == "施工图审核要点提示汇编正文，第631-652行"
+
+
+def test_same_named_xlsx_sections_keep_distinct_evidence(tmp_path):
+    path = tmp_path / "review.xlsx"
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "正文"
+    sheet.append(["3.动力及照明配电系统", "3.1普通电气要点", "电气"])
+    sheet.append([None, "3.2普通电气要点", "电气"])
+    sheet.append(["4.防雷接地系统", "4.1普通电气要点", "电气"])
+    sheet.append(["3.动力及照明配电系统", "3.1车库电气要点", "车库电气"])
+    sheet.append([None, "3.2车库电气要点", "车库电气"])
+    sheet.append(["4.防雷接地系统", "4.1车库电气要点", "车库电气"])
+    workbook.save(path)
+
+    engine = object.__new__(v2.V2TrialEngine)
+    engine.atomic = {}
+    engine._load_approved_xlsx_review_sections(path, "D1")
+    sections = [
+        item for item in engine.atomic.values()
+        if item.get("granularity") == "xlsx_section" and item["location"].get("section") == "3.动力及照明配电系统"
+    ]
+    assert {item["location"]["row_start"] for item in sections} == {1, 4}
+    assert {item["text"].split("专业：", 1)[1].split("\n", 1)[0] for item in sections} == {"电气", "车库电气"}
 
 
 def test_exact_core_phrase_rescue_adds_existing_shadow_evidence_without_query_injection():
@@ -89,6 +118,13 @@ def test_role_fact_candidate_can_promote_complete_role_evidence_beyond_top_five(
     candidate = {"candidate_rank": 6, "lineage_status": "LINEAGE_NOT_APPLICABLE", "scope": {}, "text": "阶段性设计成果审查由设计支持机构牵头，项目部参与。"}
     plan = {"original_question": "阶段性设计成果审查是由谁组织，谁参与？", "organization": [], "project": [], "year": [], "specialty": [], "metric": []}
     assert _direct_candidate(candidate, plan) is True
+
+
+def test_specialty_scope_can_match_explicit_evidence_text():
+    plan = {"organization": [], "project": ["工业厂房项目"], "year": [], "specialty": ["结构"], "metric": []}
+    row = {"source_path": "D:/risk.docx", "file_name": "risk.docx", "text": "设备基础与结构梁柱错位"}
+    scope, _ = _scope(plan, {}, {}, row)
+    assert scope["specialty"] == "MATCH"
 
 
 def test_negative_feedback_is_registered_as_trial_question_without_becoming_gold(tmp_path, monkeypatch):

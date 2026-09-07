@@ -33,6 +33,7 @@ from scripts.validate_knowledge_page_retrieval_rescue import build_catalog
 from .config import PROJECT_ROOT, TrialConfig, load_users
 from .read_only_guard import check_trial_readiness
 from .v2 import STATIC as V2_TRIAL_STATIC, router as v2_router
+from .batch import router as batch_router
 
 
 app = FastAPI(title="AI设计管理知识库 V1.0 Internal Trial", version="1.0-trial")
@@ -45,6 +46,7 @@ _readiness = check_trial_readiness(CONFIG)
 
 app.mount("/assets", StaticFiles(directory=str(KNOWLEDGE_UI_DIST / "assets"), check_dir=True), name="knowledge-ui-assets")
 app.include_router(v2_router)
+app.include_router(batch_router)
 _approved_source_status: list[dict[str, Any]] = []
 _approved_paragraph_locations: dict[str, int] = {}
 _approved_workbook_records: list[dict[str, Any]] = []

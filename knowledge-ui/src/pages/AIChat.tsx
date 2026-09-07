@@ -9,6 +9,8 @@ type FeedbackClosure = { candidate_id: string; question: string; feedback_type?:
 
 const EXAMPLES = ['设计任务书需要包含哪些内容？', '设计创效如何计算？', '自动喷淋系统管材有哪些方案可以比选？', '2025年公司设计创效情况如何？', '某项目有哪些设计价值创造点？']
 const STORAGE_KEY = 'v2_trial_ai_chat_messages'
+const FEEDBACK_DRAFT_KEY = 'v2_trial_feedback_draft_'
+const COMPLETED_CLOSURE_STATUSES = new Set(['CLOSED', 'REJECTED', 'DEFERRED'])
 
 function emptyFeedback(): FeedbackDraft {
   return { feedback_type: '回答不完整', comment: '', source_path: '', source_location: '', expected_answer: '', required_terms: [] }
@@ -16,6 +18,20 @@ function emptyFeedback(): FeedbackDraft {
 
 function splitTerms(value: string): string[] {
   return [...new Set(value.split(/[，,\n]/).map((item) => item.trim()).filter(Boolean))]
+}
+
+function feedbackDraftKey(queryId: string): string {
+  return `${FEEDBACK_DRAFT_KEY}${queryId}`
+}
+
+function loadFeedbackDraft(result?: V2Result): { draft: FeedbackDraft; terms: string } {
+  const empty = { draft: emptyFeedback(), terms: '' }
+  if (!result?.query_id) return empty
+  try {
+    const saved = JSON.parse(localStorage.getItem(feedbackDraftKey(result.query_id)) || 'null') as { draft?: Partial<FeedbackDraft>; terms?: string } | null
+    if (!saved) return empty
+    return { draft: { ...emptyFeedback(), ...(saved.draft || {}), required_terms: [] }, terms: typeof saved.terms === 'string' ? saved.terms : '' }
+  } catch { return empty }
 }
 
 export function AIChat() {
@@ -70,8 +86,11 @@ export function AIChat() {
       const response = await fetch('/api/v2/feedback', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query_id: result.query_id, trial_user: 'reviewer-001', ...draft }) })
       const payload = await response.json() as { feedback_event?: { growth_candidate_id?: string } }
       setFeedback(response.ok ? (payload.feedback_event?.growth_candidate_id ? `反馈已进入待审核修复队列：${payload.feedback_event.growth_candidate_id}` : '反馈已记录。') : '反馈暂未保存，请稍后重试。')
-      if (response.ok) void refreshClosures()
-    } catch { setFeedback('反馈暂未保存，请稍后重试。') }
+      if (response.ok) {
+        localStorage.removeItem(feedbackDraftKey(result.query_id))
+        void refreshClosures()
+      }
+    } catch { setFeedback('反馈暂未写入服务器，内容已暂存本机；服务恢复后可重新提交。') }
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -100,7 +119,7 @@ export function AIChat() {
 
 function AnswerCard({ message, onCitation, onFeedback }: { message: ChatMessage; onCitation: (citation: Citation) => void; onFeedback: (result: V2Result, input: FeedbackDraft | string) => Promise<void> }) {
   const result = message.result
-  const [draft, setDraft] = useState<FeedbackDraft>(emptyFeedback)
+  const [draft, setDraft] = useState<FeedbackDraft>(() => loadFeedbackDraft(message.result).draft)
   if (!result) return <article className="answer-card"><p>{message.text}</p></article>
   const answerResult = result
   const confirmed = result.claims.filter((item) => item.claim_type === 'DIRECT')
@@ -110,7 +129,8 @@ function AnswerCard({ message, onCitation, onFeedback }: { message: ChatMessage;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    void onFeedback(answerResult, draft)
+    localStorage.setItem(feedbackDraftKey(answerResult.query_id), JSON.stringify({ draft }))
+    void onFeedback(answerResult, { ...draft, required_terms: [] })
   }
 
   return <article className={`answer-card ${partial ? 'partial' : ''} ${conflict ? 'conflict' : ''}`}>
@@ -125,11 +145,9 @@ function AnswerCard({ message, onCitation, onFeedback }: { message: ChatMessage;
         <summary>提交问题反馈并纳入修复闭环</summary>
         <form onSubmit={submit}>
           <label>反馈类型<select value={draft.feedback_type} onChange={(event) => setDraft({ ...draft, feedback_type: event.target.value })}><option>回答不完整</option><option>答案错误</option><option>引用不对</option><option>没有回答我的问题</option><option>资料缺失</option><option>答案冲突</option></select></label>
-          <label>问题说明<textarea value={draft.comment} onChange={(event) => setDraft({ ...draft, comment: event.target.value })} placeholder="请说明遗漏、错误或引用不合适的原因" /></label>
-          <label>正确来源文件（可选）<input value={draft.source_path} onChange={(event) => setDraft({ ...draft, source_path: event.target.value })} placeholder="例如：D:\\工作\\…\\文件.pdf" /></label>
-          <label>来源位置（可选）<input value={draft.source_location} onChange={(event) => setDraft({ ...draft, source_location: event.target.value })} placeholder="例如：第19页、Sheet价值创造、第12行" /></label>
-          <label>业务确认的关键事实（逗号或换行分隔）<textarea value={draft.required_terms.join('、')} onChange={(event) => setDraft({ ...draft, required_terms: splitTerms(event.target.value) })} placeholder="例如：初步设计完成、专项外部审查完成" /></label>
-          <label>你认为正确的回答（仅供审核，不作为系统答案）<textarea value={draft.expected_answer} onChange={(event) => setDraft({ ...draft, expected_answer: event.target.value })} placeholder="系统会先核验来源，不能直接把这里的内容当事实发布" /></label>
+          <label>问题说明（必填）<textarea required value={draft.comment} onChange={(event) => setDraft({ ...draft, comment: event.target.value })} placeholder="请写明错在哪里、缺少什么，或正确答案中的关键数字" /></label>
+          <label>正确答案或关键事实（可选）<textarea value={draft.expected_answer} onChange={(event) => setDraft({ ...draft, expected_answer: event.target.value })} placeholder="例如：应为21个专业" /></label>
+          <small>当前问题、回答和引用已自动附带；来源文件、页码和回归关键事实可在后续反馈闭环中补充。</small>
           <button className="primary-button" type="submit">提交并创建待审核候选</button>
           <small>不会自动修改正式知识库、正式索引或正式问答。</small>
         </form>
@@ -140,10 +158,17 @@ function AnswerCard({ message, onCitation, onFeedback }: { message: ChatMessage;
 }
 
 function FeedbackClosurePanel({ closures, onRefresh }: { closures: FeedbackClosure[]; onRefresh: () => Promise<void> }) {
-  return <details className="feedback-closure-panel"><summary>反馈闭环队列（{closures.length}）</summary><p>确认来源后建立回归题；修复后再运行回归。系统不会自动发布知识。</p>{closures.length ? closures.slice(0, 8).map((closure) => <FeedbackClosureItem key={closure.candidate_id} closure={closure} onRefresh={onRefresh} />) : <span>暂无待处理反馈。</span>}</details>
+  const active = closures.filter((closure) => !COMPLETED_CLOSURE_STATUSES.has(closure.closure_status))
+  const completed = closures.filter((closure) => COMPLETED_CLOSURE_STATUSES.has(closure.closure_status))
+  return <details className="feedback-closure-panel">
+    <summary>反馈闭环队列（待处理 {active.length} / 已完成 {completed.length}）</summary>
+    <p>确认来源后建立回归题；修复后再运行回归。系统不会自动发布知识。</p>
+    {active.length ? active.slice(0, 8).map((closure) => <FeedbackClosureItem key={closure.candidate_id} closure={closure} onRefresh={onRefresh} />) : <span>暂无待处理反馈。</span>}
+    {completed.length > 0 && <details className="completed-feedback"><summary>已完成反馈（{completed.length}）</summary>{completed.slice(0, 8).map((closure) => <FeedbackClosureItem key={closure.candidate_id} closure={closure} onRefresh={onRefresh} completed />)}</details>}
+  </details>
 }
 
-function FeedbackClosureItem({ closure, onRefresh }: { closure: FeedbackClosure; onRefresh: () => Promise<void> }) {
+function FeedbackClosureItem({ closure, onRefresh, completed = false }: { closure: FeedbackClosure; onRefresh: () => Promise<void>; completed?: boolean }) {
   const event = closure.feedback_event || {}
   const [sourcePath, setSourcePath] = useState(event.source_path || '')
   const [sourceLocation, setSourceLocation] = useState(event.source_location || '')
@@ -166,7 +191,7 @@ function FeedbackClosureItem({ closure, onRefresh }: { closure: FeedbackClosure;
     if (response.ok) await onRefresh()
   }
 
-  return <article className="closure-item"><b>{closure.feedback_type || '业务反馈'} · {closure.closure_status}</b><p>{closure.question}</p>{closure.regression_case?.regression_ready_reason && <small>{closure.regression_case.regression_ready_reason}</small>}<input value={sourcePath} onChange={(event) => setSourcePath(event.target.value)} placeholder="确认来源文件路径" /><input value={sourceLocation} onChange={(event) => setSourceLocation(event.target.value)} placeholder="页码、行号或Sheet位置" /><input value={terms} onChange={(event) => setTerms(event.target.value)} placeholder="关键事实（逗号分隔）" /><div><button onClick={() => void approve()}>确认来源并建立回归题</button><button onClick={() => void runRegression()} disabled={!closure.regression_case?.ready} title={closure.regression_case?.ready ? '运行 Shadow 回归验证' : '来源尚未进入当前 Shadow 索引，暂不能运行回归'}>运行回归</button></div>{notice && <small>{notice}</small>}</article>
+  return <article className={`closure-item ${completed ? 'completed' : ''}`}><b>{closure.feedback_type || '业务反馈'} · {closure.closure_status}</b><p>{closure.question}</p>{closure.regression_case?.regression_ready_reason && <small>{closure.regression_case.regression_ready_reason}</small>}{completed ? <small>该反馈已完成闭环，保留为审核记录。</small> : <><input value={sourcePath} onChange={(event) => setSourcePath(event.target.value)} placeholder="确认来源文件路径" /><input value={sourceLocation} onChange={(event) => setSourceLocation(event.target.value)} placeholder="页码、行号或Sheet位置" /><input value={terms} onChange={(event) => setTerms(event.target.value)} placeholder="关键事实（逗号分隔）" /><div><button onClick={() => void approve()}>确认来源并建立回归题</button><button onClick={() => void runRegression()} disabled={!closure.regression_case?.ready} title={closure.regression_case?.ready ? '运行 Shadow 回归验证' : '来源尚未进入当前 Shadow 索引，暂不能运行回归'}>运行回归</button></div>{notice && <small>{notice}</small>}</>}</article>
 }
 
 function SourceDetail({ citation }: { citation: Citation }) {

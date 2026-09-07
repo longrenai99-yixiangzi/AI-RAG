@@ -33,6 +33,81 @@ def test_content_question_prefers_a_direct_content_statement():
     assert answer["claims"][0]["evidence_ids"] == ["E2"]
 
 
+def test_xlsx_field_question_prefers_the_approved_workbook_over_adjacent_docx():
+    question = "学校类产品线设计指标中，电气专业设计参数，包含哪些"
+    workbook = _evidence(
+        "DIRECT",
+        text=(
+            "第3行：列54：电气专业设计参数 | 列66：景观专业设计参数\n"
+            "第4行：列54：市政电源引入路数 | 列55：自备电源路数 | "
+            "列56：自备电源类型 | 列57：最高用电负荷等级"
+        ),
+    )
+    workbook.update({"evidence_id": "XLSX", "file_name": "产品线设计指标库（学校）.xlsx", "source_path": "D:/学校.xlsx"})
+    workbook_context = _evidence("SUPPORTING", text="第3行：列54：电气专业设计参数 | 列66：景观专业设计参数")
+    workbook_context.update({"evidence_id": "XLSX-CONTEXT", "file_name": "产品线设计指标库（学校）.xlsx", "source_path": "D:/学校.xlsx"})
+    adjacent = _evidence("DIRECT", text="智能化包含视频安防监控、电梯五方对讲。")
+    adjacent.update({"evidence_id": "DOCX", "file_name": "光谷实验中学.docx", "source_path": "D:/光谷.docx"})
+    bundle = _bundle("VERIFIED", [workbook, workbook_context, adjacent], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question)
+    answer = render(bundle)
+    assert "电气专业设计参数包括：市政电源引入路数、自备电源路数、自备电源类型、最高用电负荷等级" in answer["answer_text"]
+    assert answer["citations"][0]["source_path"] == "D:/学校.xlsx"
+
+
+def test_pdf_value_creation_question_counts_professions_from_summary_page():
+    question = "设计价值创造点清单里，包含了多少个专业"
+    evidence = _evidence(
+        "DIRECT",
+        text=(
+            "设计价值创造点各专业、阶段数量统计\n专业\n阶段\n方案设计\n初步设计\n施工图设计\n备注\n"
+            "总图规划\n9\n0\n2\n建筑\n8\n3\n48\n电气\n2\n5\n38\n合计\n88\n72\n578"
+        ),
+    )
+    evidence.update({"file_name": "设计价值创造点清单20260903.pdf", "source_path": "D:/价值创造点清单.pdf", "location": {"page": 3}})
+    answer = render(_bundle("VERIFIED", [evidence], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question, query_type="AGGREGATION_QUERY"))
+    assert answer["answer_status"] == "ANSWERED"
+    assert "3个专业" in answer["answer_text"]
+    assert answer["citations"][0]["location"] == {"page": 3}
+
+
+def test_pdf_value_creation_stage_question_is_not_taken_by_profession_count_rule():
+    question = "设计价值创造点清单中，各专业、阶段数量统计的方案设计、初步设计、施工图设计和合计分别是多少条？"
+    evidence = _evidence(
+        "DIRECT",
+        text=(
+            "设计价值创造点各专业、阶段数量统计\n专业\n阶段\n方案设计\n初步设计\n施工图设计\n备注\n"
+            "总图规划\n9\n0\n2\n建筑\n8\n3\n48\n合计\n88\n72\n578"
+        ),
+    )
+    evidence.update({"file_name": "设计价值创造点清单20260903.pdf", "location": {"page": 3}})
+    answer = render(_bundle("VERIFIED", [evidence], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question, query_type="AGGREGATION_QUERY"))
+    assert "方案设计：88条" in answer["answer_text"]
+    assert "总图规划：11条" not in answer["answer_text"]
+
+
+def test_review_point_question_renders_at_least_five_points_from_approved_xlsx_section():
+    question = "图纸审查中，电气专业的动力及照明配电系统的审查要点有哪些，说出不少于5条"
+    review = _evidence(
+        "DIRECT",
+        text=(
+            "工作表：全专业施工图审核要点提示汇编正文\n动力及照明配电系统\n"
+            "3.1由变电所供电的住宅宜采用TN系统。\n"
+            "3.3设备间、竖井面积合理。\n"
+            "3.4暗装配电箱位置合理。\n"
+            "3.6与其它系统联动关系明确。\n"
+            "3.7配电系统图应标注详细。"
+        ),
+    )
+    review.update({"evidence_id": "REVIEW-XLSX", "file_name": "全专业施工图审核要点提示汇编（2026年）.xlsx", "source_path": "D:/审核要点.xlsx"})
+    adjacent = _evidence("DIRECT", text="电气专业有3条风险。")
+    adjacent.update({"evidence_id": "RISK-DOCX", "file_name": "能源环保风险清单.docx", "source_path": "D:/风险.docx"})
+    bundle = _bundle("VERIFIED", [review, adjacent], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question)
+    answer = render(bundle)
+    assert "3.1由变电所供电的住宅宜采用TN系统" in answer["answer_text"]
+    assert "3.7配电系统图应标注详细" in answer["answer_text"]
+    assert answer["citations"][0]["source_path"] == "D:/审核要点.xlsx"
+
+
 def test_verified_answer_uses_the_best_repeated_local_anchor():
     question = "\u8bbe\u8ba1\u4efb\u52a1\u4e66\u9700\u8981\u5305\u542b\u54ea\u4e9b\u5185\u5bb9\uff1f"
     text = "\u8bbe\u8ba1\u4efb\u52a1\u4e66\u7ba1\u7406\u3002\n\u8bbe\u8ba1\u4efb\u52a1\u4e66\u5e94\u5305\u542b\u8bbe\u8ba1\u8303\u56f4\u548c\u6210\u679c\u8981\u6c42\u3002"

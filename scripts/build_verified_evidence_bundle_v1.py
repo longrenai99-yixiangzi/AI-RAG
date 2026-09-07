@@ -104,6 +104,10 @@ def _candidate(row: dict[str, Any], plan: dict[str, Any], documents: dict[str, d
 def _scope(plan: dict[str, Any], document: dict[str, Any], source: dict[str, Any], row: dict[str, Any]) -> tuple[dict[str, str], str]:
     scope = document.get("scope") or {}
     result = {}
+    evidence_text = " ".join(
+        str(value or "")
+        for value in (row.get("text"), source.get("text"), row.get("heading_path"), source.get("heading_path"))
+    ).casefold()
     for field, values in (("organization", plan.get("organization", [])), ("project", plan.get("project", [])), ("year", plan.get("year", [])), ("specialty", plan.get("specialty", []))):
         candidate_values = document.get(field) or scope.get(field) or []
         candidate_values = candidate_values if isinstance(candidate_values, list) else [candidate_values]
@@ -113,6 +117,8 @@ def _scope(plan: dict[str, Any], document: dict[str, Any], source: dict[str, Any
         elif any(str(value).casefold() in json.dumps(candidate_values, ensure_ascii=False).casefold() for value in values):
             result[field] = "MATCH"
         elif field in {"project", "year"} and any(str(value).casefold() in identity or _scope_alias(value).casefold() in identity for value in values):
+            result[field] = "MATCH"
+        elif field == "specialty" and any(str(value).casefold() in evidence_text for value in values):
             result[field] = "MATCH"
         elif candidate_values:
             result[field] = "MISMATCH"
@@ -165,7 +171,7 @@ def _same_scope_conflicts(candidates: list[dict[str, Any]], plan: dict[str, Any]
     return {candidate["evidence_id"]: "SAME_SCOPE_CONFLICT: same organization/year/metric with different numeric facts; rank cannot resolve." for candidate in matched}
 
 
-def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[dict[str, Any]], structured_rows: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     direct = [candidate for candidate in candidates if candidate["role"] == "DIRECT"]
     conflicts = [candidate for candidate in candidates if candidate["role"] == "CONFLICTING"]
     rows = []
@@ -173,7 +179,7 @@ def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[di
         if conflicts:
             status = "CONFLICTED"
             evidence = [candidate["evidence_id"] for candidate in conflicts]
-        elif plan.get("query_type") in {"AGGREGATION_QUERY", "STRUCTURED_QUERY"} and "FILTER" in plan.get("aggregation_plan", []) and index == len(subquestions):
+        elif plan.get("query_type") in {"AGGREGATION_QUERY", "STRUCTURED_QUERY"} and "FILTER" in plan.get("aggregation_plan", []) and index == len(subquestions) and not structured_rows:
             status = "EVIDENCE_INSUFFICIENT"
             evidence = []
         elif direct:

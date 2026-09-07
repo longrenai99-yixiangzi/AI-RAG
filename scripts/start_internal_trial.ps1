@@ -13,6 +13,26 @@ if (-not (Test-Path -LiteralPath $pythonPath)) {
     throw "V1 Python environment not found: $pythonPath"
 }
 
+# Reuse a healthy trial service, or wait for the previous trial process to
+# release the port after a stop/start cycle. Never take over an unknown owner.
+for ($waitIndex = 0; $waitIndex -lt 15; $waitIndex++) {
+    $listener = Get-NetTCPConnection -State Listen -LocalPort 8010 -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $listener) { break }
+    $listenerProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $($listener.OwningProcess)"
+    if ($null -eq $listenerProcess -or $listenerProcess.CommandLine -notmatch 'app\.trial\.main:app') {
+        throw 'STARTUP_BLOCKED: port 8010 is not owned by the V1 Internal Trial Service.'
+    }
+    try {
+        $existingHealth = Invoke-WebRequest -Uri "http://${healthHost}:8010/api/health" -UseBasicParsing -TimeoutSec 2
+        if ($existingHealth.StatusCode -eq 200) {
+            Start-Process "http://${healthHost}:8010/knowledge-os" | Out-Null
+            Write-Output 'Internal Trial Service is already ready on localhost port 8010.'
+            exit 0
+        }
+    } catch { }
+    Start-Sleep -Seconds 1
+}
+
 & $pythonPath $readinessScript
 if ($LASTEXITCODE -ne 0) {
     throw 'STARTUP_BLOCKED: Trial readiness check failed.'

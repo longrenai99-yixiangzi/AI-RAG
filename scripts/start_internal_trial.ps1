@@ -67,5 +67,5 @@ if ($null -eq $listenerProcess -or $listenerProcess.CommandLine -notmatch 'app\.
 }
 Set-Content -LiteralPath $pidPath -Value $listener.OwningProcess -Encoding ascii
 
-Start-Process "http://${healthHost}:8010/v2-trial" | Out-Null
+Start-Process "http://${healthHost}:8010/knowledge-os" | Out-Null
 Write-Output 'Internal Trial Service is ready on localhost port 8010.'

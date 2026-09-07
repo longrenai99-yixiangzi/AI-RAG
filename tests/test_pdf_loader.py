@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.ingestion.loaders.pdf_loader import PDFLoader
+from app.ingestion.loaders.pdf_loader import PDFLoader, extract_value_creation_rows, extract_value_creation_summary
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "pdf"
@@ -54,3 +54,60 @@ def test_broken_pdf_returns_read_error_without_raising() -> None:
     assert result.blocks == []
     assert result.quality is None
     assert result.error
+
+
+def test_value_creation_summary_extracts_stage_counts() -> None:
+    text = """设计价值创造点各专业、阶段数量统计
+专业
+阶段
+方案设计
+初步设计
+施工图设计
+备注
+总图规划
+9
+0
+2
+电气
+2
+5
+38
+合计
+88
+72
+578
+"""
+    assert extract_value_creation_summary(text)["合计"] == (88, 72, 578)
+
+
+def test_value_creation_rows_extract_value_item_and_applicability() -> None:
+    text = """序号
+专业类别
+部位或所属系统
+图纸阶段
+业态
+价值项
+价值点成效
+适用条件说明
+工期
+施工
+品质
+收入
+成本
+效益
+1
+总图规划
+场地整体控制
+方案设计
+学校
+价值点内容
+-
++
+/
+/
+-
++
+适用于山地或高差较大的项目。
+"""
+    assert extract_value_creation_rows(text)[0]["value_item"] == "价值点内容"
+    assert extract_value_creation_rows(text)[0]["applicability"] == "适用于山地或高差较大的项目。"

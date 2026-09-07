@@ -86,14 +86,14 @@ def _entities(question: str) -> list[str]:
     values = []
     for match in ENTITY_RE.finditer(question):
         value = re.sub(r"^20\d{2}年", "", match.group(1)).strip("（）() ")
-        if value and value not in {"设计示范项目", "EPC项目", "项目"} and not value.startswith(("设计", "示范", "当前")):
+        if value and value not in {"设计示范项目", "EPC项目", "项目"} and not ("设计示范" in value and value.endswith("项目")) and not value.startswith(("设计", "示范", "当前")):
             values.append(value)
     return list(dict.fromkeys(values))
 
 
 def _aggregation_plan(question: str) -> list[str]:
     operations = []
-    if any(term in question for term in ("有哪些", "哪些专业", "哪几个专业", "列出")):
+    if any(term in question for term in ("有哪些", "包含哪些", "包括哪些", "哪些专业", "哪几个专业", "列出")):
         operations.append("LIST_DISTINCT")
     if any(term in question for term in ("每个", "各专业", "分别", "按专业", "按项目", "分组")):
         operations.append("GROUP_BY")

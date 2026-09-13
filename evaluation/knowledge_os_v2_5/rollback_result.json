@@ -1,0 +1,12 @@
+{
+  "schema_version": "knowledge_os_v2_5.rollback_result",
+  "captured_at": "2026-09-13T10:10:43.550204+08:00",
+  "status": "READY",
+  "switch_performed": false,
+  "rollback_target": "D:\\AI智能体\\AI设计管理RAG-V1\\evaluation\\knowledge_os_v2_4\\candidate_frozen_manifest.json",
+  "rollback_target_sha256": "bb380b135dedd91c6a4ced2ee5b342101a770cbc586e75523c30b797bf58f1dd",
+  "v2_4_frozen_candidate_unchanged": true,
+  "v1_index_intact": true,
+  "formal_8000_touched": false,
+  "note": "未执行线上切换；回滚验证为冻结 V2.4 候选仍可直接作为恢复目标。"
+}

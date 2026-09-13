@@ -1,0 +1,19 @@
+{
+  "schema_version": "knowledge_os_v2_6.source_version_policy",
+  "captured_at": "2026-09-13T10:19:04.302278+08:00",
+  "semantic_version": {
+    "meaning": "业务负责人提供的正式版号/发文版号/发布日期版号",
+    "available_for_current_sources": false
+  },
+  "content_hash_version": {
+    "meaning": "物理文件 SHA-256，用于不可变内容追溯",
+    "available_for_current_sources": true,
+    "algorithm": "SHA-256"
+  },
+  "effective_version": {
+    "meaning": "经内容负责人确认后可用于内部试用的有效版本",
+    "current_status": "OWNER_APPROVED_CONTENT_HASH",
+    "approved_at": "2026-09-13T10:28:02.797117+08:00"
+  },
+  "codex_boundary": "Codex 只能记录 SOURCE_VERSION_REVIEW_REQUIRED，不能代替内容负责人确认正式版本。"
+}

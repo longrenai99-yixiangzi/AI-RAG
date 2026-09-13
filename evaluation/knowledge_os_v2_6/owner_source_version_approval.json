@@ -1,0 +1,103 @@
+{
+  "schema_version": "knowledge_os_v2_6.owner_source_version_approval",
+  "captured_at": "2026-09-13T10:19:04.302278+08:00",
+  "approval_statuses_allowed": [
+    "APPROVED",
+    "REJECTED",
+    "PENDING"
+  ],
+  "source_version_gate": "PASS",
+  "approved_count": 5,
+  "pending_count": 0,
+  "rejected_count": 0,
+  "records": [
+    {
+      "source_id": "V25-2a297977c7ab40713f8bf79e",
+      "file_name": "《项目设计管理手册》.pdf",
+      "source_path": "D:\\工作\\二公司技术部\\2026\\各类文件\\设计管理\\《项目设计管理手册》.pdf",
+      "sha256": "00a2c80e72ed3b87235a46f57f619ac12d2940c48f4f8ebcc5a11267541a0fc8",
+      "semantic_version": null,
+      "semantic_version_available": false,
+      "version_policy": "CONTENT_HASH",
+      "effective_status": "APPROVED",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-13T10:28:02.797117+08:00",
+      "approval_status": "APPROVED",
+      "review_note": "用户明确确认：当前物理文件 SHA-256 作为 CONTENT_HASH effective_version；该确认不等于授权切换 8010。",
+      "owner_gold_refs": [
+        "BA-001",
+        "BA-002"
+      ]
+    },
+    {
+      "source_id": "V25-0d35733c834b5b21d4db102a",
+      "file_name": "全专业施工图审核要点提示汇编（2026年）.xlsx",
+      "source_path": "D:\\工作\\二公司技术部\\2026\\知识库\\全专业施工图审核要点提示汇编\\全专业施工图审核要点提示汇编（2026年）.xlsx",
+      "sha256": "428aa7f36f1b4d8518f727b0a5703fb34452ee67b196fd97009d0ea6d31693d9",
+      "semantic_version": null,
+      "semantic_version_available": false,
+      "version_policy": "CONTENT_HASH",
+      "effective_status": "APPROVED",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-13T10:28:02.797117+08:00",
+      "approval_status": "APPROVED",
+      "review_note": "用户明确确认：当前物理文件 SHA-256 作为 CONTENT_HASH effective_version；该确认不等于授权切换 8010。",
+      "owner_gold_refs": [
+        "BA-005"
+      ]
+    },
+    {
+      "source_id": "V25-981e1d26667b6fcca4766db4",
+      "file_name": "3.二公司：2026年设计与技术专项责任书 .docx",
+      "source_path": "D:\\工作\\二公司技术部\\2026\\责任状\\局\\3.二公司：2026年设计与技术专项责任书 .docx",
+      "sha256": "286f7cb3be0999d7e61691ea743e6637d763abed1886a7003f1c20671de9b07e",
+      "semantic_version": null,
+      "semantic_version_available": false,
+      "version_policy": "CONTENT_HASH",
+      "effective_status": "APPROVED",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-13T10:28:02.797117+08:00",
+      "approval_status": "APPROVED",
+      "review_note": "用户明确确认：当前物理文件 SHA-256 作为 CONTENT_HASH effective_version；该确认不等于授权切换 8010。",
+      "owner_gold_refs": [
+        "BA-006"
+      ]
+    },
+    {
+      "source_id": "V25-73615154d681ddb96f65ecb5",
+      "file_name": "关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx",
+      "source_path": "D:\\工作\\二公司技术部\\2026\\示范工程\\关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx",
+      "sha256": "bb3f39087a9130c4dbbbcfc59bd636c9cb0cfe4f33ded6a3e07c7ad70713bfa4",
+      "semantic_version": null,
+      "semantic_version_available": false,
+      "version_policy": "CONTENT_HASH",
+      "effective_status": "APPROVED",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-13T10:28:02.797117+08:00",
+      "approval_status": "APPROVED",
+      "review_note": "用户明确确认：当前物理文件 SHA-256 作为 CONTENT_HASH effective_version；该确认不等于授权切换 8010。",
+      "owner_gold_refs": [
+        "BA-007"
+      ]
+    },
+    {
+      "source_id": "V25-66d32d66e4673288d0c52a6a",
+      "file_name": "EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+      "source_path": "D:\\工作\\二公司技术部\\2026\\EPC项目双周推进会\\4月\\EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+      "sha256": "00829d604999f10de9b18ff5270ddc2ae5ae32c2607b228ac02b8133f144ea30",
+      "semantic_version": null,
+      "semantic_version_available": false,
+      "version_policy": "CONTENT_HASH",
+      "effective_status": "APPROVED",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-13T10:28:02.797117+08:00",
+      "approval_status": "APPROVED",
+      "review_note": "用户明确确认：当前物理文件 SHA-256 作为 CONTENT_HASH effective_version；该确认不等于授权切换 8010。",
+      "owner_gold_refs": [
+        "BA-009"
+      ]
+    }
+  ],
+  "approved_by": "USER_CONFIRMED",
+  "approved_at": "2026-09-13T10:28:02.797117+08:00"
+}

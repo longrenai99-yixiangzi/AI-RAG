@@ -1,0 +1,45 @@
+{
+  "schema_version": "knowledge_os_v2_5.v2_4_baseline_manifest",
+  "captured_at": "2026-09-13T10:10:24.933885+08:00",
+  "source_manifest": "D:\\AI智能体\\AI设计管理RAG-V1\\evaluation\\knowledge_os_v2_4\\candidate_frozen_manifest.json",
+  "baseline": {
+    "schema_version": "knowledge_os_v2_4.candidate_frozen_manifest",
+    "status": "FROZEN",
+    "captured_at": "2026-09-12T11:54:08.855048+08:00",
+    "git_head": "a1a4fe835a32ed40c1f894c8f8aeadd28cab5c0a",
+    "source_hash": "d4567eaa5047a359aa695defab47e4319ca24517a109ce3d539527ae15a9c799",
+    "chunk_version": "structured_knowledge.v2",
+    "index_hash": "d4567eaa5047a359aa695defab47e4319ca24517a109ce3d539527ae15a9c799",
+    "embedding_model": "BAAI/bge-m3",
+    "embedding_version": "771c230b19efa5b96b629b45a8f271baa8feb3ff1fb1bb733ddebdd20165cf94",
+    "bm25_config": {
+      "section_path": 5,
+      "file_name": 3,
+      "knowledge_type": 2,
+      "raw_text": 1
+    },
+    "rrf_config": {
+      "type": "RRF",
+      "k": 60
+    },
+    "validator_config": {
+      "false_reject_target": 0.1
+    },
+    "candidate_hash": "0d6c8de71875b8eb52858d014939eb374017bf3aef22f6f876f6456cd489f3b0",
+    "dense_vectors": {
+      "path": "D:\\AI智能体\\AI设计管理RAG-V1\\evaluation\\knowledge_os_v2_3\\dense_embeddings.npy",
+      "sha256": "771c230b19efa5b96b629b45a8f271baa8feb3ff1fb1bb733ddebdd20165cf94",
+      "count": 8902
+    },
+    "reranker": {
+      "enabled": false,
+      "reason": "Reranker reduced MRR from 0.5073 to 0.4683 on confirmed Retrieval Gold."
+    },
+    "runtime": {
+      "formal_8000_touched": false,
+      "formal_qdrant_write": false,
+      "candidate_parameter_changes": false
+    }
+  },
+  "formal_8000_touched": false
+}

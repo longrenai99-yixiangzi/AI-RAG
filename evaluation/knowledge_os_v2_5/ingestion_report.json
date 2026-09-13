@@ -1,0 +1,23 @@
+{
+  "schema_version": "knowledge_os_v2_5.ingestion_report",
+  "captured_at": "2026-09-12T12:38:21.708735+08:00",
+  "source_count": 5,
+  "documents_added": 5,
+  "documents_parse_status": {
+    "parsed": 5
+  },
+  "sections_added": 77,
+  "tables_added": 5,
+  "table_rows_added": 1616,
+  "atomic_evidence_added": 7159,
+  "semantic_chunks_total": 10711,
+  "semantic_chunks_added": 1809,
+  "changed_old_chunks": 0,
+  "quarantined_added": 9,
+  "duplicate_added": 77,
+  "node_binding_added": 1891,
+  "source_version_recorded": true,
+  "quality_gate": "PASS",
+  "staging_path": "D:\\AI智能体\\AI设计管理RAG-V1\\data\\shadow\\knowledge_v2_5_staging",
+  "formal_8000_touched": false
+}

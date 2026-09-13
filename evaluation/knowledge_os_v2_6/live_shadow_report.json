@@ -1,0 +1,45 @@
+{
+  "schema_version": "knowledge_os_v2_6.live_shadow_report",
+  "captured_at": "2026-09-13T10:34:53.893359+08:00",
+  "execution_mode": "REPLAY_EXISTING_REAL_TRIAL_LOG_WITH_BM25_PREVIEW_ONLY",
+  "live_runtime_branching": false,
+  "sample_size": 15,
+  "sample_basis": "unique real questions from logs/trial/trial_audit.jsonl and data/trial_feedback/feedback.jsonl; malformed and duplicate questions removed; no synthetic questions generated",
+  "sample_target": 100,
+  "minimum_effective_sample": 30,
+  "sample_gate": "SHADOW_INSUFFICIENT_SAMPLE",
+  "query_encoder_device": "NOT_RUN_GPU_HEADROOM_PROTECTION",
+  "v2_candidate_execution": "BM25_ONLY_DIAGNOSTIC_PREVIEW; NOT_LIVE_V2_5_ANSWER_ENGINE",
+  "agreement": {
+    "source_agreement_count": 1,
+    "source_agreement_rate": 0.0667,
+    "section_agreement_count": 0,
+    "section_agreement_rate": 0
+  },
+  "new_hits": {
+    "candidate_count": 0,
+    "verified_count": 0,
+    "verification": "REVIEW_REQUIRED"
+  },
+  "lost_hits": {
+    "candidate_count": 0,
+    "verified_count": 0,
+    "verification": "REVIEW_REQUIRED"
+  },
+  "critical_failures": "NOT_ASSESSED_WITHOUT_V2_5_ANSWER_ENGINE",
+  "latency": {
+    "v1_p50_ms": null,
+    "v1_p95_ms": null,
+    "v2_p50_ms": null,
+    "v2_p95_ms": null
+  },
+  "errors": {
+    "v1_error_count": 0,
+    "v2_error_count": 15,
+    "v2_error_rate": 1.0
+  },
+  "shadow_gate": "SHADOW_INSUFFICIENT_SAMPLE",
+  "stop_reason": "真实唯一问题样本少于30，且本次未重复刷题；V2.5答案引擎未接入8010 Live Runtime，不能把离线检索回放冒充Live Shadow。",
+  "formal_8000_touched": false,
+  "records_path": "D:\\AI智能体\\AI设计管理RAG-V1\\evaluation\\knowledge_os_v2_6\\live_shadow_runs.jsonl"
+}

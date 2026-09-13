@@ -1,0 +1,191 @@
+{
+  "schema_version": "knowledge_os_v2_5.source_coverage_smoke_test",
+  "captured_at": "2026-09-13T10:10:24.583296+08:00",
+  "scope": "six_not_evaluable_owner_gold_sources",
+  "expected_count": 6,
+  "passed_count": 6,
+  "failed_count": 0,
+  "gate": "PASS",
+  "formal_8000_touched": false,
+  "staging_path": "D:\\AI智能体\\AI设计管理RAG-V1\\data\\shadow\\knowledge_v2_5_staging",
+  "records": [
+    {
+      "regression_id": "SRG-001",
+      "source_answer_gold_id": null,
+      "file_name": "《项目设计管理手册》.pdf",
+      "expected_source": "D:\\工作\\二公司技术部\\2026\\各类文件\\设计管理\\《项目设计管理手册》.pdf",
+      "physical_exists": true,
+      "staged_document_count": 1,
+      "staged_chunk_count": 189,
+      "staged_atomic_evidence_count": 5547,
+      "section_evidence": [
+        {
+          "section": "Page 17 / 9.1 设计任务书编制",
+          "matches": 2,
+          "chunk_ids": [
+            "3cff5b63-d034-586f-8ec4-31b10d5a51db",
+            "e82d6b89-4177-5eae-b17a-20ea5cd99217"
+          ]
+        }
+      ],
+      "claim_evidence": [],
+      "status": "PASS",
+      "failure": ""
+    },
+    {
+      "regression_id": "SRG-002",
+      "source_answer_gold_id": null,
+      "file_name": "《项目设计管理手册》.pdf",
+      "expected_source": "D:\\工作\\二公司技术部\\2026\\各类文件\\设计管理\\《项目设计管理手册》.pdf",
+      "physical_exists": true,
+      "staged_document_count": 1,
+      "staged_chunk_count": 189,
+      "staged_atomic_evidence_count": 5547,
+      "section_evidence": [
+        {
+          "section": "Page 30 / 17.3.2 设计创效计算",
+          "matches": 1,
+          "chunk_ids": [
+            "f58be7d6-69e4-582b-8724-7ced459ea6ae"
+          ]
+        }
+      ],
+      "claim_evidence": [],
+      "status": "PASS",
+      "failure": ""
+    },
+    {
+      "regression_id": "SRG-004",
+      "source_answer_gold_id": null,
+      "file_name": "全专业施工图审核要点提示汇编（2026年）.xlsx",
+      "expected_source": "D:\\工作\\二公司技术部\\2026\\知识库\\全专业施工图审核要点提示汇编\\全专业施工图审核要点提示汇编（2026年）.xlsx",
+      "physical_exists": true,
+      "staged_document_count": 1,
+      "staged_chunk_count": 1531,
+      "staged_atomic_evidence_count": 1487,
+      "section_evidence": [
+        {
+          "row": 1450,
+          "matches": 1,
+          "evidence_ids": [
+            "12c18a42-e51f-587e-9ac5-e54e32431695"
+          ]
+        },
+        {
+          "row": 1451,
+          "matches": 1,
+          "evidence_ids": [
+            "d24d48ea-bb57-5008-a3b9-56e76d940ae9"
+          ]
+        },
+        {
+          "row": 1452,
+          "matches": 1,
+          "evidence_ids": [
+            "fac90ca2-752d-5b3e-b280-27b26e13c8b4"
+          ]
+        },
+        {
+          "row": 1453,
+          "matches": 1,
+          "evidence_ids": [
+            "6e40b572-1d76-5439-a521-eae5380d5b7a"
+          ]
+        },
+        {
+          "row": 1454,
+          "matches": 1,
+          "evidence_ids": [
+            "0ca91c69-e90e-5e53-91dd-0a33cba6dd43"
+          ]
+        },
+        {
+          "row": 1455,
+          "matches": 1,
+          "evidence_ids": [
+            "18a7a538-a2a0-54e9-8590-1bb63f53356a"
+          ]
+        }
+      ],
+      "claim_evidence": [],
+      "status": "PASS",
+      "failure": ""
+    },
+    {
+      "regression_id": "SRG-005",
+      "source_answer_gold_id": null,
+      "file_name": "3.二公司：2026年设计与技术专项责任书 .docx",
+      "expected_source": "D:\\工作\\二公司技术部\\2026\\责任状\\局\\3.二公司：2026年设计与技术专项责任书 .docx",
+      "physical_exists": true,
+      "staged_document_count": 1,
+      "staged_chunk_count": 45,
+      "staged_atomic_evidence_count": 60,
+      "section_evidence": [
+        {
+          "table": 1,
+          "field": "考核内容",
+          "matches": 1,
+          "evidence_ids": [
+            "772d9b4a-9a4d-5e5e-8696-9b6826b203ca"
+          ]
+        }
+      ],
+      "claim_evidence": [],
+      "status": "PASS",
+      "failure": ""
+    },
+    {
+      "regression_id": "SRG-006",
+      "source_answer_gold_id": null,
+      "file_name": "关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx",
+      "expected_source": "D:\\工作\\二公司技术部\\2026\\示范工程\\关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx",
+      "physical_exists": true,
+      "staged_document_count": 1,
+      "staged_chunk_count": 2,
+      "staged_atomic_evidence_count": 21,
+      "section_evidence": [
+        {
+          "section": "一、设计示范工程实施要求",
+          "matches": 1,
+          "evidence_ids": [
+            "df5d974a-25f1-52bb-92b2-8d6a90edb218"
+          ]
+        }
+      ],
+      "claim_evidence": [],
+      "status": "PASS",
+      "failure": ""
+    },
+    {
+      "regression_id": "SRG-008",
+      "source_answer_gold_id": null,
+      "file_name": "EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+      "expected_source": "D:\\工作\\二公司技术部\\2026\\EPC项目双周推进会\\4月\\EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+      "physical_exists": true,
+      "staged_document_count": 1,
+      "staged_chunk_count": 42,
+      "staged_atomic_evidence_count": 44,
+      "section_evidence": [
+        {
+          "sheet_name": "Sheet1 (2)",
+          "row": 17,
+          "matches": 1,
+          "evidence_ids": [
+            "320e2ff6-e1c9-521b-a18d-cc5ba33aad75"
+          ]
+        },
+        {
+          "sheet_name": "Sheet1 (2)",
+          "row": 18,
+          "matches": 1,
+          "evidence_ids": [
+            "34d9b7b0-464f-5c56-8624-128bad0a1b19"
+          ]
+        }
+      ],
+      "claim_evidence": [],
+      "status": "PASS",
+      "failure": ""
+    }
+  ]
+}

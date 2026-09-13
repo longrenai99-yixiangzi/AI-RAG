@@ -1,0 +1,36 @@
+{
+  "schema_version": "knowledge_os_v2_5.shadow_result",
+  "captured_at": "2026-09-13T10:10:43.550204+08:00",
+  "status": "PASS",
+  "checks": {
+    "candidate_frozen": true,
+    "coverage_6_of_6": true,
+    "retrieval_gold_50": true,
+    "answer_gold_30": true,
+    "strict_30_of_30": true,
+    "variants_30_of_30": true,
+    "observational_48": true,
+    "staging_exists": true,
+    "formal_8000_untouched": true
+  },
+  "metrics": {
+    "new_hit": 0,
+    "lost_hit": 0,
+    "agreement": 30,
+    "agreement_rate": 1.0,
+    "citation_change": 0,
+    "latency_p50_ms": 1596.95,
+    "latency_p95_ms": 2060.5,
+    "error_rate": 0.0,
+    "sample": "sealed_holdout_30",
+    "scored": false
+  },
+  "candidate_path": "D:\\AI智能体\\AI设计管理RAG-V1\\evaluation\\knowledge_os_v2_5\\candidate_v2_5_manifest.json",
+  "staging_path": "D:\\AI智能体\\AI设计管理RAG-V1\\data\\shadow\\knowledge_v2_5_staging",
+  "runtime": {
+    "formal_qdrant_write": false,
+    "formal_8000_touched": false,
+    "8010_switch": "NOT_USED",
+    "shadow_mode": "isolated_candidate_only"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "schema_version": "knowledge_os_v2_5.admitted_sources",
+  "captured_at": "2026-09-12T12:38:21.708735+08:00",
+  "count": 5,
+  "records": [
+    {
+      "source_id": "V25-2a297977c7ab40713f8bf79e",
+      "source_version": "00a2c80e72ed3b87235a46f57f619ac12d2940c48f4f8ebcc5a11267541a0fc8",
+      "source_hash": "00a2c80e72ed3b87235a46f57f619ac12d2940c48f4f8ebcc5a11267541a0fc8",
+      "effective_status": "OWNER_GOLD_ADMITTED",
+      "source_path": "D:\\工作\\二公司技术部\\2026\\各类文件\\设计管理\\《项目设计管理手册》.pdf",
+      "owner_gold_refs": [
+        "BA-001",
+        "BA-002"
+      ],
+      "file_name": "《项目设计管理手册》.pdf",
+      "file_type": ".pdf"
+    },
+    {
+      "source_id": "V25-0d35733c834b5b21d4db102a",
+      "source_version": "428aa7f36f1b4d8518f727b0a5703fb34452ee67b196fd97009d0ea6d31693d9",
+      "source_hash": "428aa7f36f1b4d8518f727b0a5703fb34452ee67b196fd97009d0ea6d31693d9",
+      "effective_status": "OWNER_GOLD_ADMITTED",
+      "source_path": "D:\\工作\\二公司技术部\\2026\\知识库\\全专业施工图审核要点提示汇编\\全专业施工图审核要点提示汇编（2026年）.xlsx",
+      "owner_gold_refs": [
+        "BA-005"
+      ],
+      "file_name": "全专业施工图审核要点提示汇编（2026年）.xlsx",
+      "file_type": ".xlsx"
+    },
+    {
+      "source_id": "V25-981e1d26667b6fcca4766db4",
+      "source_version": "286f7cb3be0999d7e61691ea743e6637d763abed1886a7003f1c20671de9b07e",
+      "source_hash": "286f7cb3be0999d7e61691ea743e6637d763abed1886a7003f1c20671de9b07e",
+      "effective_status": "OWNER_GOLD_ADMITTED",
+      "source_path": "D:\\工作\\二公司技术部\\2026\\责任状\\局\\3.二公司：2026年设计与技术专项责任书 .docx",
+      "owner_gold_refs": [
+        "BA-006"
+      ],
+      "file_name": "3.二公司：2026年设计与技术专项责任书 .docx",
+      "file_type": ".docx"
+    },
+    {
+      "source_id": "V25-73615154d681ddb96f65ecb5",
+      "source_version": "bb3f39087a9130c4dbbbcfc59bd636c9cb0cfe4f33ded6a3e07c7ad70713bfa4",
+      "source_hash": "bb3f39087a9130c4dbbbcfc59bd636c9cb0cfe4f33ded6a3e07c7ad70713bfa4",
+      "effective_status": "OWNER_GOLD_ADMITTED",
+      "source_path": "D:\\工作\\二公司技术部\\2026\\示范工程\\关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx",
+      "owner_gold_refs": [
+        "BA-007"
+      ],
+      "file_name": "关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx",
+      "file_type": ".docx"
+    },
+    {
+      "source_id": "V25-66d32d66e4673288d0c52a6a",
+      "source_version": "00829d604999f10de9b18ff5270ddc2ae5ae32c2607b228ac02b8133f144ea30",
+      "source_hash": "00829d604999f10de9b18ff5270ddc2ae5ae32c2607b228ac02b8133f144ea30",
+      "effective_status": "OWNER_GOLD_ADMITTED",
+      "source_path": "D:\\工作\\二公司技术部\\2026\\EPC项目双周推进会\\4月\\EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+      "owner_gold_refs": [
+        "BA-009"
+      ],
+      "file_name": "EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+      "file_type": ".xlsx"
+    }
+  ]
+}

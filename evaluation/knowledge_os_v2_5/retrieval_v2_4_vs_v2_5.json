@@ -1,0 +1,87 @@
+{
+  "schema_version": "knowledge_os_v2_5.retrieval_v2_4_vs_v2_5",
+  "captured_at": "2026-09-12T12:19:49.435708+08:00",
+  "gold_count": 50,
+  "baseline": {
+    "evaluated": 50,
+    "file": {
+      "recall@5": 0.5,
+      "recall@10": 0.54,
+      "recall@20": 0.56,
+      "mrr": 0.5073,
+      "ndcg@10": 0.5138,
+      "miss": 22
+    },
+    "section": {
+      "recall@5": 0.48,
+      "recall@10": 0.54,
+      "recall@20": 0.56,
+      "mrr": 0.4895,
+      "ndcg@10": 0.4998,
+      "miss": 22
+    },
+    "row": {
+      "recall@5": 0.48,
+      "recall@10": 0.54,
+      "recall@20": 0.56,
+      "mrr": 0.4895,
+      "ndcg@10": 0.4998,
+      "miss": 22
+    }
+  },
+  "candidate": {
+    "evaluated": 50,
+    "file": {
+      "recall@5": 0.64,
+      "recall@10": 0.66,
+      "recall@20": 0.66,
+      "mrr": 0.604,
+      "ndcg@10": 0.6175,
+      "miss": 17
+    },
+    "section": {
+      "recall@5": 0.54,
+      "recall@10": 0.58,
+      "recall@20": 0.58,
+      "mrr": 0.5196,
+      "ndcg@10": 0.5335,
+      "miss": 21
+    },
+    "row": {
+      "recall@5": 0.54,
+      "recall@10": 0.58,
+      "recall@20": 0.58,
+      "mrr": 0.5196,
+      "ndcg@10": 0.5335,
+      "miss": 21
+    }
+  },
+  "delta": {
+    "file": {
+      "recall@5": 0.14,
+      "recall@10": 0.12,
+      "recall@20": 0.1,
+      "mrr": 0.0967,
+      "ndcg@10": 0.1037,
+      "miss": -5
+    },
+    "section": {
+      "recall@5": 0.06,
+      "recall@10": 0.04,
+      "recall@20": 0.02,
+      "mrr": 0.0301,
+      "ndcg@10": 0.0337,
+      "miss": -1
+    },
+    "row": {
+      "recall@5": 0.06,
+      "recall@10": 0.04,
+      "recall@20": 0.02,
+      "mrr": 0.0301,
+      "ndcg@10": 0.0337,
+      "miss": -1
+    }
+  },
+  "gate": "PASS",
+  "note": "No metric threshold or retrieval parameter was changed; delta is reported for owner review."
+}

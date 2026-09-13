@@ -1,0 +1,38 @@
+{
+  "schema_version": "knowledge_os_v2_6.release_baseline",
+  "captured_at": "2026-09-13T10:19:04.302278+08:00",
+  "git_head": "a1a4fe835a32ed40c1f894c8f8aeadd28cab5c0a",
+  "v1_runtime_config_path": "D:\\AI智能体\\AI设计管理RAG-V1\\config\\internal_trial.yaml",
+  "v1_runtime_config_hash": "32157ac3ff5c517acd7df38751e07eed628420a17856b59a10eec7e4e3af84e3",
+  "v1_index_path": "D:\\AI智能体\\AI设计管理RAG-V1\\data\\shadow\\full_corpus_qdrant",
+  "v1_index_hash": "bec5d84131181d0149e29382c2e0079764d4f5462fe4f454a615c1e631a125bf",
+  "v2_5_candidate_hash": "26928685b69d167a99289a26776b6e0712531f79eaed71effc553bd37543ce03",
+  "v2_5_source_hash": "850748257c8e5f31263933f0ee76bd43fae39c4ab7f340862e03532b824fc714",
+  "v2_5_index_hash": "850748257c8e5f31263933f0ee76bd43fae39c4ab7f340862e03532b824fc714",
+  "v2_5_embedding_hash": "c1a4e81b7e2541e9d5534265c6adbfd709d0eb753ff219a53ecae461ee0be4af",
+  "candidate_manifest_path": "D:\\AI智能体\\AI设计管理RAG-V1\\evaluation\\knowledge_os_v2_5\\candidate_v2_5_manifest.json",
+  "candidate_manifest_hash": "3aabe7cb218f9b025815b2a4182e42398460c830159491a3f0c4ef4368057136",
+  "8010_process": {
+    "pid_file": "D:\\AI智能体\\AI设计管理RAG-V1\\logs\\trial\\trial_service.pid",
+    "pid": "14384",
+    "command_observed": "uvicorn app.trial.main:app --host 127.0.0.1 --port 8010",
+    "runtime_role": "V1_PRIMARY"
+  },
+  "8010_port_status": {
+    "port": 8010,
+    "listening": true,
+    "entries": [
+      "TCP    127.0.0.1:8010         0.0.0.0:0              LISTENING       14384"
+    ]
+  },
+  "8000_port_status": {
+    "port": 8000,
+    "listening": false,
+    "entries": []
+  },
+  "formal_qdrant_write_status": "OFF",
+  "formal_sqlite_write_status": "OFF",
+  "formal_index_switch_status": "OFF",
+  "candidate_status": "FROZEN",
+  "formal_8000_touched": false
+}

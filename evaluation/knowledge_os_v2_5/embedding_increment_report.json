@@ -1,0 +1,17 @@
+{
+  "schema_version": "knowledge_os_v2_5.embedding_increment_report",
+  "captured_at": "2026-09-12T12:38:53.069835+08:00",
+  "status": "PASS",
+  "old_chunk_count": 8902,
+  "new_chunk_count": 10711,
+  "new_vectors_written": 1809,
+  "new_vectors_pending": 0,
+  "old_vectors_reused": 8902,
+  "old_vectors_changed": 0,
+  "old_vectors_equal": true,
+  "failed_embeddings": [],
+  "model": "BAAI/bge-m3",
+  "input": "retrieval_text",
+  "batch_size": 4,
+  "formal_8000_touched": false
+}

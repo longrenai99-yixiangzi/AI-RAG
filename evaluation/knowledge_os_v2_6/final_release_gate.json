@@ -1,0 +1,32 @@
+{
+  "schema_version": "knowledge_os_v2_6.final_release_gate",
+  "captured_at": "2026-09-13T10:35:16.954766+08:00",
+  "status": "BLOCKED",
+  "final_status": "BLOCKED",
+  "stop_after": "T03_LIVE_SHADOW_GATE",
+  "gates": {
+    "v2_5_candidate_frozen": "PASS",
+    "owner_source_version": "PASS",
+    "live_shadow": "SHADOW_INSUFFICIENT_SAMPLE",
+    "rollback_drill": "NOT_RUN_LIVE_SHADOW_BLOCKED",
+    "candidate_integrity": "NOT_RUN_LIVE_SHADOW_BLOCKED",
+    "8010_switch_authorization": "NOT_REQUESTED",
+    "immediate_smoke": "NOT_RUN",
+    "canary": "NOT_RUN"
+  },
+  "top_blocking_issues": [
+    "Live Shadow 有效唯一问题样本为 15，低于最低门槛 30。",
+    "V2.5 答案引擎尚未接入 8010 Live Runtime；当前仅有 BM25 诊断预览。",
+    "任务书禁止重复刷题、自动造题或以 Offline Shadow 冒充 Live Shadow；T04 及后续切换停止。"
+  ],
+  "runtime": {
+    "8010_primary_unchanged": true,
+    "8010_switch_performed": false,
+    "8000_touched": false,
+    "formal_qdrant_write": false,
+    "formal_sqlite_write": false,
+    "formal_index_switch": false,
+    "v1_index_intact": true
+  },
+  "next_action": "COLLECT_AT_LEAST_30_UNIQUE_REAL_REQUESTS_AND_WIRE_V2_5_LIVE_BRANCH"
+}

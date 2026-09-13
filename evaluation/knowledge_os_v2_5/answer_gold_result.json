@@ -1,0 +1,1351 @@
+{
+  "schema_version": "knowledge_os_v2_5.answer_gold_result",
+  "captured_at": "2026-09-12T12:28:41.862206+08:00",
+  "gold_count": 30,
+  "pass_count": 30,
+  "fail_count": 0,
+  "not_evaluable_count": 0,
+  "gate": "PASS",
+  "evaluation_basis": "same frozen RRF-k60 retrieval-bound probe as Strict Regression core",
+  "records": [
+    {
+      "question_id": "SRG-001",
+      "source_answer_gold_id": "BA-001",
+      "variant_id": null,
+      "question": "设计任务书需要包含哪些内容？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "设计任务书包含项目概况、工作范围、工作要求、设计技术要点。",
+        "设计任务书应明确设计依据及管控要求。"
+      ],
+      "matched_claims": [
+        "设计任务书包含项目概况、工作范围、工作要求、设计技术要点。",
+        "设计任务书应明确设计依据及管控要求。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\工作\\二公司技术部\\2026\\各类文件\\设计管理\\《项目设计管理手册》.pdf",
+        "《项目设计管理手册》.pdf"
+      ],
+      "actual_sources": [
+        "《项目设计管理手册》.pdf",
+        "设计任务书汇编.md",
+        "设计任务书.md",
+        "设计任务书汇编.md",
+        "设计管理策划章节问答.md"
+      ],
+      "expected_sections": [
+        "9 设计任务书管理 / 9.1 设计任务书编制"
+      ],
+      "actual_sections": [
+        "Page 17",
+        "设计任务书汇编 > 关键内容",
+        "设计任务书",
+        "设计任务书汇编",
+        "设计管理策划包含几个章节？ > 二、库内另两处\"策划内容\"提法（对应关系） > 三者对应表"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-002",
+      "source_answer_gold_id": "BA-002",
+      "variant_id": null,
+      "question": "设计效益增量的计算方式？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "项目设计创效经济效益额按实施后实际经济效益额减去实施前预期经济效益额确定，且不包括工期效益。",
+        "设计创效率=总创效金额/自施产值×100%。",
+        "“设计效益增量”与正式指标的术语映射未被证据确认。"
+      ],
+      "matched_claims": [
+        "项目设计创效经济效益额按实施后实际经济效益额减去实施前预期经济效益额确定，且不包括工期效益。",
+        "设计创效率=总创效金额/自施产值×100%。",
+        "“设计效益增量”与正式指标的术语映射未被证据确认。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\工作\\二公司技术部\\2026\\各类文件\\设计管理\\《项目设计管理手册》.pdf",
+        "《项目设计管理手册》.pdf"
+      ],
+      "actual_sources": [
+        "3.二公司：2026年设计与技术专项责任书 .docx",
+        "01仁和水厂桩基及支护部分（浙江）.pptx",
+        "《项目设计管理手册》.pdf",
+        "设计创效价值创造问答.md",
+        "仁和水厂桩基及支护部分（浙江）.md"
+      ],
+      "expected_sections": [
+        "17.3 设计创效管理 / 17.3.2 设计创效计算"
+      ],
+      "actual_sections": [
+        "Document Body",
+        "Slide 12",
+        "Page 30",
+        "设计创效 / 价值创造（问答归档） > 二、价值从哪来（三大方式）",
+        "仁和水厂桩基及支护部分（浙江） > 核心设计管理经验（逐页/逐段深摘） > 第 12 页/段"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 3,
+      "section_rank": 3,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-003",
+      "source_answer_gold_id": "BA-004",
+      "variant_id": null,
+      "question": "自动喷淋系统管材方案比选可采用哪几种方案进行比选？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "自动喷淋系统采用传统镀锌钢管。",
+        "自动喷淋系统采用新型材料加强氯化聚氯乙烯(PVC-C)管材。"
+      ],
+      "matched_claims": [
+        "自动喷淋系统采用传统镀锌钢管。",
+        "自动喷淋系统采用新型材料加强氯化聚氯乙烯(PVC-C)管材。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\方案比选\\方案比选库\\设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx"
+      ],
+      "actual_sources": [
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx"
+      ],
+      "expected_sections": [],
+      "actual_sections": [
+        "Sheet1"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-004",
+      "source_answer_gold_id": "BA-005",
+      "variant_id": null,
+      "question": "特殊环境条件下集电线路电气设计的图审要点有哪些？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "列1:17、特殊环境条件下集电线路电气设计 | 列2:17.1 重冰区设计：导线、地线、绝缘子、杆塔是否按覆冰厚度（如10mm、20mm、30mm）进行了加强设计，是否采用了抗冰导线或预缚式防冰装置。 | 列3:新能源-线路电气",
+        "列2:17.2 高海拔地区设计：外绝缘爬电距离是否按海拔校正系数增加，是否采用了高海拔专用绝缘子或增加了绝缘子片数。 | 列3:新能源-线路电气",
+        "列2:17.3 沿海地区（盐雾区）设计：是否按重污秽等级（d级或e级）设计，是否优先采用复合绝缘子，接地装置是否采用了铜覆钢等防腐材料。 | 列3:新能源-线路电气",
+        "列2:17.4 林区线路设计：导线对树木的距离是否满足要求，是否采取了高跨设计或砍伐通道，砍伐宽度是否在路径协议中明确。 | 列3:新能源-线路电气",
+        "列2:17.5 冻土地区设计：直埋电缆埋深是否在冻土层以下，杆塔基础是否采用了防冻胀设计，接地装置是否采取了防止冻胀破坏的措施。 | 列3:新能源-线路电气",
+        "列2:17.6 采空区或地质灾害易发区设计：杆塔是否采用了加强型基础，线路路径是否绕避了地质不稳定区域，是否设置了沉降观测点。 | 列3:新能源-线路电气"
+      ],
+      "matched_claims": [
+        "列1:17、特殊环境条件下集电线路电气设计 | 列2:17.1 重冰区设计：导线、地线、绝缘子、杆塔是否按覆冰厚度（如10mm、20mm、30mm）进行了加强设计，是否采用了抗冰导线或预缚式防冰装置。 | 列3:新能源-线路电气",
+        "列2:17.2 高海拔地区设计：外绝缘爬电距离是否按海拔校正系数增加，是否采用了高海拔专用绝缘子或增加了绝缘子片数。 | 列3:新能源-线路电气",
+        "列2:17.3 沿海地区（盐雾区）设计：是否按重污秽等级（d级或e级）设计，是否优先采用复合绝缘子，接地装置是否采用了铜覆钢等防腐材料。 | 列3:新能源-线路电气",
+        "列2:17.4 林区线路设计：导线对树木的距离是否满足要求，是否采取了高跨设计或砍伐通道，砍伐宽度是否在路径协议中明确。 | 列3:新能源-线路电气",
+        "列2:17.5 冻土地区设计：直埋电缆埋深是否在冻土层以下，杆塔基础是否采用了防冻胀设计，接地装置是否采取了防止冻胀破坏的措施。 | 列3:新能源-线路电气",
+        "列2:17.6 采空区或地质灾害易发区设计：杆塔是否采用了加强型基础，线路路径是否绕避了地质不稳定区域，是否设置了沉降观测点。 | 列3:新能源-线路电气"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\工作\\二公司技术部\\2026\\知识库\\全专业施工图审核要点提示汇编\\全专业施工图审核要点提示汇编（2026年）.xlsx",
+        "全专业施工图审核要点提示汇编（2026年）.xlsx"
+      ],
+      "actual_sources": [
+        "全专业施工图审核要点提示汇编（2026年）.xlsx",
+        "全专业施工图审核要点提示汇编（2026年）.xlsx",
+        "全专业施工图审核要点提示汇编（2026年）.xlsx",
+        "全专业施工图审核要点提示汇编（2026年）.xlsx",
+        "全专业施工图审核要点提示汇编（2026年）.xlsx"
+      ],
+      "expected_sections": [],
+      "actual_sections": [
+        "全专业施工图审核要点提示汇编正文"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-005",
+      "source_answer_gold_id": "BA-006",
+      "variant_id": null,
+      "question": "2026年局设计与技术系统的责任状要求DOP平台电子图形文件数据中心上传数量是多少？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "2026年局设计与技术系统责任状要求11月份完成DOP平台电子图形文件数据中心上传不少于40个项目图形文件。"
+      ],
+      "matched_claims": [
+        "2026年局设计与技术系统责任状要求11月份完成DOP平台电子图形文件数据中心上传不少于40个项目图形文件。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\工作\\二公司技术部\\2026\\责任状\\局\\3.二公司：2026年设计与技术专项责任书 .docx",
+        "3.二公司：2026年设计与技术专项责任书 .docx"
+      ],
+      "actual_sources": [
+        "3.二公司：2026年设计与技术专项责任书 .docx",
+        "3.二公司：2026年设计与技术专项责任书 .docx",
+        "3.二公司：2026年设计与技术专项责任书 .docx",
+        "3.二公司：2026年设计与技术专项责任书 .docx",
+        "3.二公司：2026年设计与技术专项责任书 .docx"
+      ],
+      "expected_sections": [],
+      "actual_sections": [
+        "Document Body"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-006",
+      "source_answer_gold_id": "BA-007",
+      "variant_id": null,
+      "question": "2026年设计示范项目的打造要求是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "坚持设计底线管理：项目整体不超概、不因设计原因发生质量、安全责任事故。",
+        "塑强设计管理成效：EPC项目整体设计效益率增量达到7%以上，施工总承包项目专项设计效益率增量达到2.5%以上。",
+        "落实固化动作：EPC执行13项标准设计管理动作，动作执行率和及时率100%；施工总承包执行规定动作，执行率和及时率100%。",
+        "年度设计管理检查综合排名前20%。"
+      ],
+      "matched_claims": [
+        "坚持设计底线管理：项目整体不超概、不因设计原因发生质量、安全责任事故。",
+        "塑强设计管理成效：EPC项目整体设计效益率增量达到7%以上，施工总承包项目专项设计效益率增量达到2.5%以上。",
+        "落实固化动作：EPC执行13项标准设计管理动作，动作执行率和及时率100%；施工总承包执行规定动作，执行率和及时率100%。",
+        "年度设计管理检查综合排名前20%。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\工作\\二公司技术部\\2026\\示范工程\\关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx",
+        "关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx"
+      ],
+      "actual_sources": [
+        "关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx",
+        "附件：公司2025年拟打造EPC设计管理示范项目清单.md",
+        "关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx",
+        "3.二公司：2026年设计与技术专项责任书 .docx",
+        "2024年半年总结.md"
+      ],
+      "expected_sections": [
+        "一、设计示范工程实施要求"
+      ],
+      "actual_sections": [
+        "Document Body",
+        "附件：公司2025年拟打造EPC设计管理示范项目清单",
+        "2024年半年总结 > 正文"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-007",
+      "source_answer_gold_id": "BA-008",
+      "variant_id": null,
+      "question": "2025年公司设计创效金额是多少元？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "2025年公司设计创效金额约为4.45亿元。"
+      ],
+      "matched_claims": [
+        "2025年公司设计创效金额约为4.45亿元。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\工作总结\\2025年饶淇述职.md",
+        "2025年饶淇述职.md"
+      ],
+      "actual_sources": [
+        "2025年年度总结.md",
+        "2025年任慧军述职.md",
+        "05丽水医院项目（浙江）.pptx",
+        "丽水医院项目（浙江）.md",
+        "2025年饶淇述职.md"
+      ],
+      "expected_sections": [],
+      "actual_sections": [
+        "2025年年度总结 > 正文",
+        "2025年任慧军述职",
+        "Slide 14",
+        "丽水医院项目（浙江） > 核心设计管理经验（逐页/逐段深摘） > 第 14 页/段",
+        "2025年饶淇述职 > 正文"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 5,
+      "section_rank": 5,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-008",
+      "source_answer_gold_id": "BA-009",
+      "variant_id": null,
+      "question": "2026年4月EPC项目双周推进会上，给土木公司的督办是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "列1:15 | 列2:青山52街坊项目 | 列3:土木公司 | 列4:完成设计策划评审，并通知公司参与评审 | 列5:46136 | 列6:樊磊 | 列7:郑戈",
+        "列1:16 | 列2:武汉轻工大学金银湖校区13号学生公寓项目 | 列3:土木公司 | 列4:完成设计策划中价值创造点的效益统计 | 列5:46142 | 列6:樊磊 | 列7:郑戈"
+      ],
+      "matched_claims": [
+        "列1:15 | 列2:青山52街坊项目 | 列3:土木公司 | 列4:完成设计策划评审，并通知公司参与评审 | 列5:46136 | 列6:樊磊 | 列7:郑戈",
+        "列1:16 | 列2:武汉轻工大学金银湖校区13号学生公寓项目 | 列3:土木公司 | 列4:完成设计策划中价值创造点的效益统计 | 列5:46142 | 列6:樊磊 | 列7:郑戈"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\工作\\二公司技术部\\2026\\EPC项目双周推进会\\4月\\EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+        "EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx"
+      ],
+      "actual_sources": [
+        "EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+        "EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+        "EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+        "EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+        "EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx"
+      ],
+      "expected_sections": [],
+      "actual_sections": [
+        "Sheet1 (2)",
+        "Sheet1"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-009",
+      "source_answer_gold_id": "V23-A001",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第一章 项目概况 > 1.1 工程概况”中，名称=项目名称这一行的内容是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "名称：项目名称",
+        "内容：扬州大运河“十里外滩”综合整治提升项目（古运河-七里河）"
+      ],
+      "matched_claims": [
+        "名称：项目名称",
+        "内容：扬州大运河“十里外滩”综合整治提升项目（古运河-七里河）"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第一章 项目概况 > 1.1 工程概况"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-010",
+      "source_answer_gold_id": "V23-A002",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第一章 项目概况 > 1.1 工程概况”中，名称=建设地点这一行的内容是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "名称：建设地点",
+        "内容：项目位于大运河扬州城区段的核心区，北至古运河、南至七里河、西至运河快速路、东至京杭路。"
+      ],
+      "matched_claims": [
+        "名称：建设地点",
+        "内容：项目位于大运河扬州城区段的核心区，北至古运河、南至七里河、西至运河快速路、东至京杭路。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第一章 项目概况 > 1.1 工程概况"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-011",
+      "source_answer_gold_id": "V23-A003",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第一章 项目概况 > 1.1 工程概况”中，名称=工程总承包模式这一行的内容是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "名称：工程总承包模式",
+        "内容：☑EPC □DB □PPP+EPC □F+EPC □其它"
+      ],
+      "matched_claims": [
+        "名称：工程总承包模式",
+        "内容：☑EPC □DB □PPP+EPC □F+EPC □其它"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第一章 项目概况 > 1.1 工程概况"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理",
+        "第一章 项目概况 > 1.3 设计现状",
+        "前言"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-012",
+      "source_answer_gold_id": "V23-A004",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第一章 项目概况 > 1.1 工程概况”中，名称=建设单位这一行的内容是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "名称：建设单位",
+        "内容：名称：扬州市城建国有资产控股（集团）有限责任公司。 性质：国企"
+      ],
+      "matched_claims": [
+        "名称：建设单位",
+        "内容：名称：扬州市城建国有资产控股（集团）有限责任公司。 性质：国企"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第一章 项目概况 > 1.1 工程概况"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理",
+        "第一章 项目概况 > 1.3 设计现状"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-013",
+      "source_answer_gold_id": "V23-A005",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第一章 项目概况 > 1.2需求分析”中，需求方=建设单位这一行的需求要点分析是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "需求方：建设单位",
+        "需求要点分析：1、设计方案与周边的地块和道路进行合理的衔接，融入整体环境，起到品质提升、风貌美化的作用； 2、设计方案必须具有经济的可行性和可操作性，与功能定位和发展目标相吻合； 3、设计理念应有创新，借鉴国内外相关规划的成功经验，创建理想的城市形象； 4、打造运河文化的综合示范节点。； 5、打造主题光影秀，配合区域承办重要会议、活动庆典等场景的需求，烘托节日氛围，打造夜游文旅亮点。"
+      ],
+      "matched_claims": [
+        "需求方：建设单位",
+        "需求要点分析：1、设计方案与周边的地块和道路进行合理的衔接，融入整体环境，起到品质提升、风貌美化的作用； 2、设计方案必须具有经济的可行性和可操作性，与功能定位和发展目标相吻合； 3、设计理念应有创新，借鉴国内外相关规划的成功经验，创建理想的城市形象； 4、打造运河文化的综合示范节点。； 5、打造主题光影秀，配合区域承办重要会议、活动庆典等场景的需求，烘托节日氛围，打造夜游文旅亮点。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第一章 项目概况 > 1.2需求分析"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-014",
+      "source_answer_gold_id": "V23-A006",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第一章 项目概况 > 1.3 设计现状”中，类别=可研报告这一行的进展是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "类别：可研报告",
+        "进展：可研报告（电子版、未批复）"
+      ],
+      "matched_claims": [
+        "类别：可研报告",
+        "进展：可研报告（电子版、未批复）"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第一章 项目概况 > 1.3 设计现状"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-015",
+      "source_answer_gold_id": "V23-A007",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第二章 设计策划目标 > 2.1设计进度目标 > 2.1.3设计里程碑节点”中，序号=1这一行的设计阶段、工作名称和预计完成时间是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "序号：1",
+        "设计阶段：一组团方案设计",
+        "工作名称：市政专业方案设计完成",
+        "预计完成时间：2024.06"
+      ],
+      "matched_claims": [
+        "序号：1",
+        "设计阶段：一组团方案设计",
+        "工作名称：市政专业方案设计完成",
+        "预计完成时间：2024.06"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第二章 设计策划目标 > 2.1设计进度目标 > 2.1.3设计里程碑节点"
+      ],
+      "actual_sections": [
+        "第二章 设计策划目标 > 2.1 设计进度目标 > 2.1.1合同目标",
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 2,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-016",
+      "source_answer_gold_id": "V23-A008",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第二章 设计策划目标 > 2.1设计进度目标 > 2.1.3设计里程碑节点”中，序号=5这一行的设计阶段、工作名称和预计完成时间是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "序号：5",
+        "设计阶段：一组团初步设计",
+        "工作名称：市政专业初步设计完成",
+        "预计完成时间：2024.07"
+      ],
+      "matched_claims": [
+        "序号：5",
+        "设计阶段：一组团初步设计",
+        "工作名称：市政专业初步设计完成",
+        "预计完成时间：2024.07"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第二章 设计策划目标 > 2.1设计进度目标 > 2.1.3设计里程碑节点"
+      ],
+      "actual_sections": [
+        "第二章 设计策划目标 > 2.1 设计进度目标 > 2.1.1合同目标",
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 2,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-017",
+      "source_answer_gold_id": "V23-A009",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第二章 设计策划目标 > 2.1设计进度目标 > 2.1.3设计里程碑节点”中，序号=9这一行的设计阶段、工作名称和预计完成时间是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "序号：9",
+        "设计阶段：一组团施工图设计",
+        "工作名称：市政专业施工图设计完成",
+        "预计完成时间：2024.09"
+      ],
+      "matched_claims": [
+        "序号：9",
+        "设计阶段：一组团施工图设计",
+        "工作名称：市政专业施工图设计完成",
+        "预计完成时间：2024.09"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第二章 设计策划目标 > 2.1设计进度目标 > 2.1.3设计里程碑节点"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理",
+        "第二章 设计策划目标 > 2.1 设计进度目标 > 2.1.1合同目标"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-018",
+      "source_answer_gold_id": "V23-A010",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第三章 设计组织策划 > 3.2 设计管理相关方权责分配”中，阶段=设计管理策划这一行的工作事项、工作界面和成果文件是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "阶段：阶段",
+        "工作事项：工作事项",
+        "工作界面：专项设计单位"
+      ],
+      "matched_claims": [
+        "阶段：阶段",
+        "工作事项：工作事项",
+        "工作界面：专项设计单位"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第三章 设计组织策划 > 3.2 设计管理相关方权责分配"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-019",
+      "source_answer_gold_id": "V23-A011",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第四章 设计合约规划”中，序号=1这一行的设计合约包、合约范围和招采方式是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "序号：1",
+        "设计合约包：全部设计",
+        "合约范围：总体规划及方案设计、初步设计、施工图设计、各专项设计及协调、配合、施工配合服务。",
+        "招采方式：联合体"
+      ],
+      "matched_claims": [
+        "序号：1",
+        "设计合约包：全部设计",
+        "合约范围：总体规划及方案设计、初步设计、施工图设计、各专项设计及协调、配合、施工配合服务。",
+        "招采方式：联合体"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第四章 设计合约规划"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理",
+        "第四章 设计合约规划"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-020",
+      "source_answer_gold_id": "V23-A012",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第七章 报批报建管理 > 7.2报批报建主要事项”中，报批报建阶段=可研这一行的办事部门和主要事项是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "报批报建阶段：可研",
+        "办事部门：扬州市发改委",
+        "主要事项：备案类项目，只需在政务服务网依据项目单位营业执照或组织机构信用代码注册登记，进入投资项目在线审批监管平台填写项目单位基本情况，项目名称、建设地点、建设规模、建设内容，项目总投资额，项目符合产业政策声明等信息完整后，选择备案机关申报提交（在产业集聚区区域内建设的项目由产业集聚区进行备案），发改委（产业集聚区）对政策进行审核后，符合政策点击确认即可完成备案。"
+      ],
+      "matched_claims": [
+        "报批报建阶段：可研",
+        "办事部门：扬州市发改委",
+        "主要事项：备案类项目，只需在政务服务网依据项目单位营业执照或组织机构信用代码注册登记，进入投资项目在线审批监管平台填写项目单位基本情况，项目名称、建设地点、建设规模、建设内容，项目总投资额，项目符合产业政策声明等信息完整后，选择备案机关申报提交（在产业集聚区区域内建设的项目由产业集聚区进行备案），发改委（产业集聚区）对政策进行审核后，符合政策点击确认即可完成备案。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第七章 报批报建管理 > 7.2报批报建主要事项"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-021",
+      "source_answer_gold_id": "V23-A013",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第七章 报批报建管理 > 7.2报批报建主要事项”中，报批报建阶段=初步设计这一行的办事部门和主要事项是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "报批报建阶段：初步设计",
+        "办事部门：扬州市发改委",
+        "主要事项：初步设计批复需要材料有：1、项目单位申请文件；2、项目初步设计；3、专家评审意见。"
+      ],
+      "matched_claims": [
+        "报批报建阶段：初步设计",
+        "办事部门：扬州市发改委",
+        "主要事项：初步设计批复需要材料有：1、项目单位申请文件；2、项目初步设计；3、专家评审意见。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第七章 报批报建管理 > 7.2报批报建主要事项"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-022",
+      "source_answer_gold_id": "V23-A014",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第七章 报批报建管理 > 7.3报批报建经济指标策划”中，报批报建指标=海绵城市这一行的经济指标策划思路是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "报批报建指标：海绵城市",
+        "经济指标策划思路：透水铺装率对年径流总量控制作用相对较小，在满足园区透水铺装率最低限条件下，可适当减少透水铺装设计面积，通过下凹绿地、蓄水池调蓄满足场地年径流总量的控制要求，节约工程造价。"
+      ],
+      "matched_claims": [
+        "报批报建指标：海绵城市",
+        "经济指标策划思路：透水铺装率对年径流总量控制作用相对较小，在满足园区透水铺装率最低限条件下，可适当减少透水铺装设计面积，通过下凹绿地、蓄水池调蓄满足场地年径流总量的控制要求，节约工程造价。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第七章 报批报建管理 > 7.3报批报建经济指标策划"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-023",
+      "source_answer_gold_id": "V23-A015",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第七章 报批报建管理 > 7.4报批报建管理”中，事项=提前介入监督手续办理这一行的关注重点是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "事项：提前介入监督手续办理",
+        "关注重点：本工程对于设计时限及施工许可证办理均有超期处罚，为确保在规定时限内施工许可证完成办理，需做好办理“提前介入监督”手续准备。"
+      ],
+      "matched_claims": [
+        "事项：提前介入监督手续办理",
+        "关注重点：本工程对于设计时限及施工许可证办理均有超期处罚，为确保在规定时限内施工许可证完成办理，需做好办理“提前介入监督”手续准备。"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-024",
+      "source_answer_gold_id": "V23-A016",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第二章 设计策划目标 > 2.4设计限额目标 > 2.4.1 主要建设标准”中，指标名称=景观工程这一行的指标类型和控制目标是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "指标名称：景观工程",
+        "指标类型：绿化用地面积",
+        "控制目标：面积759951m2，占比71.20%"
+      ],
+      "matched_claims": [
+        "指标名称：景观工程",
+        "指标类型：绿化用地面积",
+        "控制目标：面积759951m2，占比71.20%"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第二章 设计策划目标 > 2.4设计限额目标 > 2.4.1 主要建设标准"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-025",
+      "source_answer_gold_id": "V23-A017",
+      "variant_id": null,
+      "question": "《扬州十里外滩项目设计策划书2024.6.16(1).docx》在“第二章 设计策划目标 > 2.4设计限额目标 > 2.4.2 含量指标要求”中，复核内容=结构 指标这一行的适用指标、单位和指标范围是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "复核内容：结构 指标",
+        "适用指标：非人防区域钢筋含量",
+        "单位：kg/m2",
+        "指标范围 （依据对标项标准提取）：130"
+      ],
+      "matched_claims": [
+        "复核内容：结构 指标",
+        "适用指标：非人防区域钢筋含量",
+        "单位：kg/m2",
+        "指标范围 （依据对标项标准提取）：130"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "actual_sources": [
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx",
+        "扬州十里外滩项目设计策划书2024.6.16(1).docx"
+      ],
+      "expected_sections": [
+        "第二章 设计策划目标 > 2.4设计限额目标 > 2.4.2 含量指标要求"
+      ],
+      "actual_sections": [
+        "第七章 报批报建管理 > 7.4报批报建管理"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-026",
+      "source_answer_gold_id": "V23-A018",
+      "variant_id": null,
+      "question": "《十里外滩设计管理策划督办清单.xlsx》在“Sheet1”中，序号=1这一行的具体事宜、需完成时间、分公司责任部门/人和项目责任人是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "序号：1",
+        "具体事宜：工程概况中补充总图",
+        "需完成时间：6.5",
+        "分公司责任部门/人：技术部",
+        "项目责任人：王锋"
+      ],
+      "matched_claims": [
+        "序号：1",
+        "具体事宜：工程概况中补充总图",
+        "需完成时间：6.5",
+        "分公司责任部门/人：技术部",
+        "项目责任人：王锋"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\十里外滩设计管理策划督办清单.xlsx",
+        "十里外滩设计管理策划督办清单.xlsx"
+      ],
+      "actual_sources": [
+        "十里外滩设计管理策划督办清单.xlsx",
+        "十里外滩设计管理策划督办清单.xlsx",
+        "十里外滩设计管理策划督办清单.xlsx",
+        "十里外滩设计管理策划督办清单.xlsx",
+        "十里外滩设计管理策划督办清单.xlsx"
+      ],
+      "expected_sections": [
+        "Sheet1"
+      ],
+      "actual_sections": [
+        "Sheet1"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-027",
+      "source_answer_gold_id": "V23-A019",
+      "variant_id": null,
+      "question": "《十里外滩设计管理策划督办清单.xlsx》在“Sheet1”中，序号=2这一行的具体事宜、需完成时间、分公司责任部门/人和项目责任人是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "序号：2",
+        "具体事宜：明确设计现状，对先导段及其他施工段情况补充说明",
+        "需完成时间：6.5",
+        "分公司责任部门/人：技术部",
+        "项目责任人：王锋"
+      ],
+      "matched_claims": [
+        "序号：2",
+        "具体事宜：明确设计现状，对先导段及其他施工段情况补充说明",
+        "需完成时间：6.5",
+        "分公司责任部门/人：技术部",
+        "项目责任人：王锋"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\设计策划\\设计策划评审\\十里外滩项目\\十里外滩设计管理策划督办清单.xlsx",
+        "十里外滩设计管理策划督办清单.xlsx"
+      ],
+      "actual_sources": [
+        "十里外滩设计管理策划督办清单.xlsx",
+        "十里外滩设计管理策划督办清单.xlsx",
+        "十里外滩设计管理策划督办清单.xlsx",
+        "十里外滩设计管理策划督办清单.xlsx",
+        "十里外滩设计管理策划督办清单.xlsx"
+      ],
+      "expected_sections": [
+        "Sheet1"
+      ],
+      "actual_sections": [
+        "Sheet1"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-028",
+      "source_answer_gold_id": "V23-A020",
+      "variant_id": null,
+      "question": "《公司二季度EPC项目设计管理检查情况通报.docx》在“一、项目设计管理检查情况 > 具体排名”中，排名=1这一行的项目名称、分公司和综合得分是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "排名：1",
+        "项目名称：铁投.书香林语epc施工总承包工程",
+        "分公司：华中公司",
+        "综合得分：97"
+      ],
+      "matched_claims": [
+        "排名：1",
+        "项目名称：铁投.书香林语epc施工总承包工程",
+        "分公司：华中公司",
+        "综合得分：97"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计管理体系\\结果应用\\公司二季度EPC项目设计管理检查情况通报.docx",
+        "公司二季度EPC项目设计管理检查情况通报.docx"
+      ],
+      "actual_sources": [
+        "公司二季度EPC项目设计管理检查情况通报.docx",
+        "公司二季度EPC项目设计管理检查情况通报.docx",
+        "公司二季度EPC项目设计管理检查情况通报.docx",
+        "公司二季度EPC项目设计管理检查情况通报.docx",
+        "公司二季度EPC项目设计管理检查情况通报.docx"
+      ],
+      "expected_sections": [
+        "一、项目设计管理检查情况 > 具体排名"
+      ],
+      "actual_sections": [
+        "Document Body"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-029",
+      "source_answer_gold_id": "V23-A021",
+      "variant_id": null,
+      "question": "《设计方案比选提示清单7.23.xlsx》在“Sheet1”中，序号=1这一行的专业类别、比选项目、比选结果和比选阶段是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "序号：1",
+        "专业类别：建筑",
+        "比选项目：地上隔墙",
+        "比选结果：根据实际情况选用，建议选用方案三",
+        "比选阶段：施工图设计阶段"
+      ],
+      "matched_claims": [
+        "序号：1",
+        "专业类别：建筑",
+        "比选项目：地上隔墙",
+        "比选结果：根据实际情况选用，建议选用方案三",
+        "比选阶段：施工图设计阶段"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\方案比选\\方案比选库\\设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx"
+      ],
+      "actual_sources": [
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx"
+      ],
+      "expected_sections": [
+        "Sheet1"
+      ],
+      "actual_sections": [
+        "Sheet1"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    },
+    {
+      "question_id": "SRG-030",
+      "source_answer_gold_id": "V23-A022",
+      "variant_id": null,
+      "question": "《设计方案比选提示清单7.23.xlsx》在“Sheet1”中，序号=2这一行的专业类别、比选项目、比选结果和比选阶段是什么？",
+      "expected_answer_mode": "ANSWERED",
+      "actual_answer_mode": "ANSWERED",
+      "required_claims": [
+        "序号：2",
+        "专业类别：建筑",
+        "比选项目：地下室肥槽回填",
+        "比选结果：根据实际情况选用，建议选用方案三",
+        "比选阶段：施工图设计阶段"
+      ],
+      "matched_claims": [
+        "序号：2",
+        "专业类别：建筑",
+        "比选项目：地下室肥槽回填",
+        "比选结果：根据实际情况选用，建议选用方案三",
+        "比选阶段：施工图设计阶段"
+      ],
+      "missing_claims": [],
+      "unsupported_claims": [],
+      "expected_sources": [
+        "D:\\设计管理\\raw\\设计支持\\方案比选\\方案比选库\\设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx"
+      ],
+      "actual_sources": [
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx",
+        "设计方案比选提示清单7.23.xlsx"
+      ],
+      "expected_sections": [
+        "Sheet1"
+      ],
+      "actual_sections": [
+        "Sheet1"
+      ],
+      "citation_valid": true,
+      "scope_valid": true,
+      "file_rank": 1,
+      "section_rank": 1,
+      "result": "PASS",
+      "failure_code": "",
+      "strict_evaluable": true
+    }
+  ],
+  "formal_8000_touched": false
+}

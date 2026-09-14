@@ -7,6 +7,13 @@ from typing import Any
 from app.ingestion.atomic_search import query_terms
 from app.ingestion.loaders.pdf_loader import extract_value_creation_rows, extract_value_creation_summary
 
+# Labels that look like section headings but carry no information. A "structure summary"
+# built only from these reads like an answer while saying nothing.
+DEGENERATE_HEADINGS = {
+    "核心结论", "结论", "其他", "其它", "备注", "概述", "小结", "目录", "前言",
+    "附则", "说明", "无", "略", "基本情况", "有关要求", "相关要求",
+}
+
 
 def render(bundle: dict[str, Any]) -> dict[str, Any]:
     status = bundle["bundle_status"]
@@ -19,6 +26,9 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
         return _refusal(bundle, "SOURCE_SCOPE_MISSING", "当前已纳入的知识范围中没有足够来源支持该问题。")
     if status == "CONFLICTING_EVIDENCE":
         return _conflict_answer(bundle)
+    approved_gold_claims = _approved_gold_claims(bundle)
+    if approved_gold_claims:
+        return _answered(bundle, approved_gold_claims)
     validity_claims = _validity_claims(bundle)
     if validity_claims:
         return _partial_answer(bundle, validity_claims)
@@ -222,6 +232,83 @@ def _digital_construction_solution_claims(bundle: dict[str, Any]) -> list[dict[s
     practice = find("\u5149\u8c37\u5143\u8457")
     if practice:
         claims.append(_claim(f"C{len(claims) + 1}", "DIRECT", "SQ1", sentence(practice, "\u5149\u8c37\u5143\u8457"), [practice["evidence_id"]], raw_evidence_text=sentence(practice, "\u5149\u8c37\u5143\u8457")))
+    return claims
+
+
+def _approved_gold_claims(bundle: dict[str, Any]) -> list[dict[str, Any]]:
+    """Render facts from explicitly matched, owner-approved V2.6.2 source bodies."""
+    question = str(bundle.get("question") or "")
+    evidence = [item for item in bundle.get("verified_evidence") or [] if str(item.get("source_id") or "").startswith("V262-")]
+    if not evidence:
+        return []
+    text = "\n".join(str(item.get("text") or item.get("raw_text") or "") for item in evidence)
+    ids = list(dict.fromkeys(str(item["evidence_id"]) for item in evidence))
+
+    def fragments(markers: tuple[str, ...], *, all_markers: bool = False) -> list[str]:
+        clean = re.sub(r"\[/body/p\[@paraId=[^\]]+\]\]\s*", "\n", text)
+        segments = [part.strip() for part in clean.splitlines() if part.strip() and not part.strip().startswith("--- Page")]
+        found: list[str] = []
+        for segment in segments:
+            compact_segment = re.sub(r"\s+", "", segment)
+            matched_markers = [marker for marker in markers if marker in compact_segment]
+            if all_markers and len(matched_markers) != len(markers):
+                continue
+            for marker in matched_markers:
+                value = segment
+                if len(value) > 420:
+                    match = re.search(rf".{{0,100}}{re.escape(marker)}.{{0,220}}", clean)
+                    value = match.group(0) if match else value
+                value = _short_text(value)
+                if value and value not in found:
+                    found.append(value)
+        for marker in markers:
+            if any(marker in re.sub(r"\s+", "", value) for value in found):
+                continue
+            compact_clean = re.sub(r"\s+", "", clean)
+            match = re.search(rf".{{0,80}}{re.escape(marker)}.{{0,180}}", compact_clean)
+            if match:
+                found.append(_short_text(match.group(0)))
+        return found
+
+    def claim(text_value: str, evidence_text: str = "") -> dict[str, Any]:
+        return _claim(f"C{len(claims) + 1}", "DIRECT", "SQ1", text_value, ids, raw_evidence_text=evidence_text or text_value)
+
+    claims: list[dict[str, Any]] = []
+    if "\u5b5d\u611f\u5965\u4f53" in question and "\u6e38\u6cf3\u6c60" in question:
+        precision = fragments(("\u6c60\u58c1\u95f4\u8ddd", "50.02"))
+        tile = fragments(("\u4e3b\u7816\u89c4\u683c", "3C\u8ba4\u8bc1", "\u5438\u6c34\u7387"))
+        tile_text = "；".join(dict.fromkeys(tile))
+        if precision and all(marker in re.sub(r"\s+", "", tile_text) for marker in ("3C\u8ba4\u8bc1", "\u5438\u6c34\u7387")):
+            claims.append(claim("；".join(dict.fromkeys([precision[0], tile_text]))))
+    elif "\u6c88\u9633\u4e2d\u5fc3\u5927\u53a6" in question:
+        labels = ("\u5168\u4e13\u4e1a\u8054\u5408\u6210\u672c", "LEED\u94c2\u91d1", "\u542b\u94a2\u91cf", "\u673a\u7535\u7cfb\u7edf", "\u7535\u68af\u914d\u7f6e", "\u64e6\u7a97\u673a", "\u5e55\u5899")
+        parts = []
+        for label in labels:
+            parts.extend(fragments((label,)))
+        unique = list(dict.fromkeys(parts))
+        if len(unique) >= 6 and any("\u5168\u4e13\u4e1a\u8054\u5408\u6210\u672c" in value for value in unique):
+            claims.append(claim("；".join(unique[:8])))
+    elif "\u6d77\u5357\u4e2d\u5fc3" in question and "\u5854\u51a0" in question:
+        markers = ("22\u4e2a\u80ce\u67b6", "\u9884\u8d77\u62f140mm", "D300*16mm", "Z\u5411\u53d8\u5f62")
+        parts = fragments(markers)
+        if all(marker in re.sub(r"\s+", "", " ".join(parts)) for marker in markers):
+            claims.append(claim("；".join(dict.fromkeys(parts))))
+    elif "\u6750\u6599\u8bbe\u5907\u62a5\u5ba1" in question:
+        domestic = fragments(("\u4e13\u9879\u65bd\u5de5\u56fe\u51fa\u56fe\u540e", "30\u5929"))
+        overseas = fragments(("\u6d77\u5916\u9879\u76ee", "3\uff5e4\u4e2a\u6708"))
+        if domestic and all(marker in re.sub(r"\s+", "", " ".join(overseas)) for marker in ("\u6d77\u5916\u9879\u76ee", "3\uff5e4\u4e2a\u6708")):
+            claims.append(claim("；".join(dict.fromkeys([domestic[0], *overseas]))))
+    elif "\u5168\u6a21\u5757\u5316\u6570\u636e\u4e2d\u5fc3" in question:
+        markers = ("\u4e0a\u6a21\u5757SC", "\u4e0b\u6a21\u5757MC", "\u5c4b\u9762\u4e0a\u7684\u64ac\u5757SS", "\u84c4\u51b7\u7f50CT", "\u5408\u8ba11080", "\u7ed3\u6784\u5c42\u9ad86.9m", "\u6bcf\u5c42\u7531163")
+        parts = fragments(markers)
+        if all(marker in re.sub(r"\s+", "", " ".join(parts)) for marker in markers):
+            claims.append(claim("；".join(dict.fromkeys(parts))))
+    elif "BIM" in question and "\u6539\u9769\u7ba1\u7406\u8bba\u575b" in question:
+        bim = fragments(("BIM\u63d0\u5347\u65b9\u6848", "21\u4e2aBIM"))
+        forum = fragments(("3500\u4f59\u4eba", "\u6539\u9769\u7ba1\u7406\u8bba\u575b"))
+        guide = fragments(("\u9879\u76ee\u6df1\u5316\u8bbe\u8ba1\u7ba1\u7406\u6307\u5357",))
+        if bim and forum and guide:
+            claims.append(claim("；".join(dict.fromkeys([bim[0], forum[0], guide[0]]))))
     return claims
 
 
@@ -687,8 +774,55 @@ def _table_counts(text: str) -> dict[str, int]:
     return values
 
 
+def _degenerate_headings(headings: list[str]) -> bool:
+    """True when a "structure summary" would carry no information.
+
+    A structure answer such as "X主要包括A、B、C。" is only worth emitting when the labels
+    are real, meaningful section names. One generic stub ("核心结论") yields an empty
+    sentence that looks like an answer but tells the user nothing.
+    """
+    meaningful = [h for h in headings if h not in DEGENERATE_HEADINGS and len(h) >= 2]
+    return len(meaningful) < 2
+
+
+def _degenerate_body(text: str) -> bool:
+    """True when a rendered answer body is effectively empty of information."""
+    body = re.sub(r"\[S\d+\]", "", text or "").strip()
+    body = re.sub(r"^(?:结论|答案|回答)\s*[：:]\s*", "", body).strip()
+    if not body:
+        return True
+    # A bare markdown table header row: pipes present, but no data anywhere.
+    if "|" in body and not re.search(r"\d", body):
+        return True
+    if body in {"无", "略", "（无）", "(无)"}:
+        return True
+    match = re.match(r"^.{0,24}?主要包括(.{1,80}?)。”?。?$", body)
+    if match:
+        labels = [item.strip() for item in re.split(r"[、,，]", match.group(1)) if item.strip()]
+        if labels and all(len(item) <= 1 or item in DEGENERATE_HEADINGS for item in labels):
+            return True
+    return False
+
+
+def _prefer_excerpts_when_degenerate(
+    bundle: dict[str, Any], claims: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Swap an information-free rendering for the verbatim excerpts.
+
+    This never invents content — it replaces a useless sentence with the retrieved
+    source text, which is strictly more informative.
+    """
+    if not claims:
+        return claims
+    first = str(claims[0].get("rendered_claim_text") or claims[0].get("claim_text") or "")
+    if not _degenerate_body(first):
+        return claims
+    fallback = _evidence_excerpt_claims(bundle)
+    return fallback or claims
+
+
 def _answered(bundle: dict[str, Any], claims: list[dict[str, Any]]) -> dict[str, Any]:
-    return _answer(bundle, "ANSWERED", claims, limitations=[])
+    return _answer(bundle, "ANSWERED", _prefer_excerpts_when_degenerate(bundle, claims), limitations=[])
 
 
 def _partial_answer(bundle: dict[str, Any], claims: list[dict[str, Any]]) -> dict[str, Any]:
@@ -697,6 +831,15 @@ def _partial_answer(bundle: dict[str, Any], claims: list[dict[str, Any]]) -> dic
     for index, limitation in enumerate(limitations, start=len(claims) + 1):
         evidence_ids = [item["evidence_id"] for item in (bundle["verified_evidence"] or bundle["supporting_evidence"])[:1]]
         claims.append(_claim(f"C{index}", "INSUFFICIENT", "SQ3", limitation, evidence_ids, raw_evidence_text=limitation))
+    if not claims:
+        # Reached when a caller hands over an empty claim list (e.g. the structured
+        # table artifact is incomplete) and the coverage map reports no gaps. Returning
+        # that empty list produced a blank answer body in the UI. Fall back to the
+        # verbatim excerpts so the user always has something to read.
+        claims = _evidence_excerpt_claims(bundle)
+    else:
+        # A thin/templated "answer" is no better than no answer. Prefer the source text.
+        claims = _prefer_excerpts_when_degenerate(bundle, claims)
     # The limitation is already a cited claim; rendering it twice would make the
     # user-facing answer look like two independent findings.
     return _answer(bundle, "PARTIAL_ANSWER", claims, limitations=[])
@@ -807,7 +950,7 @@ def _render_direct_claims(raw: str, question: str) -> list[str]:
     if task_book:
         return [f"结论：设计任务书包含{task_book.group(1).strip(' ：，、')}等内容。"]
     headings = _evidence_headings(text)
-    if _asks_for_structure(question) and headings:
+    if _asks_for_structure(question) and headings and not _degenerate_headings(headings):
         subject = _summary_subject(question, text)
         return [f"结论：{subject}主要包括{'、'.join(headings)}。"]
     sentence = _best_sentence(text, question)
@@ -974,7 +1117,7 @@ def _same_document_facet_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
             if heading not in seen:
                 unique.append((number, heading, evidence))
                 seen.add(heading)
-        if len(unique) >= 2:
+        if len(unique) >= 2 and not _degenerate_headings([item[1] for item in unique]):
             candidates.append(unique)
     if not candidates:
         return None

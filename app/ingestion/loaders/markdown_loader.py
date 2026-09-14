@@ -93,10 +93,29 @@ class MarkdownLoader:
         try:
             parsed = yaml.safe_load(raw_front_matter) or {}
         except yaml.YAMLError as error:
-            return 0, {}, f"YAML front matter error: {error}"
+            recovered = MarkdownLoader._recover_windows_path_front_matter(raw_front_matter, error)
+            if recovered is None:
+                return 0, {}, f"YAML front matter error: {error}"
+            return closing_index + 1, recovered, None
         if not isinstance(parsed, dict):
             return 0, {}, "YAML front matter must be a mapping"
         return closing_index + 1, parsed, None
+
+    @staticmethod
+    def _recover_windows_path_front_matter(raw: str, error: yaml.YAMLError) -> dict[str, Any] | None:
+        """Recover simple key/value metadata when YAML rejects backslashes in paths."""
+        if "found unknown escape character" not in str(error):
+            return None
+        recovered: dict[str, Any] = {}
+        for line in raw.splitlines():
+            match = re.match(r"^\s*([A-Za-z_][A-Za-z0-9_-]*)\s*:\s*(.*?)\s*$", line)
+            if not match:
+                continue
+            value = match.group(2).strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in {'\"', "'"}:
+                value = value[1:-1]
+            recovered[match.group(1)] = value
+        return recovered or None
 
     @classmethod
     def _build_blocks(

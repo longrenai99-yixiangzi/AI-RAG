@@ -14,6 +14,7 @@ import numpy as np
 from rank_bm25 import BM25Okapi
 
 from app.bm25 import tokenize
+from app.ingestion.atomic_search import search_atomic_evidence
 from app.retrieval.query_planner_v1 import plan_query
 from app.verified_answer_engine_v2 import render, validate
 from scripts.run_verified_answer_engine_v2 import _runtime_bundle
@@ -23,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[2]
 V25 = ROOT / "evaluation" / "knowledge_os_v2_5"
 STAGING = ROOT / "data" / "shadow" / "knowledge_v2_5_staging"
 RUNS = ROOT / "evaluation" / "knowledge_os_v2_6" / "live_shadow_runs.jsonl"
+CANDIDATE_REVISION = "V2.6.1_DEV_PERIOD_SCOPE_RESCUE"
 
 _write_lock = threading.Lock()
 _shadow_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="v25-live-shadow")
@@ -61,8 +63,42 @@ def _location(section_path: str, table_id: str | None) -> dict[str, Any]:
     return location
 
 
+def _period_scope_rescue(question: str, plan: Any, atomic: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rescue only existing, period-matched evidence outside the RRF top-20."""
+    period = str(getattr(plan, "period", "") or "")
+    metrics = [str(value) for value in getattr(plan, "metric", [])]
+    if period not in {"H1", "FULL_YEAR"} or not metrics:
+        return []
+    h1_markers = ("\u4e0a\u534a\u5e74", "\u534a\u5e74\u603b\u7ed3")
+    annual_markers = ("\u5e74\u5ea6\u603b\u7ed3", "\u5e74\u5ea6\u8ff0\u804c", "\u5e74\u5ea6\u5de5\u4f5c", "\u8ff0\u804c\u62a5\u544a", "\u5168\u5e74\u5de5\u4f5c", "\u5168\u5e74\u521b\u6548")
+    matched = []
+    for record in atomic.values():
+        text = " ".join(str(record.get(key) or "") for key in ("file_name", "source_path", "text")).casefold()
+        period_match = any(marker in text for marker in h1_markers) if period == "H1" else any(marker in text for marker in annual_markers)
+        if period_match and all(metric.casefold() in text for metric in metrics):
+            matched.append(record)
+    return [item["record"] for item in search_atomic_evidence(question, matched, limit=3)] if matched else []
+
+
+def _candidate_row(record: dict[str, Any], rank: int, origin: str) -> dict[str, Any]:
+    return {
+        "evidence_id": str(record.get("evidence_id") or record.get("chunk_id")),
+        "document_id": record.get("document_id"),
+        "source_path": record.get("source_path"),
+        "file_name": record.get("file_name"),
+        "source_version": record.get("source_version"),
+        "heading_path": record.get("heading_path") or record.get("section_path") or "",
+        "location": record.get("location") or _location(str(record.get("section_path") or ""), record.get("table_id")),
+        "text": record.get("text") or record.get("raw_text") or "",
+        "raw_text": record.get("raw_text") or record.get("text") or "",
+        "rank": rank,
+        "candidate_origin": origin,
+        "lineage_status": "LINEAGE_CONFIRMED",
+    }
+
+
 class V25LiveShadow:
-    """Read-only V2.5 candidate branch used behind the V1 response path."""
+    """Read-only V2.5 data branch with a separately labelled V2.6.1 dev rescue."""
 
     def __init__(self) -> None:
         manifest = json.loads((V25 / "candidate_v2_5_manifest.json").read_text(encoding="utf-8"))
@@ -142,20 +178,13 @@ class V25LiveShadow:
         order = [index for index, _ in sorted(scores.items(), key=lambda item: (-item[1], item[0]))]
         candidate_rows = []
         for rank, index in enumerate(order[:20], start=1):
-            chunk = self.chunks[index]
-            candidate_rows.append({
-                "evidence_id": str(chunk.get("chunk_id")),
-                "document_id": chunk.get("document_id"),
-                "source_path": chunk.get("source_path"),
-                "file_name": chunk.get("file_name"),
-                "source_version": chunk.get("source_version"),
-                "heading_path": chunk.get("section_path") or "",
-                "location": _location(str(chunk.get("section_path") or ""), chunk.get("table_id")),
-                "text": chunk.get("raw_text") or "",
-                "raw_text": chunk.get("raw_text") or "",
-                "rank": rank,
-                "lineage_status": "LINEAGE_CONFIRMED",
-            })
+            candidate_rows.append(_candidate_row(self.atomic[str(self.chunks[index].get("chunk_id"))], rank, "FROZEN_V2_5_RRF"))
+        rescued = _period_scope_rescue(question, plan, self.atomic)
+        existing = {row["evidence_id"] for row in candidate_rows}
+        rescue_rows = [_candidate_row(record, 0, "PERIOD_SCOPE_RESCUE") for record in rescued if str(record.get("evidence_id")) not in existing]
+        candidate_rows = [*rescue_rows, *candidate_rows]
+        for rank, row in enumerate(candidate_rows, start=1):
+            row["rank"] = rank
         documents = {str(key): dict(value) for key, value in self.docs.items()}
         for document in documents.values():
             document.setdefault("scope", {})
@@ -186,6 +215,8 @@ class V25LiveShadow:
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
             "validation": validation,
             "candidate_hash": self.manifest.get("candidate_hash"),
+            "candidate_revision": CANDIDATE_REVISION,
+            "period_scope_rescue": {"invoked": bool(getattr(plan, "period", "")), "rescued_evidence_ids": [row["evidence_id"] for row in rescue_rows]},
         }
 
 
@@ -219,7 +250,7 @@ def run_async(*, question: str, query_run_id: str, conversation_id: str, primary
             "v1_citation": primary.get("citations") or [],
             "v1_latency_ms": (primary.get("latency") or {}).get("total_ms"),
             "v1_error": None,
-            "execution_mode": "LIVE_REQUEST_BACKGROUND_V2_5_SHADOW",
+            "execution_mode": "LIVE_REQUEST_BACKGROUND_V2_6_1_DEV_SHADOW",
         }
         try:
             vector = query_vector
@@ -241,9 +272,11 @@ def run_async(*, question: str, query_run_id: str, conversation_id: str, primary
                 "new_hit_verification": "REVIEW_REQUIRED" if shadow["new_hit_candidate"] else "NOT_A_CANDIDATE",
                 "lost_hit_verification": "REVIEW_REQUIRED" if shadow["lost_hit_candidate"] else "NOT_A_CANDIDATE",
                 "v2_latency_ms": shadow["latency_ms"],
-                "v2_error": None if shadow["validation"].get("valid") else "V2_5_SHADOW_ANSWER_VALIDATION_FAILED",
+                "v2_error": None if shadow["validation"].get("valid") else "V2_6_1_DEV_SHADOW_ANSWER_VALIDATION_FAILED",
                 "v2_validation": shadow["validation"],
                 "candidate_hash": shadow["candidate_hash"],
+                "candidate_revision": shadow["candidate_revision"],
+                "period_scope_rescue": shadow["period_scope_rescue"],
             })
         except Exception as error:
             base.update({"v2_status": "SHADOW_ERROR", "v2_answer_status": None, "v2_top_source": None, "v2_top_section": None, "v2_citation": [], "source_agreement": None, "section_agreement": None, "new_hit_candidate": None, "lost_hit_candidate": None, "new_hit_verification": "NOT_ASSESSED", "lost_hit_verification": "NOT_ASSESSED", "v2_latency_ms": round((time.perf_counter() - started) * 1000, 3), "v2_error": f"{type(error).__name__}: {error}"})

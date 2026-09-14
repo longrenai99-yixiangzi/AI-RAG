@@ -2,11 +2,21 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Sequence
+from functools import wraps
+import threading
 import uuid
 
 from qdrant_client import QdrantClient, models
 
 from app.domain import Chunk
+
+
+def _serialized_load(method):
+    @wraps(method)
+    def wrapper(self, *args, **kwargs):
+        with self._load_lock:
+            return method(self, *args, **kwargs)
+    return wrapper
 
 
 class BGEM3DenseProvider:
@@ -27,6 +37,7 @@ class BGEM3DenseProvider:
         self.use_fp16 = use_fp16
         self.batch_size = batch_size
         self.model: object | None = None
+        self._load_lock = threading.Lock()
         self.client = QdrantClient(location=":memory:")
         self._point_to_chunk: dict[str, str] = {}
 
@@ -34,6 +45,7 @@ class BGEM3DenseProvider:
     def ready(self) -> bool:
         return self.model is not None
 
+    @_serialized_load
     def load(self) -> None:
         if self.model is not None:
             return

@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 V26 = ROOT / "evaluation" / "knowledge_os_v2_6"
 REVIEW = V26 / "live_shadow_v2_6_1_manual_review.json"
+GOLD = ROOT / "evaluation" / "trial_qa_benchmark" / "benchmark_130_questions.jsonl"
 
 ROOT_CAUSES = {
     "V261-LSR-002": ("SOURCE_BODY_MISSING_OR_STRUCTURED_GAP", "V2 returned a topic list instead of the requested count and fields.", "Admit and parse the actual design-option checklist body; bind table headers and rows before answering."),
@@ -33,11 +34,17 @@ ROOT_CAUSES = {
 
 def main() -> int:
     payload = json.loads(REVIEW.read_text(encoding="utf-8"))
+    gold = {}
+    if GOLD.exists():
+        for line in GOLD.read_text(encoding="utf-8").splitlines():
+            row = json.loads(line)
+            gold[row.get("question")] = row
     rows = [row for row in payload.get("records") or [] if row.get("manual_decision") == "NOT_VERIFIED"]
     queue = []
     for row in rows:
         category, finding, action = ROOT_CAUSES.get(row["review_id"], ("UNCLASSIFIED", "No deterministic classification recorded.", "Manual root-cause review required."))
-        queue.append({"review_id": row["review_id"], "candidate_type": row.get("candidate_type"), "question": row.get("question"), "root_cause_category": category, "finding": finding, "next_action": action, "v1_sources": [item.get("file_name") for item in (row.get("v1") or {}).get("citations", [])[:3]], "v2_sources": [item.get("file_name") for item in (row.get("v2_6_1") or {}).get("citations", [])[:3]], "status": "OPEN_REMEDIATION"})
+        reference = gold.get(row.get("question")) or {}
+        queue.append({"review_id": row["review_id"], "candidate_type": row.get("candidate_type"), "question": row.get("question"), "root_cause_category": category, "finding": finding, "next_action": action, "v1_sources": [item.get("file_name") for item in (row.get("v1") or {}).get("citations", [])[:3]], "v2_sources": [item.get("file_name") for item in (row.get("v2_6_1") or {}).get("citations", [])[:3]], "gold_qid": reference.get("qid") or reference.get("question_id"), "gold_expected_answer": reference.get("expected_answer"), "gold_expected_source": reference.get("expected_source"), "gold_reference_status": "FOUND" if reference else "MISSING", "status": "OPEN_REMEDIATION"})
     result = {"schema_version": "knowledge_os_v2_6_1.not_verified_remediation_queue", "captured_at": datetime.now(timezone.utc).astimezone().isoformat(), "source_review_status": payload.get("status"), "record_count": len(queue), "categories": {}, "records": queue}
     for row in queue:
         result["categories"][row["root_cause_category"]] = result["categories"].get(row["root_cause_category"], 0) + 1
@@ -50,7 +57,7 @@ def main() -> int:
         live_report_path.write_text(json.dumps(live_report, ensure_ascii=False, indent=2), encoding="utf-8")
     lines = ["# V2.6.1 NOT_VERIFIED 修复队列", "", f"- 条数：`{len(queue)}`", f"- 分类：`{result['categories']}`", "- 状态：所有条目保持 `OPEN_REMEDIATION`，未自动改写答案或 Gate。", ""]
     for row in queue:
-        lines += [f"## {row['review_id']}", "", f"- 问题：{row['question']}", f"- 根因：`{row['root_cause_category']}`", f"- 证据判断：{row['finding']}", f"- 下一步：{row['next_action']}", f"- V1 来源：`{row['v1_sources']}`", f"- V2.6.1 来源：`{row['v2_sources']}`", ""]
+        lines += [f"## {row['review_id']}", "", f"- 问题：{row['question']}", f"- 根因：`{row['root_cause_category']}`", f"- 证据判断：{row['finding']}", f"- 下一步：{row['next_action']}", f"- V1 来源：`{row['v1_sources']}`", f"- V2.6.1 来源：`{row['v2_sources']}`", f"- Gold：`{row['gold_qid'] or 'MISSING'}`；目标来源：`{row['gold_expected_source'] or 'MISSING'}`", f"- Gold 标准答案：{row['gold_expected_answer'] or '未找到，需人工补齐。'}", ""]
     (ROOT / "docs" / "V2_6_1_NOT_VERIFIED_REMEDIATION_QUEUE.md").write_text("\n".join(lines), encoding="utf-8")
     print(json.dumps({"record_count": result["record_count"], "categories": result["categories"], "status": "OPEN_REMEDIATION"}, ensure_ascii=False, indent=2))
     return 0

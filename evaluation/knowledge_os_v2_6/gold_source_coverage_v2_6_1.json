@@ -1,0 +1,458 @@
+{
+  "schema_version": "knowledge_os_v2_6_1.gold_source_coverage",
+  "captured_at": "2026-09-14T14:43:21.847114+08:00",
+  "base_candidate": "V2.5_FROZEN",
+  "records": [
+    {
+      "review_id": "V261-LSR-001",
+      "question": "建设标准库共有多少份文件？按几条产品线组织？分别是哪些？",
+      "gold_qid": "Q05",
+      "expected_source_basenames": [
+        "建设标准库",
+        "建设标准库.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "建设标准库.md",
+          "source_path": "D:\\设计管理\\wiki\\concepts\\设计支持\\建设标准库.md",
+          "document_type": "RETROSPECTIVE",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [],
+      "classification": "EXACT_BODY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-002",
+      "question": "《设计方案比选提示清单》覆盖多少项比选内容？每项包含哪些字段？",
+      "gold_qid": "Q03",
+      "expected_source_basenames": [
+        "方案比选库",
+        "方案比选库.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "方案比选库.md",
+          "source_path": "D:\\设计管理\\wiki\\concepts\\设计支持\\方案比选库.md",
+          "document_type": "TABLE_LEDGER",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [],
+      "classification": "EXACT_BODY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-003",
+      "question": "设计策划评审由谁牵头？哪些单位参与？评审后形成几项督办？",
+      "gold_qid": "Q06",
+      "expected_source_basenames": [
+        "设计策划评审",
+        "设计策划评审.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "设计策划评审.md",
+          "source_path": "D:\\设计管理\\wiki\\concepts\\设计支持\\设计策划评审.md",
+          "document_type": "REVIEW_RECORD",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [],
+      "classification": "EXACT_BODY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-004",
+      "question": "设计任务书汇编收录了多少个项目的任务书？覆盖哪些业态？",
+      "gold_qid": "Q07",
+      "expected_source_basenames": [
+        "设计任务书",
+        "设计任务书汇编",
+        "设计任务书汇编.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "设计任务书汇编.md",
+          "source_path": "D:\\设计管理\\wiki\\sources\\设计任务书汇编.md",
+          "document_type": "REGISTER_PAGE",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [],
+      "classification": "REGISTRATION_OR_QUERY_ONLY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-005",
+      "question": "孝感奥体项目 50 米游泳池铺砖完成后，两端池壁间距的精度要求是多少？",
+      "gold_qid": "Q51",
+      "expected_source_basenames": [
+        "b6077e3f74f0a1b7ae9f",
+        "b6077e3f74f0a1b7ae9f.md"
+      ],
+      "stage_matches": [],
+      "physical_gold_matches": [
+        {
+          "path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\b6077e3f74f0a1b7ae9f.md",
+          "size_bytes": 39181,
+          "sha256": "c392bc19e997b52f2f31be948ea8876830c0055f612016fd8b1dc119affcb323"
+        }
+      ],
+      "classification": "PHYSICAL_GOLD_NOT_IN_CANDIDATE",
+      "approval_required": true
+    },
+    {
+      "review_id": "V261-LSR-006",
+      "question": "沈阳中心大厦的设计创效成果中，各专业分别优化了多少金额？",
+      "gold_qid": "Q70",
+      "expected_source_basenames": [
+        "cb93c382c9197043cab1",
+        "cb93c382c9197043cab1.md"
+      ],
+      "stage_matches": [],
+      "physical_gold_matches": [
+        {
+          "path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\cb93c382c9197043cab1.md",
+          "size_bytes": 44914,
+          "sha256": "7ce9483b9a83a5a0797c647718e82de2a9e68028a9ffa558c491102d06c29424"
+        }
+      ],
+      "classification": "PHYSICAL_GOLD_NOT_IN_CANDIDATE",
+      "approval_required": true
+    },
+    {
+      "review_id": "V261-LSR-007",
+      "question": "海南中心塔冠施工设置多少个支撑胎架？针对主梁变形采取了什么措施？",
+      "gold_qid": "Q77",
+      "expected_source_basenames": [
+        "f80e5def25e5a56bfc6f",
+        "f80e5def25e5a56bfc6f.md"
+      ],
+      "stage_matches": [],
+      "physical_gold_matches": [
+        {
+          "path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\f80e5def25e5a56bfc6f.md",
+          "size_bytes": 23307,
+          "sha256": "bcc9a3b8685a86085ce26f1b5163406c6db9801a4258778aee98ee912a5ba082"
+        }
+      ],
+      "classification": "PHYSICAL_GOLD_NOT_IN_CANDIDATE",
+      "approval_required": true
+    },
+    {
+      "review_id": "V261-LSR-008",
+      "question": "设计管理策划书通常包含哪几个章节板块？",
+      "gold_qid": "Q29",
+      "expected_source_basenames": [
+        "设计管理策划章节问答",
+        "设计管理策划章节问答.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "设计管理策划章节问答.md",
+          "source_path": "D:\\设计管理\\wiki\\queries\\设计管理策划章节问答.md",
+          "document_type": "QUERY_PAGE",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [],
+      "classification": "REGISTRATION_OR_QUERY_ONLY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-009",
+      "question": "\"法人管项目\"资料登记记录的文件夹分几大类、共多少份文件？",
+      "gold_qid": "Q08",
+      "expected_source_basenames": [
+        "法人管项目",
+        "法人管项目资料登记",
+        "法人管项目资料登记.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "法人管项目资料登记.md",
+          "source_path": "D:\\设计管理\\wiki\\sources\\法人管项目资料登记.md",
+          "document_type": "REGISTER_PAGE",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [],
+      "classification": "REGISTRATION_OR_QUERY_ONLY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-010",
+      "question": "设计与技术支持中心的组织架构和人员配置是怎样的？",
+      "gold_qid": "Q09",
+      "expected_source_basenames": [
+        "法人管项目",
+        "法人管项目.md",
+        "设计与技术支持中心",
+        "设计与技术支持中心.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "法人管项目.md",
+          "source_path": "D:\\设计管理\\wiki\\concepts\\设计管理体系\\法人管项目.md",
+          "document_type": "RESPONSIBILITY_CONTRACT",
+          "parse_status": "parsed"
+        },
+        {
+          "file_name": "设计与技术支持中心.md",
+          "source_path": "D:\\设计管理\\wiki\\organizations\\设计与技术支持中心.md",
+          "document_type": "RESPONSIBILITY_CONTRACT",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [],
+      "classification": "EXACT_BODY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-011",
+      "question": "材料设备报审中，专项施工图出图后的时限要求是什么？海外项目有何不同？",
+      "gold_qid": "Q40",
+      "expected_source_basenames": [
+        "0ee2959550610ce23750",
+        "0ee2959550610ce23750.md"
+      ],
+      "stage_matches": [],
+      "physical_gold_matches": [
+        {
+          "path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\0ee2959550610ce23750.md",
+          "size_bytes": 176301,
+          "sha256": "c921b8c3773304cd2ffef8659812d1498317900cbd8892460454b22a6060f89d"
+        }
+      ],
+      "classification": "PHYSICAL_GOLD_NOT_IN_CANDIDATE",
+      "approval_required": true
+    },
+    {
+      "review_id": "V261-LSR-012",
+      "question": "海外全模块化数据中心的模块构成、数量与最大重量是多少？",
+      "gold_qid": "Q58",
+      "expected_source_basenames": [
+        "2c5dbe10c9b44d1d47d0",
+        "2c5dbe10c9b44d1d47d0.md"
+      ],
+      "stage_matches": [],
+      "physical_gold_matches": [
+        {
+          "path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\2c5dbe10c9b44d1d47d0.md",
+          "size_bytes": 61838,
+          "sha256": "2d2a1005a60aae43465dd06dcb633bcd2ad1b1f3fd2812a7ee3b063e2b030cdc"
+        }
+      ],
+      "classification": "PHYSICAL_GOLD_NOT_IN_CANDIDATE",
+      "approval_required": true
+    },
+    {
+      "review_id": "V261-LSR-013",
+      "question": "2024 年二公司设计创效累计金额与创效率是多少？",
+      "gold_qid": "Q80",
+      "expected_source_basenames": [
+        "2024年年度总结",
+        "2024年年度总结.md",
+        "37746aede39d6b33f745",
+        "37746aede39d6b33f745.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "2024年年度总结.md",
+          "source_path": "D:\\设计管理\\raw\\工作总结\\2024年年度总结.md",
+          "document_type": "TRAINING",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [
+        {
+          "path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\37746aede39d6b33f745.md",
+          "size_bytes": 9620,
+          "sha256": "ce10009f6d315357ef504aa491abcf0f2f43e1f1f83eee4bdd1152894984d2f2"
+        }
+      ],
+      "classification": "EXACT_BODY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-014",
+      "question": "2024 年二公司完成多少个项目标前概算分析与评审？中标情况如何？",
+      "gold_qid": "Q81",
+      "expected_source_basenames": [
+        "2024年度总结2",
+        "2024年度总结2.md",
+        "e0d9ad43a1f66a2d8531",
+        "e0d9ad43a1f66a2d8531.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "2024年度总结2.md",
+          "source_path": "D:\\设计管理\\raw\\工作总结\\2024年度总结2.md",
+          "document_type": "RESPONSIBILITY_CONTRACT",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [
+        {
+          "path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\e0d9ad43a1f66a2d8531.md",
+          "size_bytes": 16977,
+          "sha256": "88548fb5ec49a3ecb5f757bd5d96002ef91e87cc7d7f4c6e5ba8db90ca86fdf6"
+        }
+      ],
+      "classification": "EXACT_BODY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-015",
+      "question": "2024 年上半年二公司完成多少次标前成本测算评审与图纸估概算评审？",
+      "gold_qid": "Q86",
+      "expected_source_basenames": [
+        "2024年半年总结",
+        "2024年半年总结.md",
+        "e1f57b2f1862b9e921b2",
+        "e1f57b2f1862b9e921b2.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "2024年半年总结.md",
+          "source_path": "D:\\设计管理\\raw\\工作总结\\2024年半年总结.md",
+          "document_type": "REVIEW_RECORD",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [
+        {
+          "path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\e1f57b2f1862b9e921b2.md",
+          "size_bytes": 11183,
+          "sha256": "6c15697367fd1709ca6cdb352839f366780766c9e99437857c7cbd21c78184fd"
+        }
+      ],
+      "classification": "EXACT_BODY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-016",
+      "question": "2025 年上半年二公司新开 EPC 项目设计策划完成情况如何？",
+      "gold_qid": "Q89",
+      "expected_source_basenames": [
+        "2025年半年总结",
+        "2025年半年总结.md",
+        "55122ed33fea8877f535",
+        "55122ed33fea8877f535.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "2025年半年总结.md",
+          "source_path": "D:\\设计管理\\raw\\工作总结\\2025年半年总结.md",
+          "document_type": "RETROSPECTIVE",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [
+        {
+          "path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\55122ed33fea8877f535.md",
+          "size_bytes": 35360,
+          "sha256": "801c4796a3148a19ecd22ad1ec5e89a1e0568860170a8cee71793573ba30ae13"
+        }
+      ],
+      "classification": "EXACT_BODY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-017",
+      "question": "2025 年二公司钢筋平均创效率是多少？多少个项目超 16%？",
+      "gold_qid": "Q95",
+      "expected_source_basenames": [
+        "2025年年度总结",
+        "2025年年度总结.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "2025年年度总结.md",
+          "source_path": "D:\\设计管理\\raw\\工作总结\\2025年年度总结.md",
+          "document_type": "RESPONSIBILITY_CONTRACT",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [],
+      "classification": "EXACT_BODY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-018",
+      "question": "铁投·书香林语项目屋面花架优化的做法与降低造价金额是多少？",
+      "gold_qid": "Q107",
+      "expected_source_basenames": [
+        "铁投·书香林语（华中）",
+        "铁投·书香林语（华中）.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "铁投·书香林语（华中）.md",
+          "source_path": "D:\\设计管理\\wiki\\concepts\\设计管理成果总结\\项目经验总结库\\各项目\\铁投·书香林语（华中）.md",
+          "document_type": "RETROSPECTIVE",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [],
+      "classification": "EXACT_BODY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-019",
+      "question": "EPC 项目设计管理流程包含哪 8 个环节？哪个环节资料量最大？",
+      "gold_qid": "Q129",
+      "expected_source_basenames": [
+        "EPC项目设计管理流程",
+        "EPC项目设计管理流程.md"
+      ],
+      "stage_matches": [
+        {
+          "file_name": "EPC项目设计管理流程.md",
+          "source_path": "D:\\设计管理\\wiki\\topics\\EPC项目设计管理流程.md",
+          "document_type": "DESIGN_TASK_BOOK",
+          "parse_status": "parsed"
+        }
+      ],
+      "physical_gold_matches": [],
+      "classification": "EXACT_BODY_IN_CANDIDATE",
+      "approval_required": false
+    },
+    {
+      "review_id": "V261-LSR-020",
+      "question": "2026 年上半年中建三局打造了多少个 BIM 应用示范工程？同期改革管理论坛发布什么文件？",
+      "gold_qid": "Q130",
+      "expected_source_basenames": [
+        "77d7e542b45a93853e16",
+        "77d7e542b45a93853e16.md",
+        "90b557ce19fb9d757b47",
+        "90b557ce19fb9d757b47.md"
+      ],
+      "stage_matches": [],
+      "physical_gold_matches": [
+        {
+          "path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\77d7e542b45a93853e16.md",
+          "size_bytes": 87713,
+          "sha256": "c78ccf30fb5e64479fba27a4bdf73b6cbc243b4bc31c8a3f2de1415054d48e7c"
+        },
+        {
+          "path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\90b557ce19fb9d757b47.md",
+          "size_bytes": 14803,
+          "sha256": "d23adc39ed9e3fd7c13f41b5cb02a9399f813cc902b2c04a9537853586d2ad9e"
+        }
+      ],
+      "classification": "PHYSICAL_GOLD_NOT_IN_CANDIDATE",
+      "approval_required": true
+    }
+  ],
+  "summary": {
+    "record_count": 20,
+    "exact_body_in_candidate": 11,
+    "registration_or_query_only": 3,
+    "physical_gold_not_in_candidate": 6,
+    "physical_gold_not_found": 0,
+    "approval_required_count": 6
+  }
+}

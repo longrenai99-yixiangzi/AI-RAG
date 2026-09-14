@@ -2,9 +2,9 @@
 
 > 仅记录真实用户问题；不以自动题、历史 V2.5 记录或离线重放补样本。
 
-- 有效样本：`0/30`
-- 样本门：`SHADOW_INSUFFICIENT_SAMPLE`
-- 运行状态：`SHADOW_INSUFFICIENT_SAMPLE`
+- 有效样本：`109/30`
+- 样本门：`PASS`
+- 运行状态：`LIVE_SHADOW_REVIEW_REQUIRED`
 - 运行异常：`0`
 
 候选达到 30 条真实去重问题后，仍须人工核验 New/Lost Hit 与引用，不能直接解除发布闸门。

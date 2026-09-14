@@ -1,21 +1,21 @@
 {
   "schema_version": "knowledge_os_v2_6_1.live_shadow_status",
-  "captured_at": "2026-09-14T14:20:45.930809+08:00",
+  "captured_at": "2026-09-14T14:22:59.427154+08:00",
   "execution_mode": "LIVE_REQUEST_BACKGROUND_V2_6_1_DEV_SHADOW",
   "sample_basis": "Only actual requests received after V2.6.1 dev candidate wiring; historical V2.5 rows are excluded.",
-  "raw_record_count": 121,
-  "sample_size": 109,
+  "raw_record_count": 144,
+  "sample_size": 131,
   "minimum_effective_sample": 30,
   "sample_gate": "PASS",
   "candidate_revisions": {
-    "V2.6.1_DEV_PERIOD_SCOPE_RESCUE": 109
+    "V2.6.1_DEV_PERIOD_SCOPE_RESCUE": 131
   },
   "candidate_hashes": [
     "6b4d22c1d46af866645ac2d8701f3fc581444ac0b740b443cdf7b21da9c40c89"
   ],
   "candidate_delta": {
     "new_hit_candidates": 7,
-    "lost_hit_candidates": 11
+    "lost_hit_candidates": 13
   },
   "rescue_usage": {
     "period_scope": 3,

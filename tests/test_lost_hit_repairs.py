@@ -1,0 +1,21 @@
+from app.verified_answer_engine_v2 import _digital_construction_solution_claims
+
+
+def test_q74_renderer_emits_architecture_and_basis_claims() -> None:
+    question = "\u4e2d\u5efa\u4e09\u5c40\u9879\u76ee\u6570\u5b57\u5efa\u9020\u7cfb\u7edf\u89e3\u51b3\u65b9\u6848 1.0 \u91c7\u7528\u4ec0\u4e48\u6280\u672f\u67b6\u6784\uff1f\u4f9d\u6258\u4ec0\u4e48\u7f16\u5236\uff1f"
+    bundle = {
+        "question": question,
+        "verified_evidence": [
+            {"evidence_id": "architecture", "text": "\u91c7\u7528\u81ea\u4e0b\u800c\u4e0a\u201c\u611f\u77e5\u91c7\u96c6\u5c42\u2014\u6570\u636e\u4e2d\u53f0\u5c42\u2014\u4e1a\u52a1\u5e94\u7528\u5c42\u201d\u4e09\u5c42\u67b6\u6784\u4f53\u7cfb\u3002"},
+            {"evidence_id": "basis", "text": "\u5728\u300a\u4e2d\u5efa\u96c6\u56e2\u667a\u80fd\u5efa\u90202035\u603b\u4f53\u884c\u52a8\u89c4\u5212\u300b\u6307\u5f15\u4e0b\uff0c\u6309\u5206\u9636\u6bb5\u5206\u6b65\u9aa4\u5b9e\u65bd\u601d\u8def\u7f16\u5236\u3002\n\u4f18\u5148\u9002\u7528\u4e8e\u5de5\u7a0b\u603b\u627f\u5305\uff08EPC\uff09\u6a21\u5f0f\u9879\u76ee\u548c\u5de5\u4e1a\u5316\u5efa\u9020\u9879\u76ee\u3002"},
+            {"evidence_id": "demand", "text": "\u6570\u5b57\u5efa\u9020\u7ba1\u7406\u7ec4\u7275\u5934\uff0c\u4f9d\u62588\u4e2aBIM\u793a\u8303\u9879\u76ee\u3001\u4e4b\u524d\u9879\u76ee\u68b3\u7406\u9700\u6c42\u3002"},
+            {"evidence_id": "practice", "text": "\u4ee5\u5149\u8c37\u5143\u8457\u9879\u76ee\u4e3a\u5b9e\u8df5\u8f7d\u4f53\u63a8\u52a8\u6570\u5b57\u5efa\u9020\u7cfb\u7edf\u5168\u9762\u843d\u5730\u3002"},
+        ],
+    }
+    claims = _digital_construction_solution_claims(bundle)
+    text = "\n".join(claim["rendered_claim_text"] for claim in claims)
+    assert len(claims) >= 4
+    assert "\u611f\u77e5\u91c7\u96c6\u5c42" in text
+    assert "2035\u603b\u4f53\u884c\u52a8\u89c4\u5212" in text
+    assert "8\u4e2aBIM" in text
+    assert "\u5149\u8c37\u5143\u8457" in text

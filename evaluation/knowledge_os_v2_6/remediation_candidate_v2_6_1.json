@@ -2,7 +2,7 @@
   "schema_version": "knowledge_os_v2_6_1.dev_remediation_candidate",
   "candidate_id": "V2.6.1-DEV-LSR014",
   "captured_at": "2026-09-14T11:43:16.460604+08:00",
-  "status": "DEV_REMEDIATION_PENDING_OWNER_APPROVAL",
+  "status": "DEV_REMEDIATION_EMBEDDED_NOT_RELEASED",
   "base_candidate_hash": "26928685b69d167a99289a26776b6e0712531f79eaed71effc553bd37543ce03",
   "repair_targets": [
     "LSR-014"
@@ -14,8 +14,11 @@
     "sha256": "e51a58bc0a5865620202c0ef39a0597b1e0e3853f48007647dec496121a0b176",
     "physical_exists": true,
     "parse_status": "parsed",
-    "effective_status": "PENDING_OWNER_APPROVAL",
-    "index_status": "DEV_REMEDIATION_ONLY"
+    "effective_status": "APPROVED_DEV_REMEDIATION",
+    "index_status": "DEV_REMEDIATION_ONLY",
+    "approval_status": "APPROVED",
+    "approved_by": "USER_CONFIRMED",
+    "approved_at": "2026-09-14T12:04:35.030962+08:00"
   },
   "parse_counts": {
     "documents": 1,
@@ -68,9 +71,27 @@
       "evidence_id": "b1f37e2a-2831-5329-93eb-aea6da313303"
     }
   ],
-  "embedding_status": "PENDING_NEW_CANDIDATE_EMBEDDING",
+  "embedding_status": "PASS",
   "parameter_changes": false,
   "formal_8000_touched": false,
   "8010_switch_performed": false,
-  "approval_note": "This sixth source is isolated for remediation only; it is not promoted into frozen V2.5 or formal indexes."
+  "approval_note": "This sixth source is isolated for remediation only; it is not promoted into frozen V2.5 or formal indexes.",
+  "approved_at": "2026-09-14T12:04:35.030962+08:00",
+  "dense_embeddings": {
+    "path": "D:\\AI智能体\\AI设计管理RAG-V1\\data\\shadow\\knowledge_v2_6_remediation\\lsr014_source\\dense_embeddings.npy",
+    "sha256": "39bf5088a05c695e24bf890863604024d974e0a1375feb4f8e019e6fae20f94e",
+    "shape": [
+      34,
+      1024
+    ],
+    "normalized": true,
+    "model": "BAAI/bge-m3"
+  },
+  "candidate_hash": "6b4d22c1d46af866645ac2d8701f3fc581444ac0b740b443cdf7b21da9c40c89",
+  "candidate_revision": "V2.6.1_DEV_PERIOD_SCOPE_RESCUE",
+  "full_candidate_replay": {
+    "status": "PASS",
+    "recorded_at": "2026-09-14T12:12:25.962276+08:00",
+    "result_path": "D:\\AI智能体\\AI设计管理RAG-V1\\evaluation\\knowledge_os_v2_6\\full_candidate_replay_v2_6_1.json"
+  }
 }

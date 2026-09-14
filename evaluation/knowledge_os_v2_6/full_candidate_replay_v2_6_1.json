@@ -1,0 +1,227 @@
+{
+  "schema_version": "knowledge_os_v2_6_1.full_candidate_replay",
+  "captured_at": "2026-09-14T12:12:25.962276+08:00",
+  "status": "FULL_CANDIDATE_REPLAY_PASS_NOT_LIVE_SHADOW",
+  "candidate_hash": "6b4d22c1d46af866645ac2d8701f3fc581444ac0b740b443cdf7b21da9c40c89",
+  "candidate_revision": "V2.6.1_DEV_PERIOD_SCOPE_RESCUE",
+  "release_boundary": "Read-only full-candidate replay; not an actual-user Live Shadow sample and not a Release Gate pass.",
+  "records": [
+    {
+      "question": "中建三局项目数字建造系统解决方案 1.0 采用什么技术架构？依托什么编制？",
+      "plan": {
+        "query_id": "94c8f9f5-6ff6-5cf3-898c-9d988c8821c1",
+        "original_question": "中建三局项目数字建造系统解决方案 1.0 采用什么技术架构？依托什么编制？",
+        "normalized_question": "中建三局项目数字建造系统解决方案 1.0 采用什么技术架构？依托什么编制？",
+        "query_type": "OPTION_QUERY",
+        "entities": [
+          "中建三局项目"
+        ],
+        "organization": [
+          "中建三局"
+        ],
+        "project": [
+          "中建三局项目"
+        ],
+        "year": [],
+        "period": "",
+        "specialty": [],
+        "metric": [],
+        "document_type_hint": [],
+        "document_role_hint": [],
+        "authority_requirement": "ANY",
+        "scope_constraints": {
+          "organization": [
+            "中建三局"
+          ],
+          "project": [
+            "中建三局项目"
+          ]
+        },
+        "subquestions": [],
+        "structured_query_hint": false,
+        "comparison_plan": [
+          "COMPARE_OPTIONS"
+        ],
+        "aggregation_plan": [],
+        "planner_confidence": 0.59
+      },
+      "status": "ANSWERED",
+      "bundle_status": "VERIFIED",
+      "answer": "结论：采用自下而上“感知采集层—数据中台层—业务应用层”三层架构体系。 [S1]\n在《中建集团智能建造2035总体行动规划》指引下，按分阶段分步骤实施思路编制。 [S2]\n优先适用于工程总承包（EPC）模式项目和工业化建造项目。 [S3]\n以项目数字化业务场景为牵引，数字建造管理组牵头，联合商务、供应链、安监部、投资部等相关业务部门， 依托8个BIM示范项目、4个智能建造示范项目，从施工阶段、业务线条两大维度梳理数字化需求。 [S4]\n以光谷元著项目为实践载体推动数字建造系统全面落地，需要在组织架构、岗位职责、协同流程等方面搭建完善的管理体系，也可为后续同类项目开展数字化建设提供管理参考。 [S5]",
+      "citations": [
+        {
+          "citation_id": "S1",
+          "evidence_id": "5bfdf0a1-174e-5267-97c9-67556ab05dac",
+          "source_id": "V261-4467cbfca0da88994414e699",
+          "document_id": "0cd794f5-6054-535f-a079-479d577f3f43",
+          "source_path": "D:\\工作\\二公司技术部\\2026\\局优秀管理经验\\04.中建三局项目数字建造系统解决方案.pdf",
+          "file_name": "04.中建三局项目数字建造系统解决方案.pdf",
+          "location": {},
+          "page": null,
+          "heading_path": "Page 14",
+          "sheet": null,
+          "table": null,
+          "row": null,
+          "column": null
+        },
+        {
+          "citation_id": "S2",
+          "evidence_id": "7077a49b-5d1e-5205-8fea-86719f2c7c9a",
+          "source_id": "V261-4467cbfca0da88994414e699",
+          "document_id": "0cd794f5-6054-535f-a079-479d577f3f43",
+          "source_path": "D:\\工作\\二公司技术部\\2026\\局优秀管理经验\\04.中建三局项目数字建造系统解决方案.pdf",
+          "file_name": "04.中建三局项目数字建造系统解决方案.pdf",
+          "location": {},
+          "page": null,
+          "heading_path": "Page 7",
+          "sheet": null,
+          "table": null,
+          "row": null,
+          "column": null
+        },
+        {
+          "citation_id": "S3",
+          "evidence_id": "7077a49b-5d1e-5205-8fea-86719f2c7c9a",
+          "source_id": "V261-4467cbfca0da88994414e699",
+          "document_id": "0cd794f5-6054-535f-a079-479d577f3f43",
+          "source_path": "D:\\工作\\二公司技术部\\2026\\局优秀管理经验\\04.中建三局项目数字建造系统解决方案.pdf",
+          "file_name": "04.中建三局项目数字建造系统解决方案.pdf",
+          "location": {},
+          "page": null,
+          "heading_path": "Page 7",
+          "sheet": null,
+          "table": null,
+          "row": null,
+          "column": null
+        },
+        {
+          "citation_id": "S4",
+          "evidence_id": "0922f03d-6bbe-54c6-b1e8-71cb21f11089",
+          "source_id": "V261-4467cbfca0da88994414e699",
+          "document_id": "0cd794f5-6054-535f-a079-479d577f3f43",
+          "source_path": "D:\\工作\\二公司技术部\\2026\\局优秀管理经验\\04.中建三局项目数字建造系统解决方案.pdf",
+          "file_name": "04.中建三局项目数字建造系统解决方案.pdf",
+          "location": {},
+          "page": null,
+          "heading_path": "Page 8",
+          "sheet": null,
+          "table": null,
+          "row": null,
+          "column": null
+        },
+        {
+          "citation_id": "S5",
+          "evidence_id": "8d09c16c-1903-5fa9-89bd-fb3760a88d41",
+          "source_id": "V261-4467cbfca0da88994414e699",
+          "document_id": "0cd794f5-6054-535f-a079-479d577f3f43",
+          "source_path": "D:\\工作\\二公司技术部\\2026\\局优秀管理经验\\04.中建三局项目数字建造系统解决方案.pdf",
+          "file_name": "04.中建三局项目数字建造系统解决方案.pdf",
+          "location": {},
+          "page": null,
+          "heading_path": "Page 27",
+          "sheet": null,
+          "table": null,
+          "row": null,
+          "column": null
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "validation_errors": []
+      },
+      "rescue_evidence": [
+        {
+          "evidence_id": "7077a49b-5d1e-5205-8fea-86719f2c7c9a",
+          "origin": "EXACT_NAMED_SOURCE_RESCUE"
+        },
+        {
+          "evidence_id": "0922f03d-6bbe-54c6-b1e8-71cb21f11089",
+          "origin": "EXACT_NAMED_SOURCE_RESCUE"
+        },
+        {
+          "evidence_id": "5bfdf0a1-174e-5267-97c9-67556ab05dac",
+          "origin": "EXACT_NAMED_SOURCE_RESCUE"
+        },
+        {
+          "evidence_id": "8d09c16c-1903-5fa9-89bd-fb3760a88d41",
+          "origin": "EXACT_NAMED_SOURCE_RESCUE"
+        }
+      ],
+      "review_id": "LSR-014"
+    },
+    {
+      "question": "2025 年上半年二公司\"三优一创\"总体创效率是多少？",
+      "plan": {
+        "query_id": "781d49a1-3e08-5231-8d8b-87539f7bb9d4",
+        "original_question": "2025 年上半年二公司\"三优一创\"总体创效率是多少？",
+        "normalized_question": "2025 年上半年二公司\"三优一创\"总体创效率是多少？",
+        "query_type": "SINGLE_FACT",
+        "entities": [],
+        "organization": [
+          "中建三局第二建设公司"
+        ],
+        "project": [],
+        "year": [
+          "2025"
+        ],
+        "period": "H1",
+        "specialty": [],
+        "metric": [
+          "创效"
+        ],
+        "document_type_hint": [],
+        "document_role_hint": [],
+        "authority_requirement": "ANY",
+        "scope_constraints": {
+          "organization": [
+            "中建三局第二建设公司"
+          ],
+          "year": [
+            "2025"
+          ],
+          "period": [
+            "H1"
+          ]
+        },
+        "subquestions": [],
+        "structured_query_hint": false,
+        "comparison_plan": [],
+        "aggregation_plan": [],
+        "planner_confidence": 0.65
+      },
+      "status": "ANSWERED",
+      "bundle_status": "VERIFIED",
+      "answer": "结论：加强深化设计管理 ，上半年“三优一创” 总体创效率3.31%，高于局管控目标0.31个百分点。 [S1]",
+      "citations": [
+        {
+          "citation_id": "S1",
+          "evidence_id": "2ef97ad4-2057-5b56-bb6c-dea0813dbaa1",
+          "source_id": "e6ab55f0-5aae-5731-92d8-3e8c4804a331",
+          "document_id": "f907090e-ffed-5108-9827-dfb23ec24e2a",
+          "source_path": "D:\\设计管理\\raw\\工作总结\\2025年半年总结.md",
+          "file_name": "2025年半年总结.md",
+          "location": {
+            "section_path": "2025年半年总结 > 正文"
+          },
+          "page": null,
+          "heading_path": "2025年半年总结 > 正文",
+          "sheet": null,
+          "table": null,
+          "row": null,
+          "column": null
+        }
+      ],
+      "validation": {
+        "valid": true,
+        "validation_errors": []
+      },
+      "rescue_evidence": [
+        {
+          "evidence_id": "2ef97ad4-2057-5b56-bb6c-dea0813dbaa1",
+          "origin": "PERIOD_SCOPE_RESCUE"
+        }
+      ],
+      "review_id": "LSR-017"
+    }
+  ]
+}

@@ -74,9 +74,9 @@ New Hit、Lost Hit 和 Citation 变化已由业务负责人审核。当前结果
 
 ## I. 根因修复进展（不改变发布闸门）
 
-- `LSR-014`：确认冻结 V2.5 只有登记页，真实 PDF 未进入候选正文；已建立 `V2.6.1_DEV_REMEDIATION` 隔离候选，物理文件解析为 654 段、654 条原子证据、34 个语义块。只读组件重放已答对，但新增来源仍等待 Owner 审批和嵌入。
+- `LSR-014`：确认冻结 V2.5 只有登记页，真实 PDF 未进入候选正文；新增来源已由 Owner 以 SHA-256 批准，并完成 34 个语义块的 BGE-M3 向量化。全候选重放已答对，待真实 Live Shadow 验证。
 - `LSR-017`：确认 2025 年上半年 `3.31%` 与全年 `3.33%` 属于不同期间；已在查询计划、证据范围和同范围冲突检测中加入 `H1/FULL_YEAR`，并加入仅从既有、期间匹配证据中补回的开发候选机制。只读重放已返回 `3.31%`；无期间问题仍保留冲突保护。
-- 两条组件重放均为 `ANSWERED` 且引用校验通过，但不计入 Live Shadow 或 Release Gate。
+- `V2.6.1_DEV_REMEDIATION` 的两条全候选重放均为 `ANSWERED` 且引用校验通过，但不计入 Live Shadow 或 Release Gate。
 - 本轮修复未写入 8000、未切换 8010，也未改写冻结 V2.5；修复验证通过后仍须重跑干净 Live Shadow 窗口。
 
 ## 主要交付物
@@ -87,5 +87,6 @@ New Hit、Lost Hit 和 Citation 变化已由业务负责人审核。当前结果
 - `docs/LIVE_SHADOW_REPORT.md`
 - `docs/LIVE_SHADOW_REMEDIATION_DIAGNOSIS.md`
 - `docs/V2_6_1_REMEDIATION_REPLAY.md`
+- `docs/V2_6_1_FULL_CANDIDATE_REPLAY.md`
 - `docs/8010_CONTROLLED_SWITCH_PLAN.md`
 - `docs/8010_ROLLBACK_PLAN.md`

@@ -1,0 +1,9 @@
+{
+  "schema_version": "knowledge_os_v2_6_1.remediation_source_approval",
+  "recorded_at": "2026-09-14T12:04:35.030962+08:00",
+  "source_path": "D:\\工作\\二公司技术部\\2026\\局优秀管理经验\\04.中建三局项目数字建造系统解决方案.pdf",
+  "sha256": "e51a58bc0a5865620202c0ef39a0597b1e0e3853f48007647dec496121a0b176",
+  "approval_status": "APPROVED",
+  "approved_by": "USER_CONFIRMED",
+  "scope": "V2.6.1_DEV_REMEDIATION only; not an 8010 switch or 8000 write authorization."
+}

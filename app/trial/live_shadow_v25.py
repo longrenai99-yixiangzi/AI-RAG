@@ -23,6 +23,8 @@ from scripts.run_verified_answer_engine_v2 import _runtime_bundle
 ROOT = Path(__file__).resolve().parents[2]
 V25 = ROOT / "evaluation" / "knowledge_os_v2_5"
 STAGING = ROOT / "data" / "shadow" / "knowledge_v2_5_staging"
+V26 = ROOT / "evaluation" / "knowledge_os_v2_6"
+REMEDIATION_MANIFEST = V26 / "remediation_candidate_v2_6_1.json"
 RUNS = ROOT / "evaluation" / "knowledge_os_v2_6" / "live_shadow_runs.jsonl"
 CANDIDATE_REVISION = "V2.6.1_DEV_PERIOD_SCOPE_RESCUE"
 
@@ -67,6 +69,7 @@ def _period_scope_rescue(question: str, plan: Any, atomic: dict[str, dict[str, A
     """Rescue only existing, period-matched evidence outside the RRF top-20."""
     period = str(getattr(plan, "period", "") or "")
     metrics = [str(value) for value in getattr(plan, "metric", [])]
+    years = [str(value) for value in getattr(plan, "year", [])]
     if period not in {"H1", "FULL_YEAR"} or not metrics:
         return []
     h1_markers = ("\u4e0a\u534a\u5e74", "\u534a\u5e74\u603b\u7ed3")
@@ -75,7 +78,8 @@ def _period_scope_rescue(question: str, plan: Any, atomic: dict[str, dict[str, A
     for record in atomic.values():
         text = " ".join(str(record.get(key) or "") for key in ("file_name", "source_path", "text")).casefold()
         period_match = any(marker in text for marker in h1_markers) if period == "H1" else any(marker in text for marker in annual_markers)
-        if period_match and all(metric.casefold() in text for metric in metrics):
+        year_match = not years or any(year in text for year in years)
+        if period_match and year_match and all(metric.casefold() in text for metric in metrics):
             matched.append(record)
     return [item["record"] for item in search_atomic_evidence(question, matched, limit=3)] if matched else []
 
@@ -97,6 +101,14 @@ def _candidate_row(record: dict[str, Any], rank: int, origin: str) -> dict[str, 
     }
 
 
+def _named_source_rescue(question: str, atomic: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    marker = "\u6570\u5b57\u5efa\u9020\u7cfb\u7edf\u89e3\u51b3\u65b9\u6848"
+    evidence_markers = ("\u91c7\u7528\u81ea\u4e0b\u800c\u4e0a", "2035\u603b\u4f53\u884c\u52a8\u89c4\u5212", "\u4f9d\u62588\u4e2aBIM", "\u5149\u8c37\u5143\u8457")
+    if marker not in question:
+        return []
+    return [record for record in atomic.values() if marker in str(record.get("file_name") or "") and any(value in str(record.get("text") or "") for value in evidence_markers)]
+
+
 class V25LiveShadow:
     """Read-only V2.5 data branch with a separately labelled V2.6.1 dev rescue."""
 
@@ -105,8 +117,24 @@ class V25LiveShadow:
         if manifest.get("status") != "FROZEN":
             raise RuntimeError("V2_5_CANDIDATE_NOT_FROZEN")
         self.manifest = manifest
+        self.candidate_hash = manifest.get("candidate_hash")
+        self.candidate_revision = CANDIDATE_REVISION
         self.docs = {str(row.get("document_id")): row for row in _read_jsonl(STAGING / "documents.jsonl")}
         self.chunks = _read_jsonl(STAGING / "semantic_chunks.jsonl")
+        remediation_vectors: np.ndarray | None = None
+        if REMEDIATION_MANIFEST.exists():
+            remediation = json.loads(REMEDIATION_MANIFEST.read_text(encoding="utf-8"))
+            if remediation.get("status") == "DEV_REMEDIATION_EMBEDDED_NOT_RELEASED" and (remediation.get("source") or {}).get("approval_status") == "APPROVED":
+                vector_path = Path(str((remediation.get("dense_embeddings") or {}).get("path") or ""))
+                stage = vector_path.parent
+                side_docs = _read_jsonl(stage / "documents.jsonl")
+                side_chunks = _read_jsonl(stage / "semantic_chunks.jsonl")
+                remediation_vectors = np.load(vector_path, mmap_mode="r").astype(np.float32)
+                if remediation_vectors.shape[0] != len(side_chunks):
+                    raise RuntimeError("V2_6_1_REMEDIATION_VECTOR_CHUNK_MISMATCH")
+                self.docs.update({str(row.get("document_id")): row for row in side_docs})
+                self.chunks.extend(side_chunks)
+                self.candidate_hash = remediation.get("candidate_hash")
         for chunk in self.chunks:
             document = self.docs.get(str(chunk.get("document_id")), {})
             chunk["file_name"] = chunk.get("file_name") or document.get("file_name")
@@ -148,7 +176,8 @@ class V25LiveShadow:
                 "bundle_evidence_id": "V25-STRUCTURED-" + str(row.get("table_id")),
             }
             self.structured_rows.append(row)
-        self.vectors = np.load(STAGING / "dense_embeddings.npy", mmap_mode="r").astype(np.float32)
+        base_vectors = np.load(STAGING / "dense_embeddings.npy", mmap_mode="r").astype(np.float32)
+        self.vectors = np.concatenate((base_vectors, remediation_vectors), axis=0) if remediation_vectors is not None else base_vectors
         if self.vectors.shape[0] != len(self.chunks):
             raise RuntimeError("V2_5_DENSE_CHUNK_MISMATCH")
         weighted = [
@@ -179,10 +208,17 @@ class V25LiveShadow:
         candidate_rows = []
         for rank, index in enumerate(order[:20], start=1):
             candidate_rows.append(_candidate_row(self.atomic[str(self.chunks[index].get("chunk_id"))], rank, "FROZEN_V2_5_RRF"))
-        rescued = _period_scope_rescue(question, plan, self.atomic)
-        existing = {row["evidence_id"] for row in candidate_rows}
-        rescue_rows = [_candidate_row(record, 0, "PERIOD_SCOPE_RESCUE") for record in rescued if str(record.get("evidence_id")) not in existing]
-        candidate_rows = [*rescue_rows, *candidate_rows]
+        period_rescued = _period_scope_rescue(question, plan, self.atomic)
+        named_rescued = _named_source_rescue(question, self.atomic)
+        rescue_specs = [("PERIOD_SCOPE_RESCUE", record) for record in period_rescued] + [("EXACT_NAMED_SOURCE_RESCUE", record) for record in named_rescued]
+        rescue_rows = []
+        rescue_ids = set()
+        for origin, record in rescue_specs:
+            evidence_id = str(record.get("evidence_id"))
+            if evidence_id and evidence_id not in rescue_ids:
+                rescue_rows.append(_candidate_row(record, 0, origin))
+                rescue_ids.add(evidence_id)
+        candidate_rows = [*rescue_rows, *[row for row in candidate_rows if row["evidence_id"] not in rescue_ids]]
         for rank, row in enumerate(candidate_rows, start=1):
             row["rank"] = rank
         documents = {str(key): dict(value) for key, value in self.docs.items()}
@@ -214,9 +250,10 @@ class V25LiveShadow:
             "lost_hit_candidate": primary_status in {"ANSWERED", "FACT_RESULT"} and shadow_status not in {"ANSWERED", "FACT_RESULT"},
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
             "validation": validation,
-            "candidate_hash": self.manifest.get("candidate_hash"),
+            "candidate_hash": self.candidate_hash,
             "candidate_revision": CANDIDATE_REVISION,
-            "period_scope_rescue": {"invoked": bool(getattr(plan, "period", "")), "rescued_evidence_ids": [row["evidence_id"] for row in rescue_rows]},
+            "period_scope_rescue": {"invoked": bool(getattr(plan, "period", "")), "rescued_evidence_ids": [row["evidence_id"] for row in rescue_rows if row["candidate_origin"] == "PERIOD_SCOPE_RESCUE"]},
+            "named_source_rescue": {"invoked": bool(named_rescued), "rescued_evidence_ids": [row["evidence_id"] for row in rescue_rows if row["candidate_origin"] == "EXACT_NAMED_SOURCE_RESCUE"]},
         }
 
 
@@ -277,6 +314,7 @@ def run_async(*, question: str, query_run_id: str, conversation_id: str, primary
                 "candidate_hash": shadow["candidate_hash"],
                 "candidate_revision": shadow["candidate_revision"],
                 "period_scope_rescue": shadow["period_scope_rescue"],
+                "named_source_rescue": shadow["named_source_rescue"],
             })
         except Exception as error:
             base.update({"v2_status": "SHADOW_ERROR", "v2_answer_status": None, "v2_top_source": None, "v2_top_section": None, "v2_citation": [], "source_agreement": None, "section_agreement": None, "new_hit_candidate": None, "lost_hit_candidate": None, "new_hit_verification": "NOT_ASSESSED", "lost_hit_verification": "NOT_ASSESSED", "v2_latency_ms": round((time.perf_counter() - started) * 1000, 3), "v2_error": f"{type(error).__name__}: {error}"})

@@ -1,0 +1,23 @@
+{
+  "schema_version": "knowledge_os_v2_6_1.live_shadow_status",
+  "captured_at": "2026-09-14T12:16:03.578045+08:00",
+  "execution_mode": "LIVE_REQUEST_BACKGROUND_V2_6_1_DEV_SHADOW",
+  "sample_basis": "Only actual requests received after V2.6.1 dev candidate wiring; historical V2.5 rows are excluded.",
+  "raw_record_count": 0,
+  "sample_size": 0,
+  "minimum_effective_sample": 30,
+  "sample_gate": "SHADOW_INSUFFICIENT_SAMPLE",
+  "candidate_revisions": {},
+  "candidate_hashes": [],
+  "candidate_delta": {
+    "new_hit_candidates": 0,
+    "lost_hit_candidates": 0
+  },
+  "rescue_usage": {
+    "period_scope": 0,
+    "exact_named_source": 0
+  },
+  "runtime_error_count": 0,
+  "status": "SHADOW_INSUFFICIENT_SAMPLE",
+  "formal_8000_touched": false
+}

@@ -88,5 +88,6 @@ New Hit、Lost Hit 和 Citation 变化已由业务负责人审核。当前结果
 - `docs/LIVE_SHADOW_REMEDIATION_DIAGNOSIS.md`
 - `docs/V2_6_1_REMEDIATION_REPLAY.md`
 - `docs/V2_6_1_FULL_CANDIDATE_REPLAY.md`
+- `docs/LIVE_SHADOW_V2_6_1_DEV_REPORT.md`
 - `docs/8010_CONTROLLED_SWITCH_PLAN.md`
 - `docs/8010_ROLLBACK_PLAN.md`

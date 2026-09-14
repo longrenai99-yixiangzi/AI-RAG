@@ -1,45 +1,54 @@
 {
   "schema_version": "knowledge_os_v2_6.live_shadow_report",
-  "captured_at": "2026-09-13T10:34:53.893359+08:00",
-  "execution_mode": "REPLAY_EXISTING_REAL_TRIAL_LOG_WITH_BM25_PREVIEW_ONLY",
-  "live_runtime_branching": false,
-  "sample_size": 15,
-  "sample_basis": "unique real questions from logs/trial/trial_audit.jsonl and data/trial_feedback/feedback.jsonl; malformed and duplicate questions removed; no synthetic questions generated",
+  "captured_at": "2026-09-14T08:34:45.413372+08:00",
+  "execution_mode": "LIVE_REQUEST_BACKGROUND_V2_5_SHADOW",
+  "live_runtime_branching": true,
+  "branch_status": "WIRED",
+  "raw_record_count": 144,
+  "duplicate_record_count": 13,
+  "sample_size": 131,
   "sample_target": 100,
   "minimum_effective_sample": 30,
-  "sample_gate": "SHADOW_INSUFFICIENT_SAMPLE",
-  "query_encoder_device": "NOT_RUN_GPU_HEADROOM_PROTECTION",
-  "v2_candidate_execution": "BM25_ONLY_DIAGNOSTIC_PREVIEW; NOT_LIVE_V2_5_ANSWER_ENGINE",
+  "sample_basis": "only requests received after V2.5 background branch wiring; pre-wiring real requests remain historical baseline and are not relabeled",
+  "sample_gate": "PASS",
+  "v2_candidate_execution": "V2_5_DENSE_RRF_AND_ANSWER_SHADOW",
   "agreement": {
-    "source_agreement_count": 1,
-    "source_agreement_rate": 0.0667,
+    "source_comparable_count": 119,
+    "source_agreement_count": 40,
+    "source_agreement_rate": 0.3361,
     "section_agreement_count": 0,
-    "section_agreement_rate": 0
+    "section_agreement_rate": null
   },
   "new_hits": {
-    "candidate_count": 0,
+    "candidate_count": 8,
     "verified_count": 0,
     "verification": "REVIEW_REQUIRED"
   },
   "lost_hits": {
-    "candidate_count": 0,
+    "candidate_count": 13,
     "verified_count": 0,
     "verification": "REVIEW_REQUIRED"
   },
-  "critical_failures": "NOT_ASSESSED_WITHOUT_V2_5_ANSWER_ENGINE",
+  "critical_failures": 2,
+  "answer_rates": {
+    "v1_answered_rate": 0.5725,
+    "v2_answered_rate": 0.5344
+  },
   "latency": {
-    "v1_p50_ms": null,
-    "v1_p95_ms": null,
-    "v2_p50_ms": null,
-    "v2_p95_ms": null
+    "v1_p50_ms": 1085.341,
+    "v1_p95_ms": 1514.09,
+    "v2_p50_ms": 111.98,
+    "v2_p95_ms": 158.648
   },
   "errors": {
-    "v1_error_count": 0,
-    "v2_error_count": 15,
-    "v2_error_rate": 1.0
+    "v1_error_count": 1,
+    "v2_runtime_error_count": 2,
+    "v2_branch_not_run_count": 0,
+    "v1_error_rate": 0.0076,
+    "v2_error_rate": 0.0153
   },
-  "shadow_gate": "SHADOW_INSUFFICIENT_SAMPLE",
-  "stop_reason": "真实唯一问题样本少于30，且本次未重复刷题；V2.5答案引擎未接入8010 Live Runtime，不能把离线检索回放冒充Live Shadow。",
+  "shadow_gate": "SHADOW_GATE_FAIL",
+  "stop_reason": "接入后唯一样本达到 131，但发现 2 条 V2.5 Shadow 异常，需先修复并复核。",
   "formal_8000_touched": false,
   "records_path": "D:\\AI智能体\\AI设计管理RAG-V1\\evaluation\\knowledge_os_v2_6\\live_shadow_runs.jsonl"
 }

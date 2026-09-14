@@ -1,19 +1,16 @@
 # V2.6 Live Shadow Report
 
-- 样本数：15（目标 100；最低有效样本 30）
-- 执行方式：REPLAY_EXISTING_REAL_TRIAL_LOG_WITH_BM25_PREVIEW_ONLY
-- Shadow Gate：`SHADOW_INSUFFICIENT_SAMPLE`
+- V2.5 后台分支：`WIRED`
+- 接入后有效样本：131（目标 100；最低有效样本 30）
+- 样本门：`PASS`
+- Live Shadow Gate：`SHADOW_GATE_FAIL`
 
-## 结果
+## 口径
 
-- 来源 Agreement：1/15
-- Verified New Hit：0（未判定，需业务审核）
-- Verified Lost Hit：0（未判定，需业务审核）
-- V2.5 答案引擎：未接入 8010，只有检索层回放
-- V1/V2 延迟：未形成可比数据
+only requests received after V2.5 background branch wiring; pre-wiring real requests remain historical baseline and are not relabeled
 
-## 停止原因
+## 当前限制
 
-真实唯一问题样本少于30，且本次未重复刷题；V2.5答案引擎未接入8010 Live Runtime，不能把离线检索回放冒充Live Shadow。
+接入后唯一样本达到 131，但发现 2 条 V2.5 Shadow 异常，需先修复并复核。
 
-本报告不把离线回放、Holdout 或重复刷题结果冒充 Live Shadow。样本达到 30 且 V2.5 分支接入真实请求后，才能继续形成 Live Shadow Gate。
+V1 继续给用户返回原有答案；V2.5 仅在后台运行并写入对照记录。New Hit、Lost Hit 和 Citation 变化必须人工审核，不能自动判定。

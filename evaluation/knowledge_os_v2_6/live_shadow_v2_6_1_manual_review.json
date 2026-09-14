@@ -1,11 +1,11 @@
 {
   "schema_version": "knowledge_os_v2_6_1.live_shadow_manual_review",
-  "captured_at": "2026-09-14T14:22:48.796303+08:00",
+  "captured_at": "2026-09-14T14:24:51.969658+08:00",
   "execution_mode": "LIVE_REQUEST_BACKGROUND_V2_6_1_DEV_SHADOW",
   "review_count": 20,
   "new_hit_count": 7,
   "lost_hit_count": 13,
-  "status": "PENDING_OWNER_REVIEW",
+  "status": "OWNER_REVIEWED",
   "records": [
     {
       "review_id": "V261-LSR-001",
@@ -107,8 +107,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-e1fcb895deca4c7a8848",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "VERIFIED_NEW_HIT",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-002",
@@ -169,8 +171,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-e914f46a2a764be89bb6",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-003",
@@ -231,8 +235,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-ff4c63a5e231427c9350",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-004",
@@ -346,8 +352,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-20e948a49b88414eb7e7",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-005",
@@ -453,8 +461,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-85310b20ca044a209471",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-006",
@@ -515,8 +525,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-b4203b0b196b48d1a294",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-007",
@@ -577,8 +589,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-4ce4bc1357454541ac5c",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-008",
@@ -691,8 +705,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-0588727eeffb4d8e8d60",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-009",
@@ -804,8 +820,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-5c48db9e6abd4beaad5c",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "VERIFIED_NEW_HIT",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-010",
@@ -882,8 +900,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-c09a7540c8fa4ac9aa04",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-011",
@@ -995,8 +1015,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-65fae8618f04450388f5",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-012",
@@ -1110,8 +1132,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-4911f05e8ebd4eefb732",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-013",
@@ -1188,8 +1212,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-2516c59d1887423397c7",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-014",
@@ -1304,8 +1330,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-15fd8744d7e4431d990f",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-015",
@@ -1420,8 +1448,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-64736813442c45c094d4",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-016",
@@ -1535,8 +1565,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-5e994e902925456ebf14",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-017",
@@ -1647,8 +1679,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-7bb76c599e6949a9b05a",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-018",
@@ -1764,8 +1798,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-3c3e97876d1f4115a575",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-019",
@@ -1876,8 +1912,10 @@
         }
       },
       "historical_shadow_run_id": "LS26-2df18a0f89a14041ab8a",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     },
     {
       "review_id": "V261-LSR-020",
@@ -1991,8 +2029,23 @@
         }
       },
       "historical_shadow_run_id": "LS26-e5e087981fac4adea6bd",
-      "manual_decision": null,
-      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。"
+      "manual_decision": "NOT_VERIFIED",
+      "review_note": "核对两份答案的事实、问题范围和引用定位；不得只按回答状态判断。",
+      "reviewer": "USER_CONFIRMED",
+      "reviewed_at": "2026-09-14T14:33:46.502422+08:00"
     }
-  ]
+  ],
+  "reviewed_at": "2026-09-14T14:33:46.502422+08:00",
+  "decision_counts": {
+    "VERIFIED_NEW_HIT": 2,
+    "NOT_VERIFIED": 18
+  },
+  "unknown_decision_ids": [
+    "V261-LSR-021"
+  ],
+  "pending_count": 0,
+  "verified_new_hit_count": 2,
+  "verified_lost_hit_count": 0,
+  "not_verified_count": 18,
+  "decision_note": "User supplied decisions applied. V261-LSR-021 was supplied but is not present in the current 20-record candidate list."
 }

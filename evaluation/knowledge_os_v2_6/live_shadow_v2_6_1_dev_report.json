@@ -1,6 +1,6 @@
 {
   "schema_version": "knowledge_os_v2_6_1.live_shadow_status",
-  "captured_at": "2026-09-14T14:22:59.427154+08:00",
+  "captured_at": "2026-09-14T14:24:51.838473+08:00",
   "execution_mode": "LIVE_REQUEST_BACKGROUND_V2_6_1_DEV_SHADOW",
   "sample_basis": "Only actual requests received after V2.6.1 dev candidate wiring; historical V2.5 rows are excluded.",
   "raw_record_count": 144,
@@ -23,5 +23,18 @@
   },
   "runtime_error_count": 0,
   "status": "LIVE_SHADOW_REVIEW_REQUIRED",
-  "formal_8000_touched": false
+  "formal_8000_touched": false,
+  "manual_review": {
+    "status": "OWNER_REVIEWED",
+    "review_count": 20,
+    "decision_counts": {
+      "VERIFIED_NEW_HIT": 2,
+      "NOT_VERIFIED": 18
+    },
+    "unknown_decision_ids": [
+      "V261-LSR-021"
+    ],
+    "pending_count": 0,
+    "verified_lost_hit_count": 0
+  }
 }

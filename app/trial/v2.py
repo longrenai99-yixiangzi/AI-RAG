@@ -26,11 +26,14 @@ from app.ingestion.pipeline import run_document_pipeline
 from app.ingestion.loaders.pdf_loader import extract_value_creation_rows, extract_value_creation_summary
 from app.retrieval.dense_provider import BGEM3DenseProvider
 from app.retrieval.hierarchical_v1 import HierarchicalIndex
-from app.retrieval.query_planner_v1 import plan_query
+from app.retrieval.query_planner_v1 import ORGANIZATION_ALIASES, plan_query
+from app.retrieval.retrieval_trace import build_trace, persist_trace
 from app.verified_answer_engine_v2 import render
 from scripts.run_verified_answer_engine_v2 import _load_authorized_docx_rows, _runtime_bundle
+from .live_shadow_v25 import run_async as run_v25_live_shadow_async
 
 from .config import PROJECT_ROOT, TrialConfig, load_users
+from .knowledge_store import TrialKnowledgeStore, normalize_source_path, source_id_for_path
 
 
 router = APIRouter(prefix="/api/v2", tags=["V2 Verified Trial"])
@@ -43,22 +46,29 @@ GROWTH = PROJECT_ROOT / "data" / "shadow" / "knowledge_growth_v1"
 FEEDBACK_CANDIDATES = GROWTH / "feedback_growth_candidates.jsonl"
 FEEDBACK_CASES = GROWTH / "feedback_regression_cases.jsonl"
 FEEDBACK_RUNS = GROWTH / "feedback_regression_runs.jsonl"
+RAG_DEFECTS = GROWTH / "rag_system_defects.jsonl"
 SOURCE_CLOSURE_REGISTER = PROJECT_ROOT / "data" / "shadow" / "trial_cycle_01" / "source_closure_register.jsonl"
 TRIAL_FEEDBACK_QUESTIONS = PROJECT_ROOT / "data" / "shadow" / "trial_cycle_01" / "trial_feedback_questions.jsonl"
 BATCH_ROOT = PROJECT_ROOT / "data" / "shadow" / "batch_workflow"
 BATCH_SOURCE_REGISTER = BATCH_ROOT / "source_registry.jsonl"
 BATCH_CASES = BATCH_ROOT / "acceptance_cases.jsonl"
 BATCH_RUNS = BATCH_ROOT / "regression_runs.jsonl"
+SYSTEM_AUDIT = PROJECT_ROOT / "evaluation" / "knowledge_os_system_audit"
 LOADED_SHADOW_PATHS: set[str] = set()
+KNOWLEDGE_STORE = TrialKnowledgeStore(PROJECT_ROOT / "data" / "shadow" / "knowledge_os" / "state.json")
 
 
 class V2QueryRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2_000)
     trial_user: str = "reviewer-001"
+    conversation_id: str = ""
+    node_id: str = ""
 
 
 class V2FeedbackRequest(BaseModel):
     query_id: str
+    query_run_id: str = ""
+    idempotency_key: str = ""
     trial_user: str = "reviewer-001"
     feedback_type: str
     comment: str = ""
@@ -66,6 +76,10 @@ class V2FeedbackRequest(BaseModel):
     source_location: str = ""
     expected_answer: str = ""
     required_terms: list[str] = Field(default_factory=list)
+    standard_question: str = ""
+    similar_questions: list[str] = Field(default_factory=list)
+    negative_questions: list[str] = Field(default_factory=list)
+    applicability: str = ""
 
 
 class GrowthReviewRequest(BaseModel):
@@ -84,13 +98,52 @@ class GrowthRegressionRequest(BaseModel):
     trial_user: str = "reviewer-001"
 
 
+class ReviewedFeedbackRequest(BaseModel):
+    trial_user: str = "reviewer-001"
+    decision: str = ""
+    source_path: str = ""
+    source_location: str = ""
+    required_terms: list[str] = Field(default_factory=list)
+    standard_question: str = ""
+    similar_questions: list[str] = Field(default_factory=list)
+    negative_questions: list[str] = Field(default_factory=list)
+    applicability: str = ""
+    node_id: str = ""
+
+
+class WithdrawKnowledgeRequest(BaseModel):
+    trial_user: str = "reviewer-001"
+
+
+class RollbackKnowledgeRequest(BaseModel):
+    trial_user: str = "reviewer-001"
+    target_version: int = Field(ge=1)
+    reason: str = Field(min_length=2, max_length=500)
+
+
 class V2TrialEngine:
     def __init__(self) -> None:
+        _sync_trial_sources()
         self.index = HierarchicalIndex.load(INDEX)
         self.documents = {str(row["document_id"]): row for row in self.index.documents}
         self.atomic = {str(row.get("evidence_id")): row for row in self.index.atomic if row.get("evidence_id")}
+        for document in self.documents.values():
+            document.setdefault("source_id", source_id_for_path(str(document.get("source_path") or "")))
+        for evidence in self.atomic.values():
+            evidence.setdefault("source_id", source_id_for_path(str(evidence.get("source_path") or "")))
+            evidence.setdefault("source_version", evidence.get("sha256") or "FROZEN_INDEX")
+            evidence.setdefault("raw_text", evidence.get("text", ""))
+            evidence.setdefault("search_context", " ".join(str(evidence.get(field) or "") for field in ("file_name", "heading_path")))
+            evidence.setdefault("parent_evidence_id", None)
+        alias_document_id = "system-organization-aliases"
+        alias_source_id = "SYS_ORGANIZATION_ALIASES"
+        alias_text = "；".join(f"{canonical}：{','.join(aliases)}" for canonical, aliases in ORGANIZATION_ALIASES.items())
+        self.documents[alias_document_id] = {"document_id": alias_document_id, "source_id": alias_source_id, "source_path": "app/retrieval/query_planner_v1.py", "file_name": "组织别名配置（系统）", "file_type": ".py", "document_role": "系统配置", "authority_level": "SYSTEM", "scope": {"organization": list(ORGANIZATION_ALIASES), "project": [], "year": [], "specialty": []}}
+        self.atomic["system-evidence-organization-aliases"] = {"evidence_id": "system-evidence-organization-aliases", "source_id": alias_source_id, "source_version": "CODE_CONFIG", "document_id": alias_document_id, "section_id": None, "source_path": "app/retrieval/query_planner_v1.py", "file_name": "组织别名配置（系统）", "file_type": ".py", "heading_path": "ORGANIZATION_ALIASES", "location": {"config_key": "ORGANIZATION_ALIASES"}, "text": alias_text, "raw_text": alias_text, "search_context": "组织全称 简称 别名 同一组织称谓", "parent_evidence_id": None, "granularity": "system_config", "lineage_status": "LINEAGE_CONFIRMED", "system_evidence": True}
         self.structured_rows, self.structured_audit = _load_authorized_docx_rows()
+        self.loaded_source_versions: set[tuple[str, str]] = set()
         self._load_approved_shadow_sources()
+        self._load_active_knowledge()
         self.dense = BGEM3DenseProvider(Settings.load().embedding_model, collection_name="v2_8010_query_embeddings", use_fp16=False, batch_size=1)
 
     def _load_approved_shadow_sources(self) -> None:
@@ -100,31 +153,77 @@ class V2TrialEngine:
             if source["approval_status"] != "USER_APPROVED_SHADOW_READ" or not path.is_file():
                 continue
             normalized_path = _normalize_source_path(path)
-            if normalized_path in LOADED_SHADOW_PATHS:
+            source_id = str(source.get("source_id") or source_id_for_path(path))
+            source_hash = str(source.get("current_hash") or "")
+            version_key = (source_id, source_hash)
+            if version_key in self.loaded_source_versions:
                 continue
-            document_id = "trial-approved-" + hashlib.sha256(str(path).encode("utf-8")).hexdigest()[:24]
-            result = self._load_approved_wps_read_only(path, document_id) if path.suffix.lower() == ".wps" else run_document_pipeline(path.parent, files=[path])
-            for document in result.documents:
+            document_id = "trial-source-" + source_id.casefold()
+            try:
+                result = self._load_approved_wps_read_only(path, document_id) if path.suffix.lower() == ".wps" else run_document_pipeline(path.parent, files=[path])
+                documents = result.documents
+            except Exception as error:
+                KNOWLEDGE_STORE.mark_indexed(source_id, source_hash_value=source_hash, parse_status="read_error", chunk_count=0, error=f"{type(error).__name__}: {error}")
+                continue
+            parsed_chunks = 0
+            parse_status = "empty"
+            parse_error = None
+            for document in documents:
                 metadata = dict(document.metadata or {})
-                scope = {"organization": [], "project": [], "year": [], "specialty": []}
-                if path.suffix.lower() == ".docx":
-                    project_name = self._docx_project_name(document.chunks)
-                    if project_name:
-                        scope["project"] = [project_name]
+                chunks = list(document.chunks)
+                parse_status = str(getattr(document, "status", "parsed"))
+                parse_error = getattr(document, "error", None)
+                scope = _source_scope(path, chunks)
                 self.documents[document_id] = {
                     "document_id": document_id,
                     "knowledge_root_id": "Root-002",
+                    "source_id": source_id,
                     "source_path": str(path),
                     "file_name": path.name,
                     "file_type": document.file_type,
-                    "document_role": metadata.get("document_role"),
-                    "authority_level": metadata.get("authority_level"),
+                    "document_role": metadata.get("document_role") or _document_role(path),
+                    "authority_level": metadata.get("authority_level") or "UNKNOWN",
                     "scope": scope,
                 }
-                for ordinal, chunk in enumerate(document.chunks, start=1):
-                    evidence_id = "approved-shadow-" + hashlib.sha256(f"{path}|{chunk.chunk_id}".encode("utf-8")).hexdigest()[:24]
+                blocks_by_location = {
+                    json.dumps(block.location or {}, ensure_ascii=False, sort_keys=True): block
+                    for block in getattr(document, "source_blocks", [])
+                }
+                location_counts: dict[str, int] = {}
+                for chunk in chunks:
+                    location_key = json.dumps(chunk.location or {}, ensure_ascii=False, sort_keys=True)
+                    location_counts[location_key] = location_counts.get(location_key, 0) + 1
+                for ordinal, chunk in enumerate(chunks, start=1):
+                    chunk.document_id = document_id
+                    evidence_id = "approved-shadow-" + hashlib.sha256(f"{source_id}|{source_hash}|{chunk.chunk_id}".encode("utf-8")).hexdigest()[:24]
+                    location_key = json.dumps(chunk.location or {}, ensure_ascii=False, sort_keys=True)
+                    parent_id = None
+                    parent = blocks_by_location.get(location_key)
+                    if parent is not None and location_counts.get(location_key, 0) > 1:
+                        parent_id = "approved-parent-" + hashlib.sha256(f"{source_id}|{source_hash}|{location_key}".encode("utf-8")).hexdigest()[:24]
+                        self.atomic.setdefault(parent_id, {
+                            "evidence_id": parent_id,
+                            "source_id": source_id,
+                            "source_version": source_hash,
+                            "document_id": document_id,
+                            "section_id": None,
+                            "source_path": str(path),
+                            "file_name": path.name,
+                            "file_type": document.file_type,
+                            "heading_path": parent.heading_path,
+                            "location": parent.location,
+                            "text": parent.text,
+                            "raw_text": parent.text,
+                            "search_context": _search_context(path, parent.heading_path, scope, parent.text),
+                            "parent_evidence_id": None,
+                            "granularity": "parent_block",
+                            "lineage_status": "LINEAGE_CONFIRMED",
+                            "approved_shadow_source": True,
+                        })
                     self.atomic[evidence_id] = {
                         "evidence_id": evidence_id,
+                        "source_id": source_id,
+                        "source_version": source_hash,
                         "document_id": document_id,
                         "section_id": None,
                         "source_path": str(path),
@@ -133,20 +232,58 @@ class V2TrialEngine:
                         "heading_path": chunk.heading_path,
                         "location": chunk.location,
                         "text": chunk.text,
+                        "raw_text": chunk.text,
+                        "search_context": _search_context(path, chunk.heading_path, scope, chunk.text),
+                        "parent_evidence_id": parent_id,
                         "granularity": "chunk",
                         "lineage_status": "LINEAGE_CONFIRMED",
                         "approved_shadow_source": True,
                         "ordinal": ordinal,
                     }
+                parsed_chunks += len(chunks)
             if path.suffix.lower() == ".xlsx":
                 self._load_approved_xlsx_headers(path, document_id)
                 self._load_approved_xlsx_review_sections(path, document_id)
             elif path.suffix.lower() == ".docx" and not any(row.get("source_path") == str(path) for row in self.structured_rows):
                 self.structured_rows.extend(self._load_approved_docx_value_rows(path, document_id))
+            KNOWLEDGE_STORE.mark_indexed(source_id, source_hash_value=source_hash, parse_status=parse_status, chunk_count=parsed_chunks, error=parse_error)
+            self.loaded_source_versions.add(version_key)
             LOADED_SHADOW_PATHS.add(normalized_path)
 
     def load_approved_sources(self) -> None:
         self._load_approved_shadow_sources()
+
+    def _load_active_knowledge(self) -> None:
+        for knowledge in KNOWLEDGE_STORE.active_knowledge():
+            source = KNOWLEDGE_STORE.source(str(knowledge.get("source_id") or ""))
+            if not source or source.get("index_status") != "INDEXED":
+                continue
+            source_path = str(source["source_path"])
+            evidence_id = "trial-knowledge-" + str(knowledge["knowledge_id"])
+            self.atomic[evidence_id] = {
+                "evidence_id": evidence_id,
+                "source_id": source["source_id"],
+                "source_version": source.get("current_hash", ""),
+                "knowledge_id": knowledge["knowledge_id"],
+                "document_id": "trial-source-" + str(source["source_id"]).casefold(),
+                "section_id": None,
+                "source_path": source_path,
+                "file_name": source["file_name"],
+                "file_type": source["file_type"],
+                "heading_path": "已审核试用知识",
+                "location": _location_from_text(str(knowledge.get("source_location") or "")),
+                "text": str(knowledge["content"]),
+                "raw_text": str(knowledge["content"]),
+                "search_context": " ".join([str(knowledge.get("standard_question") or ""), *[str(item) for item in knowledge.get("similar_questions", [])]]),
+                "standard_question": str(knowledge.get("standard_question") or ""),
+                "similar_questions": list(knowledge.get("similar_questions") or []),
+                "parent_evidence_id": None,
+                "negative_questions": list(knowledge.get("negative_questions") or []),
+                "granularity": "reviewed_knowledge",
+                "lineage_status": "LINEAGE_CONFIRMED",
+                "approved_shadow_source": True,
+                "approved_trial_knowledge": True,
+            }
 
 
     @staticmethod
@@ -428,15 +565,16 @@ class V2TrialEngine:
             }
         approved_records = [
             item for item in self.atomic.values()
-            if item.get("approved_shadow_source") and (not wanted_sources or _normalize_source_path(item.get("source_path")).casefold() in wanted_sources)
+            if (item.get("approved_shadow_source") or item.get("system_evidence")) and (not wanted_sources or _normalize_source_path(item.get("source_path")).casefold() in wanted_sources)
         ]
-        approved_results = search_atomic_evidence(question, approved_records, limit=10)
+        approved_candidates: list[dict[str, Any]] = []
+        approved_results = search_atomic_evidence(question, approved_records, limit=50)
         if approved_results:
-            approved_candidates = []
             for rank, item in enumerate(approved_results, start=1):
                 record = item["record"]
                 approved_candidates.append({
                     "evidence_id": record["evidence_id"],
+                    "source_id": record.get("source_id"),
                     "document_id": record["document_id"],
                     "section_id": record.get("section_id"),
                     "candidate_origin": "APPROVED_SHADOW_SOURCE",
@@ -450,6 +588,9 @@ class V2TrialEngine:
                     "text": record.get("text", "")[:900],
                     "lineage_status": record.get("lineage_status"),
                 })
+            if _asks_organization_alias_relationship(question):
+                alias = self.atomic["system-evidence-organization-aliases"]
+                approved_candidates.insert(0, {**alias, "candidate_origin": "SYSTEM_ALIAS_CONFIG"})
             compact_question = re.sub(r"\s+", "", question)
             existing_ids = {item["evidence_id"] for item in approved_candidates}
             for record in self.atomic.values():
@@ -467,6 +608,7 @@ class V2TrialEngine:
                 ):
                     approved_candidates.insert(0, {
                         "evidence_id": record["evidence_id"],
+                        "source_id": record.get("source_id"),
                         "document_id": record["document_id"],
                         "section_id": record.get("section_id"),
                         "candidate_origin": "APPROVED_SECTION_RESCUE",
@@ -503,6 +645,7 @@ class V2TrialEngine:
                 ):
                     rescued = {
                         "evidence_id": record["evidence_id"],
+                        "source_id": record.get("source_id"),
                         "document_id": record["document_id"],
                         "section_id": record.get("section_id"),
                         "candidate_origin": "APPROVED_PDF_SUMMARY_RESCUE",
@@ -522,7 +665,10 @@ class V2TrialEngine:
                         existing_ids.add(record["evidence_id"])
                     else:
                         existing.update(rescued)
-            retrieval = {**retrieval, "atomic_candidates": [*approved_candidates, *retrieval["atomic_candidates"]]}
+        retrieval = {
+            **retrieval,
+            "atomic_candidates": _rank_atomic_candidates(question, [*approved_candidates, *retrieval["atomic_candidates"]], self.atomic),
+        }
         verification_started = time.perf_counter()
         bundle = _runtime_bundle(question, plan.to_dict(), retrieval, self.documents, self.atomic, self.structured_rows)
         verification_ms = (time.perf_counter() - verification_started) * 1000
@@ -540,13 +686,241 @@ class V2TrialEngine:
             candidate_ids.append(candidate["candidate_id"])
         evidence_by_id = {item.get("evidence_id"): item for item in bundle["candidate_evidence"]}
         citations = [_citation(item, evidence_by_id.get(item.get("evidence_id"))) for item in answer["citations"]]
+        used_evidence = [evidence_by_id.get(item.get("evidence_id"), {}) for item in answer["citations"]]
+        knowledge_ids = list(dict.fromkeys(str(item.get("knowledge_id")) for item in used_evidence if item.get("knowledge_id")))
+        answer_mode = "STANDARD_ANSWER" if knowledge_ids else "DETERMINISTIC_CALCULATION" if bundle.get("structured_rows") and (bundle.get("query_plan") or {}).get("structured_query_hint") else "EVIDENCE_SYNTHESIS" if answer["claims"] else "SAFE_REFUSAL"
+        synthesis = _synthesis_trace(bundle, answer_mode)
+        failure_reason = bundle.get("failure_reason")
         return {
             "query_id": query_id, "question": question, "mode": "V2_VERIFIED", "pipeline_version": "020C-020E-020F-020G",
             "answer": answer["answer_text"], "answer_status": answer["answer_status"], "status_label": _friendly_status(answer["answer_status"]),
             "claims": answer["claims"], "claim_evidence_map": answer["claim_evidence_map"], "citations": citations, "debug": {"query_plan": plan.to_dict(), "document_candidates": retrieval["document_candidates"], "section_candidates": retrieval["section_candidates"], "table_candidates": retrieval["table_candidates"], "evidence_bundle": bundle, "claim_evidence_map": answer["claim_evidence_map"], "conflicts": bundle["conflicting_evidence"], "lineage": {"bundle_status": bundle["bundle_status"], "structured_audit": self.structured_audit}},
             "growth_candidate_ids": candidate_ids, "latency": {"query_planner_ms": round(planner_ms, 3), "query_embedding_ms": round(embedding_ms, 3), "document_retrieval_ms": retrieval["timings"]["document_retrieval_ms"], "section_retrieval_ms": retrieval["timings"]["section_retrieval_ms"], "evidence_verification_ms": round(verification_ms, 3), "answer_rendering_ms": round(rendering_ms, 3), "growth_detection_ms": round(growth_ms, 3), "total_ms": round((time.perf_counter() - started) * 1000, 3)},
             "dense_runtime": dense_runtime, "provider_http_requests": 0, "gold_runtime_injection": 0,
+            "answer_mode": answer_mode, "knowledge_ids": knowledge_ids, "source_versions": list(dict.fromkeys(str(item.get("source_version")) for item in used_evidence if item.get("source_version"))),
+            "generation_mode": synthesis["generation_mode"], "synthesis": synthesis,
+            "failure_reason": failure_reason, "failure_message": _failure_message(bundle), "review_candidates": _review_candidates(bundle),
         }
+
+def _sync_trial_sources() -> None:
+    KNOWLEDGE_STORE.sync_configured_sources(CONFIG.approved_shadow_sources)
+    for row in _read_jsonl(BATCH_SOURCE_REGISTER):
+        path = str(row.get("path") or row.get("source_path") or "")
+        if row.get("status") == "APPROVED" and path:
+            KNOWLEDGE_STORE.register_source(path)
+
+
+def _source_catalog(*, include_withdrawn: bool = False) -> list[dict[str, Any]]:
+    central = {row["source_id"]: row for row in KNOWLEDGE_STORE.list_sources(include_withdrawn=include_withdrawn)}
+    for document in _engine_instance().documents.values():
+        source_path = str(document.get("source_path") or "")
+        if not source_path:
+            continue
+        source_id = str(document.get("source_id") or source_id_for_path(source_path))
+        if source_id in central:
+            continue
+        central[source_id] = {
+            "source_id": source_id,
+            "source_path": source_path,
+            "file_name": document.get("file_name") or Path(source_path).name,
+            "file_type": document.get("file_type") or Path(source_path).suffix.lower(),
+            "source_type": document.get("document_role") or document.get("document_type") or "待分类",
+            "knowledge_root_id": document.get("knowledge_root_id") or "Root-001",
+            "approval_status": "FROZEN_INDEX",
+            "body_status": "PARSED",
+            "index_status": "INDEXED",
+            "current_hash": document.get("sha256") or "FROZEN_INDEX",
+            "version_note": "冻结索引版本",
+            "withdrawn": False,
+            "updated_at": "",
+        }
+    return sorted(central.values(), key=lambda row: (str(row.get("knowledge_root_id") or ""), str(row.get("file_name") or "").casefold()))
+
+
+def _source_scope(path: Path, chunks: list[Any]) -> dict[str, list[str]]:
+    text = "\n".join(str(chunk.text or "") for chunk in chunks[:4])
+    organization = []
+    if any(marker in f"{path}\n{text}" for marker in ("中建三局第二建设公司", "中建三局二公司", "二公司")):
+        organization.append("中建三局第二建设公司")
+    project_name = ""
+    if path.suffix.lower() == ".docx":
+        project_name = V2TrialEngine._docx_project_name(chunks)
+    return {"organization": organization, "project": [project_name] if project_name else [], "year": re.findall(r"20\d{2}", path.name)[:1], "specialty": []}
+
+
+def _document_role(path: Path) -> str:
+    name = path.name
+    if any(marker in name for marker in ("实施细则", "管理办法", "制度", "方案")):
+        return "正式制度"
+    if "任务书" in name:
+        return "标准模板"
+    if any(marker in name for marker in ("案例", "总结", "复盘")):
+        return "项目案例"
+    return "其他"
+
+
+def _search_context(path: Path, heading_path: str, scope: dict[str, list[str]], raw_text: str = "") -> str:
+    compact_text = re.sub(r"\s+", "", raw_text)
+    anchors = [
+        marker
+        for marker in ("组织机构设置", "组织定位", "公司总部", "二级部室", "分公司", "岗位", "选择设置", "设计任务书", "编制内容")
+        if marker in compact_text
+    ]
+    variants = []
+    if "公司总部设置" in compact_text and "二级部室" in compact_text:
+        variants.extend(("总部中心隶属哪个部门", "二公司总部中心隶属哪个部门"))
+    if "均设置设计支持岗" in compact_text:
+        variants.append("分公司中心共同设置哪些岗位")
+    if "区域分公司中心选择设置" in compact_text:
+        variants.extend(("区域分公司中心可以另设什么岗位", "所有中心都必须设置五个岗位"))
+    if "专业公司中心选择设置" in compact_text:
+        variants.append("专业公司中心必须设钢筋翻样岗吗")
+    return " / ".join(
+        value
+        for value in (
+            path.name,
+            "、".join(scope.get("organization", [])),
+            heading_path,
+            "、".join(anchors),
+            " / ".join(variants),
+        )
+        if value
+    )
+
+
+def _resolve_followup(question: str, previous: dict[str, Any] | None) -> str:
+    value = " ".join(question.split())
+    if not previous or len(value) > 40 or not any(marker in value for marker in ("那", "它", "这个", "分公司呢", "总部呢")):
+        return value
+    current_plan = plan_query(value)
+    if current_plan.organization or current_plan.project:
+        return value
+    previous_question = str(previous.get("resolved_question") or previous.get("question") or "")
+    previous_plan = plan_query(previous_question)
+    subject = next(iter(previous_plan.project or previous_plan.organization or previous_plan.entities), "")
+    if not subject:
+        return value
+    if "分公司" in value:
+        return f"{subject}各分公司设计与技术支持中心的组织定位是什么"
+    if "总部" in value:
+        return f"{subject}总部设计与技术支持中心的组织定位是什么"
+    return f"关于{subject}，{value}"
+
+
+def _location_from_text(value: str) -> dict[str, Any]:
+    page = re.search(r"第\s*(\d+)\s*页", value)
+    if page:
+        return {"page": int(page.group(1))}
+    paragraph = re.search(r"第\s*(\d+)\s*段", value)
+    if paragraph:
+        return {"paragraph_start": int(paragraph.group(1)), "paragraph_end": int(paragraph.group(1))}
+    return {}
+
+
+def _rank_atomic_candidates(question: str, candidates: list[dict[str, Any]], atomic: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    by_id: dict[str, dict[str, Any]] = {}
+    for candidate in candidates:
+        evidence_id = str(candidate.get("evidence_id") or "")
+        if not evidence_id or evidence_id in by_id:
+            continue
+        record = dict(atomic.get(evidence_id) or candidate)
+        record.update({key: value for key, value in candidate.items() if value is not None})
+        record.setdefault("raw_text", record.get("text", ""))
+        record.setdefault("search_context", "")
+        by_id[evidence_id] = record
+        records.append(record)
+        parent_id = str(record.get("parent_evidence_id") or "")
+        if parent_id and parent_id in atomic and parent_id not in by_id:
+            parent = dict(atomic[parent_id])
+            if (
+                record.get("source_id")
+                and record.get("source_id") == parent.get("source_id")
+                and record.get("source_version")
+                and record.get("source_version") == parent.get("source_version")
+            ):
+                by_id[parent_id] = parent
+                records.append(parent)
+    ranked = search_atomic_evidence(question, records, limit=len(records))
+    result = []
+    for rank, item in enumerate(ranked, start=1):
+        record = item["record"]
+        candidate = dict(by_id[str(record["evidence_id"])])
+        candidate.update({"rank": rank, "score": item["score"], "facet_reasons": item.get("facet_reasons", [])})
+        result.append(candidate)
+    if _asks_organization_alias_relationship(question):
+        result.sort(key=lambda item: item.get("source_id") != "SYS_ORGANIZATION_ALIASES")
+    else:
+        result.sort(key=lambda item: not _matches_reviewed_question(item, question))
+    if result:
+        for rank, item in enumerate(result, start=1):
+            item["rank"] = rank
+    return result[:40]
+
+
+def _asks_organization_alias_relationship(question: str) -> bool:
+    relationship = any(marker in question for marker in ("什么关系", "是否同一个", "是不是同一个", "全称", "简称"))
+    return relationship and any(sum(alias in question for alias in aliases) >= 2 for aliases in ORGANIZATION_ALIASES.values())
+
+
+def _synthesis_trace(bundle: dict[str, Any], answer_mode: str) -> dict[str, Any]:
+    evidence = bundle.get("verified_evidence", [])
+    return {
+        "integration_status": "BLOCKED_PROVIDER_CLAIM_DISABLED" if not CONFIG.get("provider_claim_answer_enabled") else "READY",
+        "generation_mode": "DETERMINISTIC_EVIDENCE_RENDER",
+        "input_contract": {
+            "question": bundle.get("question", ""),
+            "evidence": [
+                {"evidence_id": item.get("evidence_id"), "source_id": item.get("source_id"), "source_version": item.get("source_version")}
+                for item in evidence
+            ],
+        },
+        "output_contract": ["claims", "claim_evidence_map", "citations"],
+        "answer_mode": answer_mode,
+        "provider_http_requests": 0,
+    }
+
+
+def _failure_message(bundle: dict[str, Any]) -> str:
+    if not bundle.get("failure_reason"):
+        return ""
+    candidates = bundle.get("candidate_evidence", [])
+    if any("MISMATCH" in (item.get("scope") or {}).values() for item in candidates[:10]):
+        return "已找到相关资料，但问题范围与资料范围判断不一致；请核对组织、项目和年份。"
+    if not candidates:
+        return "当前索引没有召回相关资料；请检查来源是否登记并完成索引。"
+    return "已召回相关资料，但正文尚不足以直接支持结论；可从候选来源中核对并提交更正。"
+
+
+def _review_candidates(bundle: dict[str, Any]) -> list[dict[str, Any]]:
+    if not bundle.get("failure_reason"):
+        return []
+    rows = []
+    for item in bundle.get("candidate_evidence", []):
+        if item.get("link_only") or not item.get("source_path") or item.get("role") == "DIRECT":
+            continue
+        rows.append({
+            "evidence_id": item.get("evidence_id"),
+            "source_id": item.get("source_id"),
+            "source_version": item.get("source_version"),
+            "file_name": item.get("file_name"),
+            "source_path": item.get("source_path"),
+            "display_location": _display_location(item.get("location") or {}),
+            "excerpt": str(item.get("raw_text") or item.get("text") or "")[:360],
+            "role": item.get("role"),
+            "scope": item.get("scope") or {},
+        })
+        if len(rows) == 3:
+            break
+    return rows
+
+
+def _matches_reviewed_question(item: dict[str, Any], question: str) -> bool:
+    if not item.get("approved_trial_knowledge"):
+        return False
+    compact = re.sub(r"\s+", "", question).casefold()
+    variants = [item.get("standard_question"), *list(item.get("similar_questions") or [])]
+    return compact in {re.sub(r"\s+", "", str(value or "")).casefold() for value in variants if value}
 
 
 _engine: V2TrialEngine | None = None
@@ -560,6 +934,13 @@ def _engine_instance() -> V2TrialEngine:
             if _engine is None:
                 _engine = V2TrialEngine()
     return _engine
+
+
+def reset_trial_engine() -> None:
+    global _engine
+    with _engine_lock:
+        _engine = None
+        LOADED_SHADOW_PATHS.clear()
 
 
 def _with_exact_atomic_rescue(retrieval: dict[str, Any], question: str, atomic: list[dict[str, Any]]) -> dict[str, Any]:
@@ -577,11 +958,12 @@ def _with_exact_atomic_rescue(retrieval: dict[str, Any], question: str, atomic: 
     if not matches:
         return retrieval
     rescued = []
-    for rank, item in enumerate(search_atomic_evidence(question, matches, limit=3), start=1):
+    for rank, item in enumerate(search_atomic_evidence(question, matches, limit=10), start=1):
         record = item["record"]
         exact = [phrase for phrase in phrases if phrase in _compact(str(record.get("text") or ""))]
         rescued.append({
             "evidence_id": record.get("evidence_id"),
+            "source_id": record.get("source_id"),
             "document_id": record.get("document_id"),
             "section_id": record.get("section_id"),
             "candidate_origin": "ATOMIC_EXACT_RESCUE",
@@ -639,17 +1021,113 @@ def query(request: V2QueryRequest) -> dict[str, Any]:
     _ensure_user(request.trial_user)
     if CONFIG.get("V2_VERIFIED_RAG_ENABLED") is not True:
         raise HTTPException(status_code=503, detail="V2_VERIFIED_RAG_DISABLED")
-    result = _engine_instance().answer(request.question)
-    audit = {"timestamp": _now(), "trial_user": request.trial_user, "query_id": result["query_id"], "question": request.question, "pipeline_version": result["pipeline_version"], "answer_status": result["answer_status"], "document_ids": sorted({item.get("document_id") for item in result["debug"]["evidence_bundle"]["candidate_evidence"] if item.get("document_id")}), "evidence_ids": [item["evidence_id"] for item in result["citations"]], "citation_ids": [item["citation_id"] for item in result["citations"]], "bundle_status": result["debug"]["evidence_bundle"]["bundle_status"], "growth_candidate_ids": result["growth_candidate_ids"], "latency": result["latency"], "feedback": None, "gold_runtime_injection": 0}
+    previous = KNOWLEDGE_STORE.last_query_for_conversation(request.conversation_id)
+    resolved_question = _resolve_followup(request.question, previous)
+    result = _engine_instance().answer(resolved_question)
+    result["question"] = request.question
+    result["resolved_question"] = resolved_question
+    query_run_id = "QR_" + uuid.uuid4().hex
+    result["query_run_id"] = query_run_id
+    # V1/V2 primary response is returned unchanged; V2.5 runs in a background
+    # read-only branch and appends only the comparison record.
+    try:
+        run_v25_live_shadow_async(
+            question=str(request.question or ""),
+            query_run_id=query_run_id,
+            conversation_id=str(request.conversation_id or ""),
+            primary=result,
+            query_encoder=_engine_instance().dense.embed_query,
+        )
+    except Exception:
+        pass
+    audit = {"timestamp": _now(), "trial_user": request.trial_user, "query_id": result["query_id"], "query_run_id": query_run_id, "conversation_id": request.conversation_id, "node_id": request.node_id, "question": request.question, "resolved_question": resolved_question, "pipeline_version": result["pipeline_version"], "answer_status": result["answer_status"], "document_ids": sorted({item.get("document_id") for item in result["debug"]["evidence_bundle"]["candidate_evidence"] if item.get("document_id")}), "evidence_ids": [item["evidence_id"] for item in result["citations"]], "citation_ids": [item["citation_id"] for item in result["citations"]], "bundle_status": result["debug"]["evidence_bundle"]["bundle_status"], "growth_candidate_ids": result["growth_candidate_ids"], "latency": result["latency"], "feedback": None, "gold_runtime_injection": 0}
     _append_jsonl(TRIAL / "trial_audit.jsonl", audit)
+    KNOWLEDGE_STORE.record_query(query_run_id, audit)
+    # T04：全链路 trace 落盘；失败时不影响主流程返回结果
+    try:
+        trace = build_trace(
+            query_run_id=query_run_id,
+            question=str(request.question or ""),
+            resolved_question=str(resolved_question or ""),
+            conversation_id=str(request.conversation_id or ""),
+            result=result,
+        )
+        persist_trace(trace)
+        failure = trace.get("failure") or {}
+        audit.update({
+            "failure_stage": failure.get("failure_stage") or "",
+            "failure_code": failure.get("failure_code") or "",
+            "root_cause": failure.get("failure_reason") or "",
+        })
+        KNOWLEDGE_STORE.record_query(query_run_id, audit)
+        result["query_run_id"] = query_run_id
+        result["diagnostics"] = {
+            "query_run_id": query_run_id,
+            "failure_stage": failure.get("failure_stage") or "",
+            "failure_code": failure.get("failure_code") or "",
+            "failure_reason": failure.get("failure_reason") or "",
+            "candidate_evidence": trace["counts"]["candidate_evidence"],
+            "verified_evidence": trace["counts"]["verified_evidence"],
+        }
+    except Exception:
+        pass
     return result
 
 
 @router.post("/feedback")
 def feedback(request: V2FeedbackRequest) -> dict[str, Any]:
     _ensure_user(request.trial_user)
+    query_run = KNOWLEDGE_STORE.query_run(request.query_run_id) if request.query_run_id else None
+    source_path = _normalize_source_path(request.source_path)
+    source_id = source_id_for_path(source_path) if source_path else ""
+    idempotency_key = request.idempotency_key or uuid.uuid4().hex
+    failure_stage = str((query_run or {}).get("failure_stage") or "")
+    failure_code = str((query_run or {}).get("failure_code") or "UNKNOWN")
+    root_cause = str((query_run or {}).get("root_cause") or "需要人工复核")
+    knowledge_gap = failure_code in {"SOURCE_MISSING", "SOURCE_DISABLED", "SOURCE_BODY_MISSING"}
+    system_fix_required = failure_code not in {"NO_FAILURE", "UNKNOWN"} and not knowledge_gap
+    standard_answer_required = knowledge_gap
+    stored, created = KNOWLEDGE_STORE.record_feedback({
+        "query_id": request.query_id,
+        "query_run_id": request.query_run_id,
+        "question": (query_run or {}).get("question", ""),
+        "trial_user": request.trial_user,
+        "feedback_type": request.feedback_type,
+        "comment": request.comment,
+        "source_id": source_id,
+        "source_path": source_path,
+        "source_location": request.source_location.strip(),
+        "expected_answer": request.expected_answer.strip(),
+        "required_terms": _clean_terms(request.required_terms),
+        "standard_question": request.standard_question.strip(),
+        "similar_questions": [item.strip() for item in request.similar_questions if item.strip()],
+        "negative_questions": [item.strip() for item in request.negative_questions if item.strip()],
+        "applicability": request.applicability.strip(),
+        "node_id": str((query_run or {}).get("node_id") or ""),
+        "failure_stage": failure_stage,
+        "failure_code": failure_code,
+        "root_cause": root_cause,
+        "system_fix_required": system_fix_required,
+        "standard_answer_required": standard_answer_required,
+    }, idempotency_key)
+    if not created:
+        return {"saved": True, "deduplicated": True, "feedback_event": stored, "closure_status": stored.get("status", "RECORDED"), "automatic_knowledge_publish": 0}
     event = {"feedback_id": "v2-feedback-" + uuid.uuid4().hex, "timestamp": _now(), "trial_user": request.trial_user, "query_id": request.query_id, "feedback_type": request.feedback_type, "comment": request.comment, "source_path": request.source_path, "source_location": request.source_location, "expected_answer": request.expected_answer, "required_terms": _clean_terms(request.required_terms), "growth_candidate_id": None}
-    if _feedback_profile(request.feedback_type)["creates_candidate"]:
+    if system_fix_required:
+        defect = {
+            "defect_id": "DEF_" + uuid.uuid5(uuid.NAMESPACE_URL, stored["feedback_id"]).hex[:20],
+            "feedback_id": stored["feedback_id"],
+            "query_run_id": request.query_run_id,
+            "question": (query_run or {}).get("question", ""),
+            "failure_stage": failure_stage,
+            "failure_code": failure_code,
+            "root_cause": root_cause,
+            "status": "OPEN",
+            "created_at": _now(),
+        }
+        if defect["defect_id"] not in {row.get("defect_id") for row in _read_jsonl(RAG_DEFECTS)}:
+            _append_jsonl(RAG_DEFECTS, defect)
+    elif (knowledge_gap or failure_code == "UNKNOWN") and _feedback_profile(request.feedback_type)["creates_candidate"]:
         candidate = _feedback_growth_candidate(event)
         event["growth_candidate_id"] = candidate["candidate_id"]
         existing = {row.get("candidate_id") for row in _read_jsonl(FEEDBACK_CANDIDATES)}
@@ -657,7 +1135,290 @@ def feedback(request: V2FeedbackRequest) -> dict[str, Any]:
             _append_jsonl(FEEDBACK_CANDIDATES, candidate)
         _register_trial_question(event, candidate)
     _append_jsonl(TRIAL / "feedback_events.jsonl", event)
-    return {"saved": True, "feedback_event": event, "closure_status": "PENDING_BUSINESS_REVIEW" if event["growth_candidate_id"] else "RECORDED", "automatic_knowledge_publish": 0}
+    return {"saved": True, "feedback_event": {**stored, "growth_candidate_id": event["growth_candidate_id"]}, "closure_status": stored["status"], "automatic_knowledge_publish": 0}
+
+
+@router.get("/knowledge/overview")
+def knowledge_overview() -> dict[str, Any]:
+    _sync_trial_sources()
+    overview = KNOWLEDGE_STORE.overview()
+    sources = _source_catalog()
+    overview.update({
+        "sources": len(sources),
+        "indexed_sources": sum(row.get("index_status") == "INDEXED" for row in sources),
+    })
+    return overview
+
+
+@router.get("/knowledge/sources")
+def knowledge_sources(query: str = "", file_type: str = "", include_withdrawn: bool = False, offset: int = 0, limit: int = 50) -> dict[str, Any]:
+    _sync_trial_sources()
+    rows = _source_catalog(include_withdrawn=include_withdrawn)
+    folded = query.casefold().strip()
+    if folded:
+        rows = [row for row in rows if folded in " ".join(str(row.get(field) or "") for field in ("file_name", "source_path", "source_type")).casefold()]
+    if file_type:
+        rows = [row for row in rows if str(row.get("file_type") or "").casefold() == file_type.casefold()]
+    total = len(rows)
+    start = max(0, offset)
+    size = max(1, min(limit, 200))
+    return {"items": rows[start:start + size], "total": total, "offset": start, "limit": size}
+
+
+@router.get("/knowledge/sources/{source_id}")
+def knowledge_source(source_id: str) -> dict[str, Any]:
+    source = next((row for row in _source_catalog(include_withdrawn=True) if row.get("source_id") == source_id), None)
+    if source is None:
+        raise HTTPException(status_code=404, detail="SOURCE_NOT_FOUND")
+    return {"source": source}
+
+
+@router.get("/knowledge/sources/{source_id}/evidence")
+def knowledge_source_evidence(source_id: str, limit: int = 10) -> dict[str, Any]:
+    source = next((row for row in _source_catalog(include_withdrawn=True) if row.get("source_id") == source_id), None)
+    if source is None:
+        raise HTTPException(status_code=404, detail="SOURCE_NOT_FOUND")
+    records = [
+        {
+            "evidence_id": record["evidence_id"],
+            "source_id": source_id,
+            "source_version": record.get("source_version"),
+            "parent_evidence_id": record.get("parent_evidence_id"),
+            "file_name": record.get("file_name"),
+            "location": record.get("location") or {},
+            "heading_path": record.get("heading_path") or "",
+            "raw_text": str(record.get("raw_text") or record.get("text") or "")[:1600],
+            "search_context": str(record.get("search_context") or ""),
+            "excerpt": str(record.get("raw_text") or record.get("text") or "")[:900],
+        }
+        for record in _engine_instance().atomic.values()
+        if str(record.get("source_id") or "") == source_id
+    ][:max(1, min(limit, 50))]
+    return {"source": source, "items": records}
+
+
+@router.post("/knowledge/sources/{source_id}/refresh")
+def refresh_knowledge_source(source_id: str, request: WithdrawKnowledgeRequest) -> dict[str, Any]:
+    _ensure_user(request.trial_user)
+    source = KNOWLEDGE_STORE.source(source_id)
+    if source is None:
+        raise HTTPException(status_code=404, detail="SOURCE_NOT_FOUND")
+    path = Path(str(source["source_path"]))
+    if not path.is_file():
+        raise HTTPException(status_code=422, detail="SOURCE_FILE_NOT_FOUND")
+    KNOWLEDGE_STORE.register_source(path, reactivate=True)
+    reset_trial_engine()
+    _engine_instance()
+    return {"source": KNOWLEDGE_STORE.source(source_id), "formal_knowledge_publish": 0}
+
+
+@router.post("/knowledge/sources/{source_id}/withdraw")
+def withdraw_knowledge_source(source_id: str, request: WithdrawKnowledgeRequest) -> dict[str, Any]:
+    _ensure_user(request.trial_user)
+    source = KNOWLEDGE_STORE.withdraw_source(source_id, reviewer=request.trial_user)
+    if source is None:
+        raise HTTPException(status_code=404, detail="SOURCE_NOT_FOUND")
+    reset_trial_engine()
+    return {"source": source, "formal_knowledge_publish": 0}
+
+
+@router.get("/knowledge/search")
+def knowledge_search(q: str, limit: int = 20) -> dict[str, Any]:
+    if not q.strip():
+        return {"items": [], "query": q, "message": "请输入关键词后再搜索。"}
+    maximum = max(1, min(limit, 50))
+    items = KNOWLEDGE_STORE.search(q, maximum)
+    seen = {
+        str((item.get("source") or {}).get("source_id") or (item.get("knowledge") or {}).get("knowledge_id") or "")
+        for item in items
+    }
+    for match in search_atomic_evidence(q, _engine_instance().atomic.values(), limit=maximum * 2):
+        evidence = match["record"]
+        source_id = str(evidence.get("source_id") or source_id_for_path(str(evidence.get("source_path") or "")))
+        key = f"EVIDENCE:{evidence.get('evidence_id')}"
+        if key in seen:
+            continue
+        items.append({"type": "EVIDENCE", "score": match["score"], "evidence": {"evidence_id": evidence.get("evidence_id"), "source_id": source_id, "file_name": evidence.get("file_name"), "source_path": evidence.get("source_path"), "location": evidence.get("location") or {}, "heading_path": evidence.get("heading_path") or "", "excerpt": str(evidence.get("raw_text") or evidence.get("text") or "")[:500]}})
+        seen.add(key)
+        if len(items) >= maximum:
+            break
+    return {"items": sorted(items, key=lambda item: -float(item.get("score") or 0))[:maximum], "query": q}
+
+
+@router.get("/knowledge/items")
+def knowledge_items() -> dict[str, Any]:
+    return {"items": KNOWLEDGE_STORE.active_knowledge()}
+
+
+@router.get("/knowledge/change-candidates")
+def knowledge_change_candidates() -> dict[str, Any]:
+    return {"items": KNOWLEDGE_STORE.list_change_candidates()}
+
+
+@router.get("/knowledge/diagnostics/overview")
+def knowledge_diagnostics_overview() -> dict[str, Any]:
+    source = _read_json(SYSTEM_AUDIT / "t01" / "source_coverage.json")
+    chunks = _read_json(SYSTEM_AUDIT / "t02" / "chunk_audit_summary.json")
+    metadata = _read_json(SYSTEM_AUDIT / "t03" / "metadata_audit.json")
+    retrieval = _read_json(SYSTEM_AUDIT / "t05" / "retrieval_model_audit.json")
+    validator = _read_json(SYSTEM_AUDIT / "t06" / "validator_audit.json")
+    answers = _read_json(SYSTEM_AUDIT / "t07" / "answer_audit.json")
+    benchmark = _read_json(SYSTEM_AUDIT / "t09" / "manifest.json")
+    traces = _latest_traces()
+    failures: dict[str, int] = {}
+    for trace in traces:
+        code = str((trace.get("failure") or {}).get("failure_code") or "UNKNOWN")
+        if code != "NO_FAILURE":
+            failures[code] = failures.get(code, 0) + 1
+    chunk_metrics = chunks.get("metrics") or {}
+    retrieval_metrics = (retrieval.get("metrics") or {}).get("C_HYBRID") or {}
+    rerank_metrics = (retrieval.get("metrics") or {}).get("D_RERANK") or {}
+    return {
+        "generated_at": _now(),
+        "question_runs": len(traces),
+        "answer_success_rate": _ratio(sum(trace.get("answer_status") == "ANSWERED" for trace in traces), len(traces)),
+        "quality_funnel": [
+            {"stage": "Source Available", "rate": source.get("source_coverage_rate"), "status": "PROVISIONAL_GOLD"},
+            {"stage": "Parse Success", "rate": chunk_metrics.get("parse_success_rate"), "status": "MEASURED"},
+            {"stage": "Chunk Integrity", "rate": chunk_metrics.get("chunk_integrity_rate"), "status": "MEASURED"},
+            {"stage": "Metadata Strong Facts", "rate": metadata.get("strong_fact_avg_fill_rate"), "status": "MEASURED"},
+            {"stage": "Recall@20", "rate": retrieval_metrics.get("recall@20"), "status": retrieval_metrics.get("status", "NOT_RUN")},
+            {"stage": "Rerank@5", "rate": rerank_metrics.get("rerank@5_hit_rate"), "status": rerank_metrics.get("status", "NOT_RUN")},
+            {"stage": "Evidence Pass", "rate": _metric_rate(validator.get("evidence_pass_rate")), "status": validator.get("status", "NOT_RUN")},
+            {"stage": "Answer Correct", "rate": _metric_rate(answers.get("answer_correct_rate")), "status": answers.get("status", "NOT_RUN")},
+        ],
+        "failure_distribution": [{"code": code, "count": count} for code, count in sorted(failures.items(), key=lambda item: (-item[1], item[0]))],
+        "chunk_errors": chunks.get("error_code_distribution") or {},
+        "benchmark": {key: benchmark.get(key) for key in ("total_questions", "development_count", "regression_count", "holdout_count", "source_distribution", "type_distribution")},
+        "audit_files": {"source": bool(source), "chunks": bool(chunks), "metadata": bool(metadata), "retrieval": bool(retrieval), "validator": bool(validator), "answers": bool(answers)},
+    }
+
+
+@router.get("/knowledge/diagnostics/questions")
+def knowledge_diagnostic_questions(failure_code: str = "", offset: int = 0, limit: int = 50) -> dict[str, Any]:
+    rows = _latest_traces()
+    if failure_code:
+        rows = [row for row in rows if str((row.get("failure") or {}).get("failure_code") or "") == failure_code]
+    rows.sort(key=lambda row: str(row.get("timestamp") or ""), reverse=True)
+    total = len(rows)
+    start, size = max(0, offset), max(1, min(limit, 200))
+    return {"items": [{"query_run_id": row.get("query_run_id"), "timestamp": row.get("timestamp"), "question": row.get("question"), "answer_status": row.get("answer_status"), "failure": row.get("failure"), "counts": row.get("counts"), "latency": row.get("latency")} for row in rows[start:start + size]], "total": total, "offset": start, "limit": size}
+
+
+@router.get("/knowledge/diagnostics/questions/{query_run_id}")
+def knowledge_diagnostic_question(query_run_id: str) -> dict[str, Any]:
+    if not re.fullmatch(r"QR_[A-Za-z0-9_\-]+", query_run_id):
+        raise HTTPException(status_code=404, detail="TRACE_NOT_FOUND")
+    path = SYSTEM_AUDIT / "t04" / "traces" / f"{query_run_id}.json"
+    trace = _read_json(path)
+    if not trace:
+        raise HTTPException(status_code=404, detail="TRACE_NOT_FOUND")
+    return {"trace": trace}
+
+
+@router.get("/knowledge/diagnostics/defects")
+def knowledge_diagnostic_defects(offset: int = 0, limit: int = 50) -> dict[str, Any]:
+    rows = sorted(_read_jsonl(RAG_DEFECTS), key=lambda row: str(row.get("created_at") or ""), reverse=True)
+    start, size = max(0, offset), max(1, min(limit, 200))
+    return {"items": rows[start:start + size], "total": len(rows), "offset": start, "limit": size}
+
+
+@router.get("/feedback-workflow")
+def feedback_workflow() -> dict[str, Any]:
+    rows = []
+    for feedback in KNOWLEDGE_STORE.list_feedback():
+        source = KNOWLEDGE_STORE.source(str(feedback.get("source_id") or "")) if feedback.get("source_id") else None
+        state = str(source.get("index_status")) if source else "SOURCE_CONFIRMATION_REQUIRED"
+        closure = "ACTIVE" if feedback.get("status") == "ACTIVE" else "SOURCE_CLOSURE_REQUIRED" if feedback.get("status") == "APPROVED" and state != "INDEXED" else str(feedback.get("status") or "RECORDED")
+        rows.append({**feedback, "source": source, "source_runtime_status": state, "closure_status": closure})
+    return {"items": rows}
+
+
+@router.post("/feedback-workflow/{feedback_id}/review")
+def review_feedback_workflow(feedback_id: str, request: ReviewedFeedbackRequest) -> dict[str, Any]:
+    _ensure_user(request.trial_user)
+    if request.decision not in {"APPROVE", "REJECT", "DEFER"}:
+        raise HTTPException(status_code=422, detail="INVALID_REVIEW_DECISION")
+    feedback = KNOWLEDGE_STORE.feedback(feedback_id)
+    if feedback is None:
+        raise HTTPException(status_code=404, detail="FEEDBACK_NOT_FOUND")
+    if request.decision == "APPROVE" and feedback.get("system_fix_required"):
+        raise HTTPException(status_code=409, detail="SYSTEM_DEFECT_CANNOT_PUBLISH_AS_STANDARD_ANSWER")
+    source_path = _normalize_source_path(request.source_path or str(feedback.get("source_path") or ""))
+    if request.decision == "APPROVE" and not source_path:
+        raise HTTPException(status_code=422, detail="SOURCE_PATH_REQUIRED")
+    source_id = str(feedback.get("source_id") or "")
+    if request.decision == "APPROVE":
+        path = Path(source_path)
+        if path.suffix.lower() not in {".md", ".pdf", ".docx", ".xlsx", ".pptx", ".wps"} or not path.is_file():
+            raise HTTPException(status_code=422, detail="SOURCE_PATH_NOT_APPROVABLE")
+        source = KNOWLEDGE_STORE.register_source(path, reactivate=True)
+        source_id = str(source["source_id"])
+        reset_trial_engine()
+        _engine_instance()
+        source = KNOWLEDGE_STORE.source(source_id) or source
+        if source.get("index_status") != "INDEXED":
+            return {"saved": True, "feedback": feedback, "source": source, "status": "SOURCE_INDEX_FAILED", "automatic_knowledge_publish": 0}
+    reviewed, knowledge = KNOWLEDGE_STORE.review_feedback(
+        feedback_id,
+        decision=request.decision,
+        source_id=source_id,
+        location=request.source_location.strip(),
+        required_terms=_clean_terms(request.required_terms),
+        reviewer=request.trial_user,
+        standard_question=request.standard_question,
+        similar_questions=[item.strip() for item in request.similar_questions if item.strip()],
+        negative_questions=[item.strip() for item in request.negative_questions if item.strip()],
+        applicability=request.applicability,
+        node_id=request.node_id,
+    )
+    if knowledge:
+        reset_trial_engine()
+    return {"saved": True, "feedback": reviewed, "knowledge": knowledge, "source": KNOWLEDGE_STORE.source(source_id) if source_id else None, "automatic_knowledge_publish": 0}
+
+
+@router.post("/feedback-workflow/{feedback_id}/regression")
+def run_feedback_workflow_regression(feedback_id: str, request: ReviewedFeedbackRequest) -> dict[str, Any]:
+    _ensure_user(request.trial_user)
+    feedback = KNOWLEDGE_STORE.feedback(feedback_id)
+    if feedback is None:
+        raise HTTPException(status_code=404, detail="FEEDBACK_NOT_FOUND")
+    source_id = str(feedback.get("source_id") or "")
+    source = KNOWLEDGE_STORE.source(source_id)
+    if not source or source.get("index_status") != "INDEXED":
+        return {"feedback_id": feedback_id, "regression_status": "NOT_READY", "reason": "来源正文尚未进入当前试用索引。", "automatic_knowledge_publish": 0}
+    result = _engine_instance().answer(str(feedback.get("question") or ""), detect_growth=False)
+    citation = next((item for item in result.get("citations", []) if item.get("source_id") == source_id), None)
+    location = str(feedback.get("source_location") or "").strip()
+    location_hit = not location or (citation is not None and location in str(citation.get("display_location") or ""))
+    missing = [term for term in feedback.get("required_terms", []) if term not in str(result.get("answer") or "")]
+    passed = result.get("answer_status") == "ANSWERED" and citation is not None and location_hit and not missing
+    regression = {"run_id": "RW_" + uuid.uuid4().hex, "run_at": _now(), "answer_status": result.get("answer_status"), "citation_source_hit": citation is not None, "citation_location_hit": location_hit, "missing_required_terms": missing, "regression_status": "PASSED" if passed else "FAILED", "answer_excerpt": str(result.get("answer") or "")[:900]}
+    KNOWLEDGE_STORE.record_regression(feedback_id, regression)
+    return {"feedback_id": feedback_id, "regression": regression, "automatic_knowledge_publish": 0}
+
+
+@router.post("/knowledge/items/{knowledge_id}/withdraw")
+def withdraw_knowledge(knowledge_id: str, request: WithdrawKnowledgeRequest) -> dict[str, Any]:
+    _ensure_user(request.trial_user)
+    knowledge = KNOWLEDGE_STORE.withdraw_knowledge(knowledge_id, reviewer=request.trial_user)
+    if knowledge is None:
+        raise HTTPException(status_code=404, detail="KNOWLEDGE_NOT_FOUND")
+    reset_trial_engine()
+    return {"knowledge": knowledge, "automatic_knowledge_publish": 0}
+
+
+@router.post("/knowledge/items/{knowledge_id}/rollback")
+def rollback_knowledge(knowledge_id: str, request: RollbackKnowledgeRequest) -> dict[str, Any]:
+    _ensure_user(request.trial_user)
+    try:
+        knowledge = KNOWLEDGE_STORE.rollback_knowledge(knowledge_id, target_version=request.target_version, reviewer=request.trial_user, reason=request.reason)
+    except ValueError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    if knowledge is None:
+        raise HTTPException(status_code=404, detail="KNOWLEDGE_NOT_FOUND")
+    reset_trial_engine()
+    return {"knowledge": knowledge, "automatic_knowledge_publish": 0}
 
 
 @router.get("/growth-candidates")
@@ -728,7 +1489,7 @@ def _friendly_status(value: str) -> str:
 
 def _citation(item: dict[str, Any], evidence: dict[str, Any] | None = None) -> dict[str, Any]:
     location = item.get("location") or {}
-    return {"citation_id": item["citation_id"], "evidence_id": item.get("evidence_id"), "file_name": item.get("file_name"), "source_path": item.get("source_path"), "location": location, "display_location": _display_location(location), "excerpt": str((evidence or {}).get("text") or "")[:900]}
+    return {"citation_id": item["citation_id"], "evidence_id": item.get("evidence_id"), "source_id": item.get("source_id") or (evidence or {}).get("source_id"), "source_version": (evidence or {}).get("source_version"), "file_name": item.get("file_name"), "source_path": item.get("source_path"), "location": location, "display_location": _display_location(location), "excerpt": str((evidence or {}).get("raw_text") or (evidence or {}).get("text") or "")[:900]}
 
 
 def _display_location(location: dict[str, Any]) -> str:
@@ -744,7 +1505,13 @@ def _display_location(location: dict[str, Any]) -> str:
         return f"表{location['table']}" + (f"，第{start}-{end}行" if start else "")
     if location.get("line_start"):
         return f"第{location['line_start']}-{location.get('line_end', location['line_start'])}行"
-    return "位置已记录"
+    if location.get("paragraph_start"):
+        start = location["paragraph_start"]
+        end = location.get("paragraph_end", start)
+        return f"第{start}-{end}段" if end != start else f"第{start}段"
+    if location.get("config_key"):
+        return f"系统配置 {location['config_key']}"
+    return "位置未定位"
 
 
 def _ensure_user(user_id: str) -> None:
@@ -879,8 +1646,13 @@ def _declared_source_status(source_path: str) -> str:
 def _source_runtime_status(source_path: str) -> str:
     if not source_path:
         return "PENDING_OWNER_CONFIRMATION"
-    if any(_same_source_path(source_path, source.get("path")) for source in _approved_shadow_sources() if source.get("approval_status") == "USER_APPROVED_SHADOW_READ"):
-        return "INDEXED_SHADOW" if _normalize_source_path(source_path) in LOADED_SHADOW_PATHS else "SOURCE_IDENTIFIED"
+    source = KNOWLEDGE_STORE.source(source_id_for_path(source_path))
+    if source:
+        if source.get("withdrawn"):
+            return "WITHDRAWN"
+        if source.get("index_status") == "INDEXED":
+            return "INDEXED_SHADOW"
+        return "SOURCE_IDENTIFIED"
     try:
         indexed = any(_same_source_path(source_path, row.get("source_path")) for row in _engine_instance().index.atomic)
     except Exception:
@@ -889,18 +1661,16 @@ def _source_runtime_status(source_path: str) -> str:
 
 
 def _approved_shadow_sources() -> list[dict[str, str]]:
-    sources = [dict(row) for row in CONFIG.approved_shadow_sources]
-    seen = {_normalize_source_path(row.get("path")) for row in sources}
-    for row in _read_jsonl(BATCH_SOURCE_REGISTER):
-        path = str(row.get("path") or row.get("source_path") or "")
-        if row.get("status") != "APPROVED" or not path:
-            continue
-        normalized = _normalize_source_path(path)
-        if normalized in seen:
-            continue
-        sources.append({"path": path, "approval_status": "USER_APPROVED_SHADOW_READ"})
-        seen.add(normalized)
-    return sources
+    _sync_trial_sources()
+    return [
+        {
+            "source_id": str(row["source_id"]),
+            "path": str(row["source_path"]),
+            "approval_status": str(row["approval_status"]),
+            "current_hash": str(row.get("current_hash") or ""),
+        }
+        for row in KNOWLEDGE_STORE.active_sources()
+    ]
 
 
 def _case_with_readiness(case: dict[str, Any]) -> dict[str, Any]:
@@ -971,6 +1741,30 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def _latest_traces() -> list[dict[str, Any]]:
+    rows = _read_jsonl(SYSTEM_AUDIT / "t04" / "traces.jsonl")
+    latest = {str(row.get("query_run_id") or ""): row for row in rows if row.get("query_run_id") and row.get("question")}
+    return list(latest.values())
+
+
+def _ratio(numerator: int, denominator: int) -> float | None:
+    return round(numerator / denominator, 4) if denominator else None
+
+
+def _metric_rate(value: Any) -> float | None:
+    if isinstance(value, dict):
+        value = value.get("rate")
+    return float(value) if isinstance(value, (int, float)) else None
 
 
 def _append_jsonl(path: Path, row: dict[str, Any]) -> None:

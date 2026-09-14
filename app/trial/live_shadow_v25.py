@@ -29,6 +29,10 @@ REMEDIATION_MANIFESTS = (V26 / "remediation_candidate_v2_6_2.json", V26 / "remed
 RUNS = ROOT / "evaluation" / "knowledge_os_v2_6" / "live_shadow_runs.jsonl"
 CANDIDATE_REVISION = "V2.6.1_DEV_PERIOD_SCOPE_RESCUE"
 
+
+def _execution_mode(revision: str) -> str:
+    return "LIVE_REQUEST_BACKGROUND_V2_6_2_DEV_SHADOW" if str(revision).startswith("V2.6.2") else "LIVE_REQUEST_BACKGROUND_V2_6_1_DEV_SHADOW"
+
 _write_lock = threading.Lock()
 _shadow_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="v25-live-shadow")
 
@@ -295,7 +299,7 @@ class V25LiveShadow:
             "latency_ms": round((time.perf_counter() - started) * 1000, 3),
             "validation": validation,
             "candidate_hash": self.candidate_hash,
-            "candidate_revision": CANDIDATE_REVISION,
+            "candidate_revision": self.candidate_revision,
             "period_scope_rescue": {"invoked": bool(getattr(plan, "period", "")), "rescued_evidence_ids": [row["evidence_id"] for row in rescue_rows if row["candidate_origin"] == "PERIOD_SCOPE_RESCUE"]},
             "named_source_rescue": {"invoked": bool(named_rescued), "rescued_evidence_ids": [row["evidence_id"] for row in rescue_rows if row["candidate_origin"] == "EXACT_NAMED_SOURCE_RESCUE"]},
             "approved_gold_source_rescue": {"invoked": bool(gold_rescued), "rescued_evidence_ids": [row["evidence_id"] for row in rescue_rows if row["candidate_origin"] == "APPROVED_GOLD_SOURCE_RESCUE"]},
@@ -340,6 +344,7 @@ def run_async(*, question: str, query_run_id: str, conversation_id: str, primary
                 vector = query_encoder(question)
             shadow = _get_engine().run(question, primary, query_vector=vector)
             base.update({
+                "execution_mode": _execution_mode(shadow["candidate_revision"]),
                 "v2_status": shadow["v2_status"],
                 "v2_answer_status": shadow["v2_answer_status"],
                 "v2_answer": shadow["v2_answer"],

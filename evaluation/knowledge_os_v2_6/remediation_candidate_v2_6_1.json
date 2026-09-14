@@ -1,0 +1,76 @@
+{
+  "schema_version": "knowledge_os_v2_6_1.dev_remediation_candidate",
+  "candidate_id": "V2.6.1-DEV-LSR014",
+  "captured_at": "2026-09-14T11:43:16.460604+08:00",
+  "status": "DEV_REMEDIATION_PENDING_OWNER_APPROVAL",
+  "base_candidate_hash": "26928685b69d167a99289a26776b6e0712531f79eaed71effc553bd37543ce03",
+  "repair_targets": [
+    "LSR-014"
+  ],
+  "source": {
+    "source_id": "V261-4467cbfca0da88994414e699",
+    "source_path": "D:\\工作\\二公司技术部\\2026\\局优秀管理经验\\04.中建三局项目数字建造系统解决方案.pdf",
+    "file_name": "04.中建三局项目数字建造系统解决方案.pdf",
+    "sha256": "e51a58bc0a5865620202c0ef39a0597b1e0e3853f48007647dec496121a0b176",
+    "physical_exists": true,
+    "parse_status": "parsed",
+    "effective_status": "PENDING_OWNER_APPROVAL",
+    "index_status": "DEV_REMEDIATION_ONLY"
+  },
+  "parse_counts": {
+    "documents": 1,
+    "sections": 29,
+    "paragraphs": 654,
+    "tables": 0,
+    "table_rows": 0,
+    "atomic_evidence": 654,
+    "metadata_conflicts": 0
+  },
+  "semantic_chunks": {
+    "count": 34,
+    "path": "D:\\AI智能体\\AI设计管理RAG-V1\\data\\shadow\\knowledge_v2_6_remediation\\lsr014_source\\semantic_chunks.jsonl"
+  },
+  "evidence_hits": [
+    {
+      "text": "在《中建集团智能建造2035总体行动规划》指引下，按分阶段分步骤实施思路编制。",
+      "location": {
+        "page": 7,
+        "text_line_start": 2,
+        "text_line_end": 2
+      },
+      "evidence_id": "05df2e34-926d-507a-9df8-fedcf8a6e299"
+    },
+    {
+      "text": "依托8个BIM示范项目、4个智能建造示范项目，从施工阶段、业务线条两大维度梳理数字化需求。",
+      "location": {
+        "page": 8,
+        "text_line_start": 3,
+        "text_line_end": 3
+      },
+      "evidence_id": "90773625-7b49-5674-a8cd-262dfa06f12e"
+    },
+    {
+      "text": "采用自下而上“感知采集层—数据中台层—业务应用层”三层架构体系，适配项目全周期数字化管控需求。",
+      "location": {
+        "page": 14,
+        "text_line_start": 2,
+        "text_line_end": 2
+      },
+      "evidence_id": "46217e56-af57-5e8d-afbd-b28ba3e2feb4"
+    },
+    {
+      "text": "以光谷元著项目为实践载体推动数字建造系统全面落地，需要在组织架构、岗位职责、协同流程等方面搭建",
+      "location": {
+        "page": 27,
+        "text_line_start": 2,
+        "text_line_end": 2
+      },
+      "evidence_id": "b1f37e2a-2831-5329-93eb-aea6da313303"
+    }
+  ],
+  "embedding_status": "PENDING_NEW_CANDIDATE_EMBEDDING",
+  "parameter_changes": false,
+  "formal_8000_touched": false,
+  "8010_switch_performed": false,
+  "approval_note": "This sixth source is isolated for remediation only; it is not promoted into frozen V2.5 or formal indexes."
+}

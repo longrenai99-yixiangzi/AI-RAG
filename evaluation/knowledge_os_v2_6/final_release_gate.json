@@ -1,6 +1,6 @@
 {
   "schema_version": "knowledge_os_v2_6.final_release_gate",
-  "captured_at": "2026-09-14T08:34:50.593382+08:00",
+  "captured_at": "2026-09-14T10:30:13.748100+08:00",
   "status": "BLOCKED",
   "final_status": "BLOCKED",
   "stop_after": "T03_LIVE_SHADOW_GATE",
@@ -15,8 +15,10 @@
     "canary": "NOT_RUN"
   },
   "top_blocking_issues": [
-    "V2.5 答案分支尚未接入 8010 Live Runtime；当前仅有 BM25 诊断预览。",
-    "任务书禁止重复刷题、自动造题或以 Offline Shadow 冒充 Live Shadow；T04 及后续切换停止。"
+    "人工核验确认 VERIFIED_LOST_HIT=2，说明 V2.5 在两条真实问题上退化。",
+    "人工核验确认 NOT_VERIFIED=16：两份重放答案的事实、来源定位等均不正确。",
+    "历史 Shadow 异常=2，虽已修复代码，仍须保留审计并完成干净窗口验证。",
+    "T04 Rollback Drill 及后续 8010 切换停止。"
   ],
   "runtime": {
     "8010_primary_unchanged": true,
@@ -27,5 +29,6 @@
     "formal_index_switch": false,
     "v1_index_intact": true
   },
-  "next_action": "SUBMIT_NEW_REAL_REQUESTS_AFTER_LIVE_BRANCH_FIX"
+  "next_action": "INVESTIGATE_TWO_VERIFIED_LOST_HITS_AND_RUN_CLEAN_SHADOW_WINDOW",
+  "manual_review_semantics": "NOT_VERIFIED means both replay answers and source locations were user-confirmed incorrect."
 }

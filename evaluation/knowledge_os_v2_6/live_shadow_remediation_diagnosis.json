@@ -1,0 +1,102 @@
+{
+  "schema_version": "knowledge_os_v2_6.lost_hit_remediation_diagnosis",
+  "captured_at": "2026-09-14T11:43:15.441279+08:00",
+  "release_boundary": {
+    "v2_5_frozen_candidate_unchanged": true,
+    "formal_8000_touched": false,
+    "8010_switch_performed": false,
+    "status": "DIAGNOSIS_ONLY_NEW_REMEDIATION_CANDIDATE_REQUIRED"
+  },
+  "records": [
+    {
+      "review_id": "LSR-014",
+      "question": "中建三局项目数字建造系统解决方案 1.0 采用什么技术架构？依托什么编制？",
+      "root_cause": "SOURCE_BODY_MISSING",
+      "finding": "V2.5 only contains a registration/index page that names the PDF; the PDF body is absent from the frozen candidate staging corpus.",
+      "registration_only_matches": 1,
+      "exact_body_matches_in_v2_5_staging": 0,
+      "physical_source": {
+        "physical_exists": true,
+        "path": "D:\\工作\\二公司技术部\\2026\\局优秀管理经验\\04.中建三局项目数字建造系统解决方案.pdf",
+        "file_size_bytes": 4422163,
+        "sha256": "e51a58bc0a5865620202c0ef39a0597b1e0e3853f48007647dec496121a0b176",
+        "parse_status": "parsed",
+        "document_id": "0cd794f5-6054-535f-a079-479d577f3f43",
+        "paragraph_count": 654,
+        "atomic_evidence_count": 654,
+        "evidence_hits": [
+          {
+            "text": "在《中建集团智能建造2035总体行动规划》指引下，按分阶段分步骤实施思路编制。",
+            "location": {
+              "page": 7,
+              "text_line_start": 2,
+              "text_line_end": 2
+            },
+            "section_id": "4989b394-f4da-56d0-8dfc-f8a4c6a5801c"
+          },
+          {
+            "text": "依托8个BIM示范项目、4个智能建造示范项目，从施工阶段、业务线条两大维度梳理数字化需求。",
+            "location": {
+              "page": 8,
+              "text_line_start": 3,
+              "text_line_end": 3
+            },
+            "section_id": "37b73d19-7fd8-5507-aae0-d6221af28a89"
+          },
+          {
+            "text": "采用自下而上“感知采集层—数据中台层—业务应用层”三层架构体系，适配项目全周期数字化管控需求。",
+            "location": {
+              "page": 14,
+              "text_line_start": 2,
+              "text_line_end": 2
+            },
+            "section_id": "cd98520d-1f99-5b82-866c-8a0218bfd1f6"
+          },
+          {
+            "text": "以光谷元著项目为实践载体推动数字建造系统全面落地，需要在组织架构、岗位职责、协同流程等方面搭建",
+            "location": {
+              "page": 27,
+              "text_line_start": 2,
+              "text_line_end": 2
+            },
+            "section_id": "9c40e49a-f2d7-53ab-841f-8b3fd41db9c4"
+          }
+        ]
+      },
+      "expected_evidence": [
+        "采用自下而上‘感知采集层—数据中台层—业务应用层’三层架构体系。",
+        "在《中建集团智能建造2035总体行动规划》指引下编制。",
+        "依托8个BIM示范项目、4个智能建造示范项目梳理数字化需求；以光谷元著项目为实践载体。"
+      ],
+      "remediation": "Ingest the real PDF as a V2.6.1_DEV_REMEDIATION source, then replay Q74; do not rewrite frozen V2.5."
+    },
+    {
+      "review_id": "LSR-017",
+      "question": "2025 年上半年二公司\"三优一创\"总体创效率是多少？",
+      "root_cause": "TEMPORAL_SCOPE_COLLISION",
+      "finding": "The query specifies 2025 H1, but conflict detection groups H1 3.31% with full-year 3.33% because the plan has year but no period scope.",
+      "source_context": {
+        "2025年半年总结.md": {
+          "3.31": [
+            "全形势总体平稳。 未发生安全生产责任事故，承办市级以上观摩会23次，天大佐治亚项目参与承办国家级绿色建造与可持续发展观摩会，14个项目获省级安全文明工地，7个项目获市级安全文明工地、5个项目获国际安全奖。 科技创新强基赋能。 新开EPC项目100%设计策划， 设计价值创造策划850条，预计创效9409万元。 加强深化设计管理 ，上半年“三优一创” 总体创效率3.31%，高于局管控目标0.31个百分点。 公司总部统筹开展重要课题科技攻关 ， 1项 获评“国际领先”，2项获评“国际先进” ， 获 省部级科技奖4项， 授权发明专利13 项， 江苏省住建厅首批科技创新平台1项。 （三） 价值创造纵深推进。 结算质效持续改善。 完成结算总额218.95亿元，连续三年上半年突破200亿元，同比增长5.4%，自施结算利润率7"
+          ],
+          "3.33": []
+        },
+        "2025年年度总结.md": {
+          "3.31": [],
+          "3.33": [
+            "。 二是打造设计管理示范项目。 发布《公司EPC设计管理示范项目打造方案》， 通过设计赋能、多级协同，成功打造4个设计增效7%以上的标杆项目。 “三优一创”稳步提升 出台《深化设计管理细则》《钢筋工程深化设计案例汇编》等一系列标准化文件，提升项目技术创效水平，2025年，钢筋平均创效率9.66%，11个项目钢筋内外结算量效益超16%，“三优一创” 整体创效率3.33% 。 科技转化有力推进 立项江苏省智能建造试点项目5个，举办国家级智能建造观摩会2场；新立项科技、绿色示范工程15个，全年通过验收12个；新 入库《中建三局科技成果转化清单》1项，推广应用中建集团“三清单”产品 ， 合同额3090 万元。 年度重点工作落实情况 发挥 科技 创新 引领 一是建立1+14+N科研体系 ， 公司总部统筹制定三年科研规划与"
+          ]
+        },
+        "2025年饶淇述职.md": {
+          "3.31": [],
+          "3.33": [
+            "料，减免税额1358万元；依托企业高新技术平台和成果产出，主导申报并获批惠企资金650万元。 4 开展“三优一创”价值创造管理工作，总体创效率不低于3%。 已完成 1. 2025年，实现65个钢筋工程内外结算完成项目钢筋量效益9.66%，199个在建及完工未结项目技术翻样优化率5.86% 2. 完成 “三优一创” 责任目标，建立创效管理台账，2025年创效率3.33% 5 施工组织设计及方案编制及时率不低于90%、超危大方案论证率及通过率100%。 已完成 指导重点项目技术策划指导17项，评审率100%；审核大型及以上项目施工组织设计17项，超危大方案263项，施组及方案编制及时率100%，超危大方案论证通过率100% 。 主要成绩 技术管理 公司开展技术指导 72 项次，成功攻克光谷八路溶洞处理、安徽 410"
+          ]
+        }
+      },
+      "expected_evidence": "2025 H1 overall efficiency is 3.31%.",
+      "remediation": "Add H1/FULL_YEAR period scope to query plans and evidence; compare numeric facts only inside the same period, while retaining conflicts for period-unspecified queries."
+    }
+  ]
+}

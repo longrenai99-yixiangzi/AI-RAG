@@ -26,8 +26,8 @@ V2.5 已冻结，V2.5 后台分支已接入 8010，且不改变用户看到的�
 | 样本数量门 | PASS |
 | 来源可比样本 | 119 |
 | 来源 Agreement | 40/119（33.61%） |
-| New Hit 候选 | 8，待人工核验 |
-| Lost Hit 候选 | 13，待人工核验 |
+| New Hit 候选 | 8（已核验 3 条 VERIFIED_NEW_HIT） |
+| Lost Hit 候选 | 13（已核验 2 条 VERIFIED_LOST_HIT） |
 | V1 Answered Rate | 57.25% |
 | V2.5 Answered Rate | 53.44% |
 | V1 Latency P50/P95 | 1085.341 / 1514.09 ms |
@@ -36,7 +36,7 @@ V2.5 已冻结，V2.5 后台分支已接入 8010，且不改变用户看到的�
 | V2.5 Error Rate | 1.53% |
 | Live Shadow Gate | `SHADOW_GATE_FAIL` |
 
-New Hit、Lost Hit 和 Citation 变化没有自动判定为正确或错误；必须由业务负责人审核。V2.5 当前以后台真实分支运行，不影响 V1 主回答。
+New Hit、Lost Hit 和 Citation 变化已由业务负责人审核。当前结果为 `VERIFIED_NEW_HIT=3`、`VERIFIED_LOST_HIT=2`、`NOT_VERIFIED=16`；其中 `NOT_VERIFIED=16` 明确表示两份重放答案的事实和来源定位均不正确。V2.5 当前以后台真实分支运行，不影响 V1 主回答。
 
 ## C. Rollback Drill
 
@@ -65,12 +65,18 @@ New Hit、Lost Hit 和 Citation 变化没有自动判定为正确或错误；必
 阻塞项：
 
 1. 2 条历史 V2.5 Shadow 异常仍需保留并完成处置记录；
-2. New Hit 8 条、Lost Hit 13 条尚未完成业务核验；
+2. 已确认 `VERIFIED_LOST_HIT=2`；另有 `NOT_VERIFIED=16`，两份重放答案的事实和来源定位均不正确；
 3. V2.5 答案分支虽已接入，但 Release Gate 不能因样本量达标而跳过错误和引用审核。
 
 ## 下一步
 
-先完成 2 条异常的修复验证和 New/Lost Hit、Citation 人工审核；确认无 Verified Lost Hit、无 Critical Failure 后，才继续 T04 Rollback Drill。
+先处置 2 条 `VERIFIED_LOST_HIT` 并完成历史异常的干净窗口验证；只有确认无 Verified Lost Hit、无 Critical Failure 后，才继续 T04 Rollback Drill。
+
+## I. 根因修复进展（不改变发布闸门）
+
+- `LSR-014`：确认冻结 V2.5 只有登记页，真实 PDF 未进入候选正文；已建立 `V2.6.1_DEV_REMEDIATION` 隔离候选，物理文件解析为 654 段、654 条原子证据、34 个语义块，等待该新增来源的 Owner 审批和嵌入。
+- `LSR-017`：确认 2025 年上半年 `3.31%` 与全年 `3.33%` 属于不同期间；已在查询计划、证据范围和同范围冲突检测中加入 `H1/FULL_YEAR`，无期间问题仍保留冲突保护。
+- 本轮修复未写入 8000、未切换 8010，也未改写冻结 V2.5；修复验证通过后仍须重跑干净 Live Shadow 窗口。
 
 ## 主要交付物
 

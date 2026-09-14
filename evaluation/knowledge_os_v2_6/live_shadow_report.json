@@ -48,7 +48,20 @@
     "v2_error_rate": 0.0153
   },
   "shadow_gate": "SHADOW_GATE_FAIL",
-  "stop_reason": "接入后唯一样本达到 131，但发现 2 条 V2.5 Shadow 异常，需先修复并复核。",
+  "stop_reason": "人工核验确认 2 条 VERIFIED_LOST_HIT，且历史存在 2 条 Shadow 异常；按门禁停止，不进入 Rollback Drill。",
   "formal_8000_touched": false,
-  "records_path": "D:\\AI智能体\\AI设计管理RAG-V1\\evaluation\\knowledge_os_v2_6\\live_shadow_runs.jsonl"
+  "records_path": "D:\\AI智能体\\AI设计管理RAG-V1\\evaluation\\knowledge_os_v2_6\\live_shadow_runs.jsonl",
+  "manual_review": {
+    "review_count": 21,
+    "decision_counts": {
+      "VERIFIED_NEW_HIT": 3,
+      "VERIFIED_LOST_HIT": 2,
+      "NOT_VERIFIED": 16,
+      "PENDING": 0
+    },
+    "verified_new_hit_count": 3,
+    "verified_lost_hit_count": 2,
+    "status": "OWNER_REVIEWED",
+    "not_verified_semantics": "用户确认：16 条 NOT_VERIFIED 的两份重放答案及其来源定位均不正确。"
+  }
 }

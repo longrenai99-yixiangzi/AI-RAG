@@ -1,0 +1,66 @@
+{
+  "schema_version": "knowledge_os_v2_6_2.source_approval",
+  "captured_at": "2026-09-14T14:48:23.513727+08:00",
+  "approval_status": "APPROVED",
+  "approved_by": "USER_CONFIRMED",
+  "records": [
+    {
+      "source_id": "V262-881b20c5fd8911599c14998f",
+      "source_path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\b6077e3f74f0a1b7ae9f.md",
+      "file_name": "b6077e3f74f0a1b7ae9f.md",
+      "sha256": "c392bc19e997b52f2f31be948ea8876830c0055f612016fd8b1dc119affcb323",
+      "approval_status": "APPROVED",
+      "approved_by": "USER_CONFIRMED"
+    },
+    {
+      "source_id": "V262-10fe63b37583a8fd03f711c0",
+      "source_path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\cb93c382c9197043cab1.md",
+      "file_name": "cb93c382c9197043cab1.md",
+      "sha256": "7ce9483b9a83a5a0797c647718e82de2a9e68028a9ffa558c491102d06c29424",
+      "approval_status": "APPROVED",
+      "approved_by": "USER_CONFIRMED"
+    },
+    {
+      "source_id": "V262-d830170d477cc339f3bf0b08",
+      "source_path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\f80e5def25e5a56bfc6f.md",
+      "file_name": "f80e5def25e5a56bfc6f.md",
+      "sha256": "bcc9a3b8685a86085ce26f1b5163406c6db9801a4258778aee98ee912a5ba082",
+      "approval_status": "APPROVED",
+      "approved_by": "USER_CONFIRMED"
+    },
+    {
+      "source_id": "V262-aefc05c4e054cf4b5bc466d1",
+      "source_path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\0ee2959550610ce23750.md",
+      "file_name": "0ee2959550610ce23750.md",
+      "sha256": "c921b8c3773304cd2ffef8659812d1498317900cbd8892460454b22a6060f89d",
+      "approval_status": "APPROVED",
+      "approved_by": "USER_CONFIRMED"
+    },
+    {
+      "source_id": "V262-bc520cc77150d6c5db16cae5",
+      "source_path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\2c5dbe10c9b44d1d47d0.md",
+      "file_name": "2c5dbe10c9b44d1d47d0.md",
+      "sha256": "2d2a1005a60aae43465dd06dcb633bcd2ad1b1f3fd2812a7ee3b063e2b030cdc",
+      "approval_status": "APPROVED",
+      "approved_by": "USER_CONFIRMED"
+    },
+    {
+      "source_id": "V262-e0532bfd99fc16bf1461c470",
+      "source_path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\77d7e542b45a93853e16.md",
+      "file_name": "77d7e542b45a93853e16.md",
+      "sha256": "c78ccf30fb5e64479fba27a4bdf73b6cbc243b4bc31c8a3f2de1415054d48e7c",
+      "approval_status": "APPROVED",
+      "approved_by": "USER_CONFIRMED"
+    },
+    {
+      "source_id": "V262-ee1fb237fa9116daa0cbce60",
+      "source_path": "D:\\设计管理\\.ai-growth\\parsed\\approved-sources\\90b557ce19fb9d757b47.md",
+      "file_name": "90b557ce19fb9d757b47.md",
+      "sha256": "d23adc39ed9e3fd7c13f41b5cb02a9399f813cc902b2c04a9537853586d2ad9e",
+      "approval_status": "APPROVED",
+      "approved_by": "USER_CONFIRMED"
+    }
+  ],
+  "formal_8000_touched": false,
+  "8010_switch_authorized": false
+}

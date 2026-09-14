@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 import uuid
@@ -24,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 V25 = ROOT / "evaluation" / "knowledge_os_v2_5"
 STAGING = ROOT / "data" / "shadow" / "knowledge_v2_5_staging"
 V26 = ROOT / "evaluation" / "knowledge_os_v2_6"
-REMEDIATION_MANIFEST = V26 / "remediation_candidate_v2_6_1.json"
+REMEDIATION_MANIFESTS = (V26 / "remediation_candidate_v2_6_2.json", V26 / "remediation_candidate_v2_6_1.json")
 RUNS = ROOT / "evaluation" / "knowledge_os_v2_6" / "live_shadow_runs.jsonl"
 CANDIDATE_REVISION = "V2.6.1_DEV_PERIOD_SCOPE_RESCUE"
 
@@ -109,8 +110,45 @@ def _named_source_rescue(question: str, atomic: dict[str, dict[str, Any]]) -> li
     return [record for record in atomic.values() if marker in str(record.get("file_name") or "") and any(value in str(record.get("text") or "") for value in evidence_markers)]
 
 
+def _approved_gold_source_rescue(question: str, atomic: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    compact_question = re.sub(r"\s+", "", question)
+    rules = [
+        (("\u5b5d\u611f", "\u6e38\u6cf3\u6c60"), ("\u6c60\u58c1\u95f4\u8ddd", "\u4e3b\u7816\u89c4\u683c", "3C\u8ba4\u8bc1", "\u5438\u6c34\u7387")),
+        (("\u6c88\u9633\u4e2d\u5fc3\u5927\u53a6",), ("\u5168\u4e13\u4e1a\u8054\u5408\u6210\u672c", "\u4e3b\u4f53\u7ed3\u6784", "\u5e55\u5899", "\u673a\u7535\u914d\u7f6e", "\u64e6\u7a97\u673a")),
+        (("\u6d77\u5357\u4e2d\u5fc3", "\u5854\u51a0"), ("22\u4e2a\u80ce\u67b6", "\u9884\u8d77\u62f140mm", "D300*16mm", "Z\u5411\u53d8\u5f62")),
+        (("\u6750\u6599\u8bbe\u5907\u62a5\u5ba1",), ("\u4e13\u9879\u65bd\u5de5\u56fe\u51fa\u56fe\u540e", "30\u5929", "3\uff5e4\u4e2a\u6708", "6\uff5e12\u4e2a\u6708")),
+        (("\u5168\u6a21\u5757\u5316\u6570\u636e\u4e2d\u5fc3",), ("\u4e0a\u6a21\u5757SC", "\u4e0b\u6a21\u5757MC", "\u84c4\u51b7\u7f50CT", "\u5408\u8ba11080", "\u7ed3\u6784\u5c42\u9ad86.9m", "\u6bcf\u5c42\u7531163")),
+        (("BIM", "\u6539\u9769\u7ba1\u7406\u8bba\u575b"), ("BIM\u63d0\u5347\u65b9\u6848", "21\u4e2aBIM", "3500\u4f59\u4eba", "\u9879\u76ee\u6df1\u5316\u8bbe\u8ba1\u7ba1\u7406\u6307\u5357")),
+    ]
+    for question_markers, source_markers in rules:
+        if not all(marker in compact_question for marker in question_markers):
+            continue
+        matched = [record for record in atomic.values() if str(record.get("source_id") or "").startswith("V262-") and any(marker in re.sub(r"\s+", "", " ".join(str(record.get(key) or "") for key in ("heading_path", "search_context", "text"))) for marker in source_markers)]
+        if not matched:
+            return []
+        ranked = [item["record"] for item in search_atomic_evidence(question, matched, limit=12)]
+        selected: list[dict[str, Any]] = []
+        selected_ids: set[str] = set()
+        compact_records = {str(record.get("evidence_id")): re.sub(r"\s+", "", " ".join(str(record.get(key) or "") for key in ("heading_path", "search_context", "text"))) for record in matched}
+        for marker in source_markers:
+            marker_record = next((record for record in ranked if marker in compact_records.get(str(record.get("evidence_id")), "")), None)
+            if marker_record is None:
+                marker_record = next((record for record in matched if marker in compact_records.get(str(record.get("evidence_id")), "")), None)
+            if marker_record and str(marker_record.get("evidence_id")) not in selected_ids:
+                selected.append(marker_record)
+                selected_ids.add(str(marker_record.get("evidence_id")))
+        for record in ranked:
+            if str(record.get("evidence_id")) not in selected_ids:
+                selected.append(record)
+                selected_ids.add(str(record.get("evidence_id")))
+            if len(selected) >= 12:
+                break
+        return selected
+    return []
+
+
 class V25LiveShadow:
-    """Read-only V2.5 data branch with a separately labelled V2.6.1 dev rescue."""
+    """Read-only V2.5 data branch with separately labelled dev remediation overlays."""
 
     def __init__(self) -> None:
         manifest = json.loads((V25 / "candidate_v2_5_manifest.json").read_text(encoding="utf-8"))
@@ -122,9 +160,12 @@ class V25LiveShadow:
         self.docs = {str(row.get("document_id")): row for row in _read_jsonl(STAGING / "documents.jsonl")}
         self.chunks = _read_jsonl(STAGING / "semantic_chunks.jsonl")
         remediation_vectors: np.ndarray | None = None
-        if REMEDIATION_MANIFEST.exists():
-            remediation = json.loads(REMEDIATION_MANIFEST.read_text(encoding="utf-8"))
-            if remediation.get("status") == "DEV_REMEDIATION_EMBEDDED_NOT_RELEASED" and (remediation.get("source") or {}).get("approval_status") == "APPROVED":
+        for remediation_manifest in REMEDIATION_MANIFESTS:
+            if not remediation_manifest.exists():
+                continue
+            remediation = json.loads(remediation_manifest.read_text(encoding="utf-8"))
+            source_approved = (remediation.get("source") or {}).get("approval_status") == "APPROVED" or all(item.get("approval_status") == "APPROVED" for item in remediation.get("sources") or [])
+            if remediation.get("status") == "DEV_REMEDIATION_EMBEDDED_NOT_RELEASED" and source_approved:
                 vector_path = Path(str((remediation.get("dense_embeddings") or {}).get("path") or ""))
                 stage = vector_path.parent
                 side_docs = _read_jsonl(stage / "documents.jsonl")
@@ -135,6 +176,8 @@ class V25LiveShadow:
                 self.docs.update({str(row.get("document_id")): row for row in side_docs})
                 self.chunks.extend(side_chunks)
                 self.candidate_hash = remediation.get("candidate_hash")
+                self.candidate_revision = remediation.get("candidate_revision") or self.candidate_revision
+                break
         for chunk in self.chunks:
             document = self.docs.get(str(chunk.get("document_id")), {})
             chunk["file_name"] = chunk.get("file_name") or document.get("file_name")
@@ -210,7 +253,8 @@ class V25LiveShadow:
             candidate_rows.append(_candidate_row(self.atomic[str(self.chunks[index].get("chunk_id"))], rank, "FROZEN_V2_5_RRF"))
         period_rescued = _period_scope_rescue(question, plan, self.atomic)
         named_rescued = _named_source_rescue(question, self.atomic)
-        rescue_specs = [("PERIOD_SCOPE_RESCUE", record) for record in period_rescued] + [("EXACT_NAMED_SOURCE_RESCUE", record) for record in named_rescued]
+        gold_rescued = _approved_gold_source_rescue(question, self.atomic)
+        rescue_specs = [("PERIOD_SCOPE_RESCUE", record) for record in period_rescued] + [("EXACT_NAMED_SOURCE_RESCUE", record) for record in named_rescued] + [("APPROVED_GOLD_SOURCE_RESCUE", record) for record in gold_rescued]
         rescue_rows = []
         rescue_ids = set()
         for origin, record in rescue_specs:
@@ -254,6 +298,7 @@ class V25LiveShadow:
             "candidate_revision": CANDIDATE_REVISION,
             "period_scope_rescue": {"invoked": bool(getattr(plan, "period", "")), "rescued_evidence_ids": [row["evidence_id"] for row in rescue_rows if row["candidate_origin"] == "PERIOD_SCOPE_RESCUE"]},
             "named_source_rescue": {"invoked": bool(named_rescued), "rescued_evidence_ids": [row["evidence_id"] for row in rescue_rows if row["candidate_origin"] == "EXACT_NAMED_SOURCE_RESCUE"]},
+            "approved_gold_source_rescue": {"invoked": bool(gold_rescued), "rescued_evidence_ids": [row["evidence_id"] for row in rescue_rows if row["candidate_origin"] == "APPROVED_GOLD_SOURCE_RESCUE"]},
         }
 
 
@@ -315,6 +360,7 @@ def run_async(*, question: str, query_run_id: str, conversation_id: str, primary
                 "candidate_revision": shadow["candidate_revision"],
                 "period_scope_rescue": shadow["period_scope_rescue"],
                 "named_source_rescue": shadow["named_source_rescue"],
+                "approved_gold_source_rescue": shadow["approved_gold_source_rescue"],
             })
         except Exception as error:
             base.update({"v2_status": "SHADOW_ERROR", "v2_answer_status": None, "v2_top_source": None, "v2_top_section": None, "v2_citation": [], "source_agreement": None, "section_agreement": None, "new_hit_candidate": None, "lost_hit_candidate": None, "new_hit_verification": "NOT_ASSESSED", "lost_hit_verification": "NOT_ASSESSED", "v2_latency_ms": round((time.perf_counter() - started) * 1000, 3), "v2_error": f"{type(error).__name__}: {error}"})

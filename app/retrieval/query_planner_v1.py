@@ -9,8 +9,13 @@ from app.bm25 import tokenize
 
 SPECIALTIES = ("总图", "建筑", "结构", "机电", "电气", "暖通", "给排水", "BIM", "EPC", "消防", "幕墙", "景观", "室内")
 METRICS = ("工期", "金额", "创效", "效益", "利润", "数量", "比例", "排名", "上传", "条数")
-ORGANIZATIONS = ("中国建筑第三工程局", "中建三局", "第二建设公司", "二公司", "公司", "局")
-ENTITY_RE = re.compile(r"([\u3400-\u9fffA-Za-z0-9（）()·+\-]{2,36}(?:项目|中心|医院|馆|园|厂房|学校))")
+ORGANIZATION_ALIASES = {
+    "中建三局第二建设公司": ("中建三局第二建设公司", "中建三局二公司", "第二建设公司", "二公司"),
+    "中建三局": ("中国建筑第三工程局", "中建三局"),
+}
+PROJECT_RE = re.compile(r"([\u3400-\u9fffA-Za-z0-9（）()·+\-]{2,48}项目)")
+ENTITY_RE = re.compile(r"([\u3400-\u9fffA-Za-z0-9（）()·+\-]{2,48}(?:项目|中心|医院|馆|园|厂房|学校))")
+GENERIC_PROJECT_MARKERS = ("多少", "几个", "哪些", "所有", "各个", "累计", "共计", "成功打造", "打造为", "完成了", "项目数")
 
 
 @dataclass(slots=True)
@@ -23,6 +28,7 @@ class QueryPlan:
     organization: list[str] = field(default_factory=list)
     project: list[str] = field(default_factory=list)
     year: list[str] = field(default_factory=list)
+    period: str = ""
     specialty: list[str] = field(default_factory=list)
     metric: list[str] = field(default_factory=list)
     document_type_hint: list[str] = field(default_factory=list)
@@ -42,23 +48,26 @@ class QueryPlan:
 def plan_query(question: str) -> QueryPlan:
     normalized = " ".join(question.split())
     years = list(dict.fromkeys(re.findall(r"20\d{2}", normalized)))
+    period = _period_scope(normalized)
+    projects = _projects(normalized)
     entities = _entities(normalized)
     specialties = [term for term in SPECIALTIES if term in normalized]
     metrics = [term for term in METRICS if term in normalized]
-    organizations = [term for term in ORGANIZATIONS if term in normalized]
+    organizations = _organizations(normalized)
     aggregation = _aggregation_plan(normalized)
     comparison = _comparison_plan(normalized)
     query_type = _query_type(normalized, aggregation, comparison)
     document_types, roles = _document_hints(normalized, query_type)
-    authority = "L2_OR_L3" if any(term in normalized for term in ("责任状", "制度", "图审", "规范", "正式", "要求")) or query_type == "METHOD_QUERY" or ("任务书" in normalized and not entities) else "ANY"
+    authority = "L2_OR_L3" if any(term in normalized for term in ("责任状", "制度", "图审", "规范", "正式", "要求")) or query_type == "METHOD_QUERY" or ("任务书" in normalized and not projects) else "ANY"
     scope = {key: value for key, value in {
         "organization": organizations,
-        "project": entities,
+        "project": projects,
         "year": years,
+        "period": [period] if period else [],
         "specialty": specialties,
     }.items() if value}
-    subquestions = _subquestions(normalized, aggregation, entities)
-    confidence = 0.45 + 0.12 * bool(years) + 0.14 * bool(entities) + 0.1 * bool(specialties) + 0.08 * bool(metrics) + 0.06 * bool(aggregation)
+    subquestions = _subquestions(normalized, aggregation, projects)
+    confidence = 0.45 + 0.12 * bool(years) + 0.14 * bool(projects) + 0.1 * bool(specialties) + 0.08 * bool(metrics) + 0.06 * bool(aggregation)
     return QueryPlan(
         query_id=str(uuid.uuid5(uuid.NAMESPACE_URL, normalized)),
         original_question=question,
@@ -66,8 +75,9 @@ def plan_query(question: str) -> QueryPlan:
         query_type=query_type,
         entities=entities,
         organization=organizations,
-        project=entities,
+        project=projects,
         year=years,
+        period=period,
         specialty=specialties,
         metric=metrics,
         document_type_hint=document_types,
@@ -82,13 +92,46 @@ def plan_query(question: str) -> QueryPlan:
     )
 
 
+def _period_scope(question: str) -> str:
+    if any(marker in question for marker in ("\u4e0a\u534a\u5e74", "\u534a\u5e74")):
+        return "H1"
+    if any(marker in question for marker in ("\u5168\u5e74", "\u5e74\u5ea6", "\u5e74\u7ec8", "\u5168\u5e74\u5ea6")):
+        return "FULL_YEAR"
+    return ""
+
+
+def _projects(question: str) -> list[str]:
+    values = []
+    for match in PROJECT_RE.finditer(question):
+        value = re.sub(r"^20\d{2}年", "", match.group(1)).strip("（）() ")
+        if _is_named_project(value):
+            values.append(value)
+    return list(dict.fromkeys(values))
+
+
 def _entities(question: str) -> list[str]:
     values = []
     for match in ENTITY_RE.finditer(question):
         value = re.sub(r"^20\d{2}年", "", match.group(1)).strip("（）() ")
-        if value and value not in {"设计示范项目", "EPC项目", "项目"} and not ("设计示范" in value and value.endswith("项目")) and not value.startswith(("设计", "示范", "当前")):
+        if value and not _is_generic_project_phrase(value) and value not in {"设计示范项目", "EPC项目", "项目"} and not value.startswith(("设计", "示范", "当前")):
             values.append(value)
     return list(dict.fromkeys(values))
+
+
+def _is_named_project(value: str) -> bool:
+    return bool(value) and value not in {"设计示范项目", "EPC项目", "项目"} and not _is_generic_project_phrase(value) and not value.startswith(("设计", "示范", "当前"))
+
+
+def _is_generic_project_phrase(value: str) -> bool:
+    return bool(re.match(r"^度(?:设计|多少|有|成功|最终)", value)) or any(marker in value for marker in GENERIC_PROJECT_MARKERS)
+
+
+def _organizations(question: str) -> list[str]:
+    values = []
+    for canonical, aliases in ORGANIZATION_ALIASES.items():
+        if any(alias in question for alias in aliases):
+            values.append(canonical)
+    return values
 
 
 def _aggregation_plan(question: str) -> list[str]:
@@ -97,7 +140,7 @@ def _aggregation_plan(question: str) -> list[str]:
         operations.append("LIST_DISTINCT")
     if any(term in question for term in ("每个", "各专业", "分别", "按专业", "按项目", "分组")):
         operations.append("GROUP_BY")
-    if any(term in question for term in ("多少条", "多少个", "合计", "总数")) or ("数量" in question and "是多少" not in question):
+    if re.search(r"(?:多少|几)(?:个|条|项|家|份|次|人|座)", question) or any(term in question for term in ("合计", "总数")) or ("数量" in question and "是多少" not in question):
         operations.append("COUNT")
     if any(term in question for term in ("其中", "利润>0", "利润大于0", "满足条件", "增加效益")):
         operations.append("FILTER")
@@ -123,7 +166,7 @@ def _query_type(question: str, aggregation: list[str], comparison: list[str]) ->
         return "METHOD_QUERY"
     if any(term in question for term in ("案例", "经验", "复盘")):
         return "CASE_QUERY"
-    if len(_entities(question)) >= 2:
+    if len(_projects(question)) >= 2:
         return "MULTI_HOP_QUERY"
     if any(term in question for term in ("多少", "日期", "时间", "金额")):
         return "SINGLE_FACT"
@@ -137,6 +180,8 @@ def _document_hints(question: str, query_type: str) -> tuple[list[str], list[str
         return ["DESIGN_TASK_BOOK", "TEMPLATE"], ["标准模板", "管理指南"]
     if any(term in question for term in ("图审", "审核要点")):
         return ["TABLE_LEDGER", "MANAGEMENT_GUIDE"], ["管理指南", "标准模板"]
+    if query_type == "AGGREGATION_QUERY" and re.search(r"20\d{2}(?:年|年度)", question) and "项目" in question:
+        return ["WORK_SUMMARY", "RESPONSIBILITY_CONTRACT", "TABLE_LEDGER", "PROJECT_PLAN"], ["工作总结", "责任文件", "台账"]
     if query_type in {"AGGREGATION_QUERY", "STRUCTURED_QUERY"}:
         return ["TABLE_LEDGER", "PROJECT_PLAN"], ["台账", "项目策划"]
     if query_type == "POLICY_QUERY":
@@ -158,4 +203,10 @@ def _subquestions(question: str, aggregation: list[str], entities: list[str]) ->
         values.append("按条件筛选后统计数量")
     if "督办" in question and any(term in question for term in ("什么", "哪些", "事项")):
         values.append("列出目标单位的全部督办事项")
+    if "组织架构" in question or ("组织" in question and "岗位" in question):
+        values.extend((
+            "组织定位和隶属关系",
+            "各层级的岗位或机构设置",
+            "适用条件或选设边界",
+        ))
     return list(dict.fromkeys(values))

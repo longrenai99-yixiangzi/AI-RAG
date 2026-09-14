@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from app.retrieval.hierarchical_v1 import HierarchicalIndex
+from app.retrieval.query_planner_v1 import ORGANIZATION_ALIASES
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -98,7 +99,8 @@ def _candidate(row: dict[str, Any], plan: dict[str, Any], documents: dict[str, d
     document = documents.get(str(row.get("document_id")), {})
     path = str(row.get("source_path") or source.get("source_path") or "").replace("/", "\\").casefold()
     scope, scope_reason = _scope(plan, document, source, row)
-    return {"evidence_id": evidence_id, "document_id": row.get("document_id"), "section_id": row.get("section_id"), "table_id": source.get("table_id"), "file_name": row.get("file_name"), "source_path": row.get("source_path"), "heading_path": row.get("heading_path") or source.get("heading_path"), "location": row.get("location") or source.get("location"), "text": str(source.get("text") or row.get("text") or ""), "candidate_rank": row.get("rank"), "candidate_origin": row.get("candidate_origin"), "exact_core_phrase_matches": row.get("exact_core_phrase_matches") or [], "document_role": row.get("document_role") or document.get("document_role"), "document_type": row.get("document_type") or document.get("document_type"), "authority": row.get("authority") or document.get("authority_level"), "scope": scope, "scope_reason": scope_reason, "lineage_status": row.get("lineage_status") or source.get("lineage_status") or "LINEAGE_NOT_APPLICABLE", "registration_page_flag": document.get("document_type") == "REGISTER_PAGE" or "\\wiki\\sources\\" in path, "query_page_flag": "\\wiki\\queries\\" in path, "role": "INSUFFICIENT", "why_selected": "Selected by 020C hierarchical candidate generation."}
+    text = str(source.get("text") or row.get("text") or "")
+    return {"evidence_id": evidence_id, "source_id": row.get("source_id") or source.get("source_id"), "source_version": row.get("source_version") or source.get("source_version"), "knowledge_id": row.get("knowledge_id") or source.get("knowledge_id"), "approved_trial_knowledge": bool(row.get("approved_trial_knowledge") or source.get("approved_trial_knowledge")), "parent_evidence_id": row.get("parent_evidence_id") or source.get("parent_evidence_id"), "raw_text": str(source.get("raw_text") or row.get("raw_text") or text), "search_context": str(source.get("search_context") or row.get("search_context") or ""), "negative_questions": list(source.get("negative_questions") or row.get("negative_questions") or []), "document_id": row.get("document_id"), "section_id": row.get("section_id"), "table_id": source.get("table_id"), "file_name": row.get("file_name"), "source_path": row.get("source_path"), "heading_path": row.get("heading_path") or source.get("heading_path"), "location": row.get("location") or source.get("location"), "text": text, "candidate_rank": row.get("rank"), "candidate_origin": row.get("candidate_origin"), "exact_core_phrase_matches": row.get("exact_core_phrase_matches") or [], "document_role": row.get("document_role") or document.get("document_role"), "document_type": row.get("document_type") or document.get("document_type"), "authority": row.get("authority") or document.get("authority_level"), "scope": scope, "scope_reason": scope_reason, "lineage_status": row.get("lineage_status") or source.get("lineage_status") or "LINEAGE_NOT_APPLICABLE", "registration_page_flag": document.get("document_type") == "REGISTER_PAGE" or "\\wiki\\sources\\" in path, "query_page_flag": "\\wiki\\queries\\" in path, "link_only": _link_only(text), "role": "INSUFFICIENT", "why_selected": "Selected by 020C hierarchical candidate generation."}
 
 
 def _scope(plan: dict[str, Any], document: dict[str, Any], source: dict[str, Any], row: dict[str, Any]) -> tuple[dict[str, str], str]:
@@ -116,7 +118,9 @@ def _scope(plan: dict[str, Any], document: dict[str, Any], source: dict[str, Any
             result[field] = "NOT_APPLICABLE"
         elif any(str(value).casefold() in json.dumps(candidate_values, ensure_ascii=False).casefold() for value in values):
             result[field] = "MATCH"
-        elif field in {"project", "year"} and any(str(value).casefold() in identity or _scope_alias(value).casefold() in identity for value in values):
+        elif field in {"project", "year"} and any(str(value).casefold() in identity or _scope_alias(value).casefold() in identity or str(value).casefold() in evidence_text for value in values):
+            result[field] = "MATCH"
+        elif field == "organization" and any(_organization_in_text(str(value), f"{identity} {evidence_text}") for value in values):
             result[field] = "MATCH"
         elif field == "specialty" and any(str(value).casefold() in evidence_text for value in values):
             result[field] = "MATCH"
@@ -127,6 +131,8 @@ def _scope(plan: dict[str, Any], document: dict[str, Any], source: dict[str, Any
     text = " ".join(str(value or "") for value in (row.get("file_name"), row.get("heading_path"), row.get("text"), source.get("text"))).casefold()
     metrics = plan.get("metric", [])
     result["metric"] = "NOT_APPLICABLE" if not metrics else "MATCH" if all(str(value).casefold() in text for value in metrics) else "MISMATCH"
+    period = str(plan.get("period") or "")
+    result["period"] = "NOT_APPLICABLE" if not period else _period_status(period, f"{identity} {evidence_text}")
     return result, "Field-level scope is recorded; MATCH alone does not resolve same-scope fact conflicts."
 
 
@@ -134,15 +140,65 @@ def _scope_alias(value: Any) -> str:
     return re.sub(r"项目$", "", str(value or "")).strip()
 
 
+def _organization_in_text(value: str, text: str) -> bool:
+    aliases = ORGANIZATION_ALIASES.get(value, (value,))
+    return any(alias.casefold() in text for alias in aliases)
+
+
+def _period_status(period: str, text: str) -> str:
+    compact = re.sub(r"\s+", "", text).casefold()
+    h1_markers = ("\u4e0a\u534a\u5e74", "\u534a\u5e74\u603b\u7ed3")
+    annual_markers = ("\u5e74\u5ea6\u603b\u7ed3", "\u5e74\u5ea6\u8ff0\u804c", "\u5e74\u5ea6\u5de5\u4f5c", "\u8ff0\u804c\u62a5\u544a", "\u5168\u5e74\u5de5\u4f5c", "\u5168\u5e74\u521b\u6548")
+    if period == "H1":
+        if any(marker in compact for marker in ("\u534a\u5e74\u603b\u7ed3", "\u4e0a\u534a\u5e74")):
+            return "MATCH"
+        if any(marker in compact for marker in annual_markers):
+            return "MISMATCH"
+        return "UNKNOWN"
+    if period == "FULL_YEAR":
+        if any(marker in compact for marker in ("\u534a\u5e74\u603b\u7ed3", "\u4e0a\u534a\u5e74")) and not any(marker in compact for marker in annual_markers):
+            return "MISMATCH"
+        if any(marker in compact for marker in annual_markers) or "\u5168\u5e74" in compact:
+            return "MATCH"
+        if any(marker in compact for marker in h1_markers):
+            return "MISMATCH"
+        return "UNKNOWN"
+    return "UNKNOWN"
+
+
+def _link_only(text: str) -> bool:
+    if not any(marker in text for marker in ("[[", "file://", "http://", "https://")):
+        return False
+    body = re.sub(r"\[\[[^\]]+\]\]|file://\S+|https?://\S+", "", text)
+    return len(re.sub(r"\s+", "", body)) < 40
+
+
 def _direct_candidate(candidate: dict[str, Any], plan: dict[str, Any]) -> bool:
     if candidate["lineage_status"] == "LINEAGE_NOT_CONFIRMED":
         return False
+    if candidate.get("link_only"):
+        return False
+    compact_question = re.sub(r"\s+", "", str(plan.get("original_question") or "")).casefold()
+    if any(re.sub(r"\s+", "", value).casefold() == compact_question for value in candidate.get("negative_questions", [])):
+        return False
     for field, values in (("organization", plan.get("organization", [])), ("project", plan.get("project", [])), ("year", plan.get("year", [])), ("specialty", plan.get("specialty", []))):
-        if values and candidate["scope"].get(field) != "MATCH":
+        status = candidate["scope"].get(field)
+        if values and status == "MISMATCH":
+            return False
+        if values and field in {"project", "year"} and status != "MATCH":
             return False
     if plan.get("metric") and candidate["scope"].get("metric") != "MATCH":
         return False
-    return int(candidate.get("candidate_rank") or 10**6) <= 5 or _role_fact_candidate(candidate, plan)
+    if plan.get("period") and candidate["scope"].get("period") != "MATCH":
+        return False
+    question = str(plan.get("original_question") or "")
+    if "任务书" in question and not plan.get("project") and candidate.get("document_role") in {"项目案例", "项目复盘"}:
+        return False
+    return (
+        int(candidate.get("candidate_rank") or 10**6) <= 10
+        or candidate.get("document_role") in set(plan.get("document_role_hint", []))
+        or _role_fact_candidate(candidate, plan)
+    )
 
 
 def _role_fact_candidate(candidate: dict[str, Any], plan: dict[str, Any]) -> bool:
@@ -164,11 +220,21 @@ def _supporting_candidate(candidate: dict[str, Any], plan: dict[str, Any]) -> bo
 def _same_scope_conflicts(candidates: list[dict[str, Any]], plan: dict[str, Any]) -> dict[str, str]:
     if not plan.get("organization") or not plan.get("year") or not plan.get("metric"):
         return {}
-    matched = [candidate for candidate in candidates if candidate["scope"].get("organization") == "MATCH" and candidate["scope"].get("year") == "MATCH" and candidate["scope"].get("metric") == "MATCH"]
-    number_sets = {candidate["evidence_id"]: tuple(sorted(set(re.findall(r"-?\d+(?:\.\d+)?", candidate["text"])))) for candidate in matched}
-    if len(set(number_sets.values())) < 2:
+    period = str(plan.get("period") or "")
+    matched = [candidate for candidate in candidates if candidate["scope"].get("organization") == "MATCH" and candidate["scope"].get("year") == "MATCH" and candidate["scope"].get("metric") == "MATCH" and (not period or candidate["scope"].get("period") == "MATCH")]
+    metric_values = {candidate["evidence_id"]: _metric_values(candidate["text"], plan.get("metric", [])) for candidate in matched}
+    observed = {values for values in metric_values.values() if values}
+    if len(observed) < 2:
         return {}
     return {candidate["evidence_id"]: "SAME_SCOPE_CONFLICT: same organization/year/metric with different numeric facts; rank cannot resolve." for candidate in matched}
+
+
+def _metric_values(text: str, metrics: list[str]) -> tuple[str, ...]:
+    values = []
+    for metric in metrics:
+        values.extend(re.findall(rf"{re.escape(metric)}[^。；;\n]{{0,20}}?(-?\d+(?:\.\d+)?)", text))
+        values.extend(re.findall(rf"(-?\d+(?:\.\d+)?)[^。；;\n]{{0,8}}{re.escape(metric)}", text))
+    return tuple(sorted(set(values)))
 
 
 def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[dict[str, Any]], structured_rows: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
@@ -183,13 +249,25 @@ def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[di
             status = "EVIDENCE_INSUFFICIENT"
             evidence = []
         elif direct:
-            status = "COVERED"
-            evidence = [candidate["evidence_id"] for candidate in direct]
+            supported = [candidate for candidate in direct if _supports_subquestion(candidate, subquestion)]
+            status = "COVERED" if supported else "EVIDENCE_INSUFFICIENT"
+            evidence = [candidate["evidence_id"] for candidate in supported]
         else:
             status = "NOT_COVERED"
             evidence = []
         rows.append({"subquestion_id": f"SQ{index}", "subquestion": subquestion, "coverage_status": status, "evidence_ids": evidence, "coverage_reason": "Conflict takes precedence over rank; filter/count requires lineage-safe structured evidence."})
     return rows
+
+
+def _supports_subquestion(candidate: dict[str, Any], subquestion: str) -> bool:
+    text = str(candidate.get("text") or "")
+    if "组织定位" in subquestion:
+        return any(marker in text for marker in ("作为", "隶属", "统筹"))
+    if "岗位或机构设置" in subquestion:
+        return any(marker in text for marker in ("设置", "岗位", "机构"))
+    if "选设边界" in subquestion:
+        return any(marker in text for marker in ("选择设置", "选设", "可设置"))
+    return True
 
 
 def _structured_facts(plan: dict[str, Any], candidates: list[dict[str, Any]], coverage: list[dict[str, Any]]) -> dict[str, Any]:

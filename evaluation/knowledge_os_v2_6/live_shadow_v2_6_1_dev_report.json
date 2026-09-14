@@ -36,5 +36,27 @@
     ],
     "pending_count": 0,
     "verified_lost_hit_count": 0
+  },
+  "not_verified_remediation_queue": {
+    "status": "OPEN_REMEDIATION",
+    "count": 18,
+    "path": "D:\\AI智能体\\AI设计管理RAG-V1\\evaluation\\knowledge_os_v2_6\\not_verified_remediation_queue.json",
+    "categories": {
+      "SOURCE_BODY_MISSING_OR_STRUCTURED_GAP": 1,
+      "QUERY_INTENT_SCOPE_MISMATCH": 2,
+      "SOURCE_BODY_MISSING_OR_REGISTRATION_ONLY": 2,
+      "SOURCE_BODY_OR_LOCATION_MISMATCH": 1,
+      "QUERY_SCOPE_AND_AGGREGATION_MISMATCH": 1,
+      "PROJECT_RETRIEVAL_MISMATCH": 1,
+      "SOURCE_ROLE_OR_RENDERING_GAP": 1,
+      "SOURCE_BODY_OR_ROLE_MISMATCH": 1,
+      "SOURCE_BODY_MISSING_OR_PROJECT_MISMATCH": 1,
+      "METRIC_PERIOD_OR_DEFINITION_CONFLICT": 1,
+      "SOURCE_AND_NARRATIVE_AGGREGATION_GAP": 1,
+      "TIME_SCOPE_SOURCE_MISMATCH": 2,
+      "METRIC_FACET_CONFLICT": 1,
+      "TABLE_ROW_SCOPE_MISMATCH": 1,
+      "MULTI_SOURCE_PERIOD_GAP": 1
+    }
   }
 }

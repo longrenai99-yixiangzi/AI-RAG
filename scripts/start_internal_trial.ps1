@@ -9,6 +9,28 @@ $stderrLog = Join-Path $logDir 'trial_service.stderr.log'
 $hostAddress = '127.0.0.1'
 $healthHost = '127.0.0.1'
 
+# Refresh provider settings changed after the Codex desktop process started.
+foreach ($name in 'RAG_API_KEY', 'RAG_API_BASE_URL', 'RAG_CHAT_MODEL') {
+    $value = [Environment]::GetEnvironmentVariable($name, 'User')
+    if ($value) { Set-Item -Path "Env:$name" -Value $value }
+}
+
+# Defensive: collapse duplicated case-variant environment variables.
+# Windows PowerShell 5.1's Start-Process builds a case-INsensitive environment
+# dictionary and raises "已添加项。字典中的关键字:..." when the process block
+# carries both PATH and Path / HTTP_PROXY and http_proxy (some agent/IDE shells
+# inject case-variant twins). Keep exactly one entry per name; the duplicated
+# values are identical, so behavior is unchanged.
+$duplicateEnvironmentNames = @(
+    [Environment]::GetEnvironmentVariables('Process').Keys |
+        Group-Object { $_.ToUpperInvariant() } |
+        Where-Object { $_.Count -gt 1 } |
+        ForEach-Object { $_.Group[0] }
+)
+foreach ($duplicateName in $duplicateEnvironmentNames) {
+    [Environment]::SetEnvironmentVariable($duplicateName, $null, 'Process')
+}
+
 if (-not (Test-Path -LiteralPath $pythonPath)) {
     throw "V1 Python environment not found: $pythonPath"
 }
@@ -66,7 +88,7 @@ if (-not $ready) {
 $v2Config = Get-Content -LiteralPath (Join-Path $projectRoot 'config\internal_trial.yaml') -Raw
 if ($v2Config -match 'V2_VERIFIED_RAG_ENABLE[LOCAL_PATH_REDACTED]*true') {
     try {
-        $warmup = Invoke-RestMethod -Uri "http://${healthHost}:8010/api/v2/warmup" -Method Post -UseBasicParsing -TimeoutSec 75
+        $warmup = Invoke-RestMethod -Uri "http://${healthHost}:8010/api/v2/warmup" -Method Post -UseBasicParsing -TimeoutSec 600
         if (-not $warmup.ready) { throw 'V2 warmup returned not ready.' }
     } catch {
         if (Get-Process -Id $process.Id -ErrorAction SilentlyContinue) {

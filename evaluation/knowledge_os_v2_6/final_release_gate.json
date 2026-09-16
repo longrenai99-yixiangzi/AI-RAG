@@ -1,24 +1,24 @@
 {
   "schema_version": "knowledge_os_v2_6.final_release_gate",
-  "captured_at": "2026-09-14T10:30:13.748100+08:00",
-  "status": "BLOCKED",
-  "final_status": "BLOCKED",
-  "stop_after": "T03_LIVE_SHADOW_GATE",
+  "captured_at": "2026-09-15T14:05:17.6676721+08:00",
+  "status": "CONDITIONAL_INTERNAL_CLOSED",
+  "final_status": "NOT_FORMAL_RELEASE",
+  "stop_after": "OWNER_ACCEPTED_CONDITIONAL_CLOSURE",
   "gates": {
     "v2_5_candidate_frozen": "PASS",
     "owner_source_version": "PASS",
-    "live_shadow": "SHADOW_GATE_FAIL",
+    "live_shadow": "SHADOW_INSUFFICIENT_SAMPLE",
     "rollback_drill": "NOT_RUN_LIVE_SHADOW_BLOCKED",
-    "candidate_integrity": "NOT_RUN_LIVE_SHADOW_BLOCKED",
+    "candidate_integrity": "PASS",
     "8010_switch_authorization": "NOT_REQUESTED",
     "immediate_smoke": "NOT_RUN",
     "canary": "NOT_RUN"
   },
   "top_blocking_issues": [
-    "人工核验确认 VERIFIED_LOST_HIT=2，说明 V2.5 在两条真实问题上退化。",
-    "人工核验确认 NOT_VERIFIED=16：两份重放答案的事实、来源定位等均不正确。",
-    "历史 Shadow 异常=2，虽已修复代码，仍须保留审计并完成干净窗口验证。",
-    "T04 Rollback Drill 及后续 8010 切换停止。"
+    "当前 V2.6.2 候选的 22 条人工复核仍为 ANSWER_GOLD_MATCH，新增 2024 年度总结来源后候选哈希变为 77eaf3eb…bd1d18。",
+    "上一候选的 30 条 Live Shadow 不再计入当前候选；当前新候选样本为 0/30。",
+    "新能源项目设计优化问题已完成离线修复；352 条历史真实问题的兼容性重放为条件性通过，不替代当前 Live Shadow。",
+    "T04 Rollback Drill 及后续 8010 切换仍停止。"
   ],
   "runtime": {
     "8010_primary_unchanged": true,
@@ -29,6 +29,6 @@
     "formal_index_switch": false,
     "v1_index_intact": true
   },
-  "next_action": "INVESTIGATE_TWO_VERIFIED_LOST_HITS_AND_RUN_CLEAN_SHADOW_WINDOW",
-  "manual_review_semantics": "NOT_VERIFIED means both replay answers and source locations were user-confirmed incorrect."
+  "next_action": "NONE_OWNER_ACCEPTED_CONDITIONAL_CLOSURE",
+  "manual_review_semantics": "All 22 V2.6.2 retained/revised answers are user-confirmed ANSWER_GOLD_MATCH; release remains blocked by current-candidate Live Shadow sample alignment."
 }

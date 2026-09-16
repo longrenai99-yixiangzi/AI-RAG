@@ -34,11 +34,12 @@ def main() -> int:
     if manifest.get("status") != "DEV_REMEDIATION_PENDING_EMBEDDING":
         raise RuntimeError("V2_6_2_CANDIDATE_NOT_PENDING_EMBEDDING")
     chunks = _read_jsonl(STAGING / "semantic_chunks.jsonl")
-    base = np.load(STAGING / "dense_embeddings_v2_6_1.npy").astype(np.float32)
-    base_count = int(manifest["semantic_chunks"]["base_v2_6_1"])
-    if base.shape != (base_count, 1024) or len(chunks) <= base_count:
-        raise RuntimeError(f"V2_6_2_BASE_VECTOR_MISMATCH:{base.shape}:{len(chunks)}:{base_count}")
-    provider = BGEM3DenseProvider(MODEL, collection_name="v2_6_2_remediation_embedding", use_fp16=False, batch_size=4)
+    vector_path = STAGING / "dense_embeddings.npy"
+    existing = np.load(vector_path).astype(np.float32) if vector_path.exists() else np.load(STAGING / "dense_embeddings_v2_6_1.npy").astype(np.float32)
+    base_count = int(existing.shape[0])
+    if existing.ndim != 2 or existing.shape[1] != 1024 or base_count > len(chunks):
+        raise RuntimeError(f"V2_6_2_BASE_VECTOR_MISMATCH:{existing.shape}:{len(chunks)}:{base_count}")
+    provider = BGEM3DenseProvider(MODEL, collection_name="v2_6_2_remediation_embedding", use_fp16=False, batch_size=32)
     try:
         fresh = np.asarray(provider.embed_documents([str(row.get("retrieval_text") or "") for row in chunks[base_count:]]), dtype=np.float32)
     finally:
@@ -48,8 +49,7 @@ def main() -> int:
     norms = np.linalg.norm(fresh, axis=1, keepdims=True)
     if np.any(norms == 0):
         raise RuntimeError("V2_6_2_ZERO_EMBEDDING_VECTOR")
-    vectors = np.concatenate((base, fresh / norms), axis=0)
-    vector_path = STAGING / "dense_embeddings.npy"
+    vectors = np.concatenate((existing, fresh / norms), axis=0)
     np.save(vector_path, vectors)
     now = datetime.now(timezone.utc).astimezone().isoformat()
     candidate_material = json.dumps({"base": manifest["base_candidate_hash"], "sources": manifest["sources"], "semantic_chunks_sha256": _sha(STAGING / "semantic_chunks.jsonl"), "dense_embeddings_sha256": _sha(vector_path), "revision": "V2.6.2_DEV_SOURCE_COVERAGE"}, ensure_ascii=False, sort_keys=True).encode("utf-8")

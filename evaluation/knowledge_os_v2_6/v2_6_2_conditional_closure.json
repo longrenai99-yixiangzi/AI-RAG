@@ -1,0 +1,44 @@
+{
+  "schema_version": "knowledge_os_v2_6_2.conditional_closure",
+  "captured_at": "2026-09-16T08:58:20.846932+08:00",
+  "status": "OWNER_ACCEPTED_CONDITIONAL_CLOSURE_NOT_FORMAL_RELEASE",
+  "owner_acceptance": {
+    "decision": "ACCEPTED",
+    "scope": "INTERNAL_CONDITIONAL_CLOSURE_ONLY",
+    "formal_release_authorized": false,
+    "8010_switch_authorized": false,
+    "formal_8000_write_authorized": false
+  },
+  "candidate_hash": "77eaf3eb59ce4deb679213db5f93a326f79e774da998506d29bc442c1bdd1d18",
+  "evidence": {
+    "manual_answer_gold": {
+      "ANSWER_GOLD_MATCH": 22,
+      "NOT_VERIFIED": 0
+    },
+    "candidate_integrity": "PASS",
+    "compatibility_questions": 352,
+    "compatibility_status_counts": {
+      "ANSWERED": 221,
+      "PARTIAL_ANSWER": 131
+    },
+    "current_live_shadow": {
+      "sample_size": 0,
+      "minimum_effective_sample": 30,
+      "sample_gate": "SHADOW_INSUFFICIENT_SAMPLE"
+    }
+  },
+  "formal_release_blockers": [
+    "跨候选兼容性重放是离线诊断，不能替代当前候选的真实 Live Shadow。",
+    "当前候选哈希下的有效 Live Shadow 样本尚未达到 30 条。",
+    "真实 Rollback Drill 需要明确授权在 8010 执行受控切换；8000 继续禁止写入。"
+  ],
+  "allowed_next_steps": [
+    "保留本条件性收口包作为内部评估结论，不执行切换。",
+    "在当前候选下补足真实 Live Shadow 后，申请 8010 受控切换与 Rollback Drill 授权。"
+  ],
+  "runtime": {
+    "8010_switch_performed": false,
+    "8010_switch_authorized": false,
+    "formal_8000_touched": false
+  }
+}

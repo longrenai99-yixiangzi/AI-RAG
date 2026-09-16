@@ -1,0 +1,144 @@
+{
+  "schema_version": "knowledge_os_v2_6_2.candidate_integrity",
+  "captured_at": "2026-09-16T08:45:35.490049+08:00",
+  "candidate_hash": "77eaf3eb59ce4deb679213db5f93a326f79e774da998506d29bc442c1bdd1d18",
+  "source_count": 21,
+  "approved_sources_pass": true,
+  "vector_shape": [
+    2312,
+    1024
+  ],
+  "semantic_chunk_count": 2312,
+  "vector_chunk_alignment_pass": true,
+  "status": "PASS",
+  "formal_8000_touched": false,
+  "8010_switch_authorized": false,
+  "sources": [
+    {
+      "file_name": "b6077e3f74f0a1b7ae9f.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "沈阳中心大厦工作成果分享.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "海南中心项目塔冠技术交流分享2026.5.27.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "0ee2959550610ce23750.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "2c5dbe10c9b44d1d47d0.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "局2026年半年运营情况分析会暨第二次改革管理论坛上的领导讲话、报告.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "90b557ce19fb9d757b47.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "EPC设计管理经验总结(平鲁风电项目) 2026.5修改.docx",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "design_review_folder_inventory_2026_09_15.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "丽水医院项目 .docx",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "百草园超高层产品线观摩材料.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "433315cbf3a4f79a6894.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "西北公司-沣东医院项目经验交流.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "9992d9f7b525192965e4.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "呼市移动数据中心项目观摩会汇报材料.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "2025年年度总结.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "EPC设计管理经验总结（之寓·保税区人才公寓项目）.docx",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "EPC设计管理经验总结(涟水第三水厂建设项目3.17).docx",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "EPC设计管理经验总结(丰台崔村旧改项目)2026.5.6.docx",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "EPC设计管理经验总结(泸州垃圾焚烧发电厂项目)20260309.docx",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    },
+    {
+      "file_name": "2024年度总结2.md",
+      "exists": true,
+      "hash_match": true,
+      "approval_status": "APPROVED"
+    }
+  ]
+}

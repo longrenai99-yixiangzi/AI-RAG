@@ -18,12 +18,26 @@ STAGING = ROOT / "data" / "shadow" / "knowledge_v2_6_remediation" / "v2_6_2_sour
 APPROVED = Path(r"D:\设计管理\.ai-growth\parsed\approved-sources")
 SOURCES = {
     "b6077e3f74f0a1b7ae9f.md": "c392bc19e997b52f2f31be948ea8876830c0055f612016fd8b1dc119affcb323",
-    "cb93c382c9197043cab1.md": "7ce9483b9a83a5a0797c647718e82de2a9e68028a9ffa558c491102d06c29424",
-    "f80e5def25e5a56bfc6f.md": "bcc9a3b8685a86085ce26f1b5163406c6db9801a4258778aee98ee912a5ba082",
+    "沈阳中心大厦工作成果分享.md": "7ce9483b9a83a5a0797c647718e82de2a9e68028a9ffa558c491102d06c29424",
+    "海南中心项目塔冠技术交流分享2026.5.27.md": "bcc9a3b8685a86085ce26f1b5163406c6db9801a4258778aee98ee912a5ba082",
     "0ee2959550610ce23750.md": "c921b8c3773304cd2ffef8659812d1498317900cbd8892460454b22a6060f89d",
     "2c5dbe10c9b44d1d47d0.md": "2d2a1005a60aae43465dd06dcb633bcd2ad1b1f3fd2812a7ee3b063e2b030cdc",
-    "77d7e542b45a93853e16.md": "c78ccf30fb5e64479fba27a4bdf73b6cbc243b4bc31c8a3f2de1415054d48e7c",
+    "局2026年半年运营情况分析会暨第二次改革管理论坛上的领导讲话、报告.md": "c78ccf30fb5e64479fba27a4bdf73b6cbc243b4bc31c8a3f2de1415054d48e7c",
     "90b557ce19fb9d757b47.md": "d23adc39ed9e3fd7c13f41b5cb02a9399f813cc902b2c04a9537853586d2ad9e",
+    "EPC设计管理经验总结(平鲁风电项目) 2026.5修改.docx": "ace8824935b32b76063df7c894ed7fc70ce358569703715224009b073358770e",
+    "design_review_folder_inventory_2026_09_15.md": "2630fbb10fc68341b13bba5395c0c781c54ae4e0ac371a6fd166cd2f07f8feff",
+    "丽水医院项目 .docx": "72553e1809d816cf77d787a2184f1dc3c8e73469344e2b1c843a1ed607e3081e",
+    "百草园超高层产品线观摩材料.md": "c5dcd9b7346a66bad4cf40873e232c440b69e6e357a83044d8a201da165b59ef",
+    "433315cbf3a4f79a6894.md": "b168773319f08591d1cf97943a31834fbcbc1459fd99e04ca6e3e20cb4cf3ac9",
+    "西北公司-沣东医院项目经验交流.md": "676dd4b3ef4decf149f9f6138e8f20ed1c9db94262ccf46b61286c777d5a73af",
+    "9992d9f7b525192965e4.md": "fe8e3a86250e8d72bdf7f1d6feb445c4f9a2395ca21c30c91f1c5f9a6e4846ba",
+    "呼市移动数据中心项目观摩会汇报材料.md": "afe9999cbc700480eb14d494c1dcddf6e11efb52bcacc90d35f6e216fa158868",
+    "2025年年度总结.md": "35ec22b164f144b506b83d92947319e14abcea03bab1e0d1d8eeeef7c8443fcd",
+    "EPC设计管理经验总结（之寓·保税区人才公寓项目）.docx": "2760e5e2adfba071eab398b92b5501619fa92081009c35a18110a973041381dc",
+    "EPC设计管理经验总结(涟水第三水厂建设项目3.17).docx": "a103f5a8c9861c5c753eb77a16e692ce09600179de2db5fe947c0231ac8da138",
+    "EPC设计管理经验总结(丰台崔村旧改项目)2026.5.6.docx": "2b738077c1a52520200a5566e2fdec7ac3992b67ee3c29bc54b21a6f9efae64c",
+    "EPC设计管理经验总结(泸州垃圾焚烧发电厂项目)20260309.docx": "7fa0d0ef34a3c93d697bd8125a4945a23e8305249e98d5bb6aa8bdc0d74582eb",
+    "2024年度总结2.md": "34396ccfd2031f1f7d320d9278b91b2345ca2916d42c5320ce4b1f51377febfc",
 }
 
 
@@ -93,7 +107,7 @@ def main() -> int:
         "embedding_status": "PENDING_NEW_SOURCE_EMBEDDING",
         "formal_8000_touched": False,
         "8010_switch_performed": False,
-        "approval_scope": "User approved seven SHA-256 versions for V2.6.2_DEV_REMEDIATION only.",
+        "approval_scope": "User approved twenty-one SHA-256 versions for V2.6.2_DEV_REMEDIATION only.",
     }
     (V26 / "remediation_candidate_v2_6_2.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     (V26 / "remediation_source_approval_v2_6_2.json").write_text(json.dumps({"schema_version": "knowledge_os_v2_6_2.source_approval", "captured_at": now, "approval_status": "APPROVED", "approved_by": "USER_CONFIRMED", "records": admitted, "formal_8000_touched": False, "8010_switch_authorized": False}, ensure_ascii=False, indent=2), encoding="utf-8")

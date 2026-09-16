@@ -1,0 +1,17 @@
+{
+  "schema_version": "knowledge_os_v2_6_2.manual_review_summary",
+  "captured_at": "2026-09-15T15:46:04.065308+08:00",
+  "current_candidate_hash": "3537491e0415771324babcb56de09ae3a21d593266656f1cd0aa905231d1e260",
+  "current_candidate_revision": "V2.6.2_DEV_SOURCE_COVERAGE",
+  "manual_review_total": 22,
+  "decision_counts": {
+    "ANSWER_GOLD_MATCH": 22,
+    "NOT_VERIFIED": 0
+  },
+  "current_candidate_revalidated_retained": 12,
+  "historical_live_shadow_report_candidate_hash": "d142b9cf61a5b1734de4e0514597b6a7578a3b6631bf02e936d175e492c9cdd5",
+  "historical_live_shadow_sample": 215,
+  "sample_hash_alignment": false,
+  "release_gate": "BLOCKED_LIVE_SHADOW_FALSE_POSITIVE_NEW_HIT",
+  "formal_8000_touched": false
+}

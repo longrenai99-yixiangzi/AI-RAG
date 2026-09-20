@@ -1,6 +1,6 @@
 # 8010 Rollback Plan（GATED）
 
-状态：准备方案已写明；真实 `V1 → V2.5 → V1` 演练尚未执行，不能标记 PASS。
+状态：真实 `V1 → V2.6.2 → V1` 演练已于 2026-09-16 在 8010 完成并通过。候选三题 Smoke 均为 `ANSWERED` 且有引用，V1 配置快照已恢复；8000 未启动、未写入。详见 `evaluation/knowledge_os_v2_6/v2_6_2_8010_rollback_drill.json`。
 
 回滚原则：只恢复 versioned config、versioned index pointer 和 V1 runtime package，不重新 Parse、Chunk、Embedding、建 Index，也不人工改数据库。
 

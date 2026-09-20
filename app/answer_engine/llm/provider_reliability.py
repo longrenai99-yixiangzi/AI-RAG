@@ -211,6 +211,8 @@ class ShadowReliableProvider:
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        if self.settings.api_base_url.startswith("https://api.deepseek.com") and self.settings.chat_model.startswith("deepseek-v4-"):
+            payload["thinking"] = {"type": "disabled"}
         headers = {
             "Authorization": f"Bearer {self.settings.api_key}",
             "Content-Type": "application/json",

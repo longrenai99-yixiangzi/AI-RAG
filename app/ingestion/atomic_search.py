@@ -37,7 +37,7 @@ def search_atomic_evidence(
     token_sets = []
     query_phrases = phrases(query)
     for record in records:
-        searchable = " ".join(str(record.get(field) or "") for field in ("text", "heading_path", "file_name", "source_path"))
+        searchable = " ".join(str(record.get(field) or "") for field in ("search_context", "text", "heading_path", "file_name", "source_path"))
         token_sets.append((searchable, set(_tokenize_cached(searchable))))
     document_frequency = {
         term: sum(term in tokens or (len(term) >= 3 and term in searchable) for searchable, tokens in token_sets)

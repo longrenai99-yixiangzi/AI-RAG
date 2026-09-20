@@ -17,6 +17,16 @@ PROJECT_RE = re.compile(r"([\u3400-\u9fffA-Za-z0-9（）()·+\-]{2,48}项目)")
 ENTITY_RE = re.compile(r"([\u3400-\u9fffA-Za-z0-9（）()·+\-]{2,48}(?:项目|中心|医院|馆|园|厂房|学校))")
 GENERIC_PROJECT_MARKERS = ("多少", "几个", "哪些", "所有", "各个", "累计", "共计", "成功打造", "打造为", "完成了", "项目数")
 
+# A project constraint is hard: _direct_candidate requires scope.project == "MATCH", and
+# an unsatisfiable constraint silently drops every candidate (verified_evidence == 0).
+# So a *wrong* value here is worse than no value at all, and these patterns all produced
+# a bogus project name out of a descriptive phrase in the question.
+PROJECT_PHRASE_MARKERS = ("的", "作为", "管项目", "层面", "及以上", "分别")
+GENERIC_PROJECT_STEMS = {
+    "数据", "数据中心", "级数据", "海外", "项目", "项目及",
+    "中建三局", "中建三局第二建设公司", "公司层面重点管控",
+}
+
 
 @dataclass(slots=True)
 class QueryPlan:
@@ -103,23 +113,58 @@ def _period_scope(question: str) -> str:
 def _projects(question: str) -> list[str]:
     values = []
     for match in PROJECT_RE.finditer(question):
-        value = re.sub(r"^20\d{2}年", "", match.group(1)).strip("（）() ")
+        value = _strip_date_prefix(match.group(1))
         if _is_named_project(value):
             values.append(value)
     return list(dict.fromkeys(values))
 
 
+def _strip_date_prefix(value: str) -> str:
+    """Normalise "2025年老谷南项目" / "2025 年老谷南项目" / "年老谷南项目" -> "老谷南项目"."""
+    value = re.sub(r"^20\d{2}\s*年", "", value)
+    value = re.sub(r"^年", "", value)
+    return value.strip("（）() ")
+
+
 def _entities(question: str) -> list[str]:
     values = []
     for match in ENTITY_RE.finditer(question):
-        value = re.sub(r"^20\d{2}年", "", match.group(1)).strip("（）() ")
+        value = _strip_date_prefix(match.group(1))
         if value and not _is_generic_project_phrase(value) and value not in {"设计示范项目", "EPC项目", "项目"} and not value.startswith(("设计", "示范", "当前")):
             values.append(value)
     return list(dict.fromkeys(values))
 
 
 def _is_named_project(value: str) -> bool:
-    return bool(value) and value not in {"设计示范项目", "EPC项目", "项目"} and not _is_generic_project_phrase(value) and not value.startswith(("设计", "示范", "当前"))
+    if not value or value in {"设计示范项目", "EPC项目", "项目"}:
+        return False
+    if _is_generic_project_phrase(value):
+        return False
+    if value.startswith(("设计", "示范", "当前")):
+        return False
+    # Descriptive phrases are not project names. Extracting one of these poisons the
+    # whole verification stage: the constraint can never be satisfied, so every
+    # candidate is dropped and the answer degrades to an unrelated excerpt dump.
+    if any(marker in value for marker in PROJECT_PHRASE_MARKERS):
+        return False
+    # Leftover from stripping a year, e.g. "2025 年老谷南项目" -> "年老谷南项目".
+    if value.startswith("年"):
+        return False
+    stem = value
+    for suffix in ("项目", "工程"):
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+            break
+    stem = stem.strip("（）() ")
+    if len(stem) < 2:
+        return False
+    if stem in GENERIC_PROJECT_STEMS:
+        return False
+    # Fragment split off a preceding qualifier, e.g. "内蒙古电力 A 级数据中心项目"
+    # where the space broke the match and left "级数据中心项目".
+    if stem.startswith("级"):
+        return False
+    return True
 
 
 def _is_generic_project_phrase(value: str) -> bool:
@@ -203,7 +248,9 @@ def _subquestions(question: str, aggregation: list[str], entities: list[str]) ->
         values.append("按条件筛选后统计数量")
     if "督办" in question and any(term in question for term in ("什么", "哪些", "事项")):
         values.append("列出目标单位的全部督办事项")
-    if "组织架构" in question or ("组织" in question and "岗位" in question):
+    if "组织架构" in question and "人员配置" in question:
+        values.extend(("组织架构", "人员配置"))
+    elif "组织架构" in question or ("组织" in question and "岗位" in question):
         values.extend((
             "组织定位和隶属关系",
             "各层级的岗位或机构设置",

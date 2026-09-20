@@ -8,6 +8,8 @@ const primary = [
   ['/ai', 'AI问答'],
   ['/batch', '批量验收'],
   ['/sources', '知识资产'],
+  ['/knowledge-os/diagnostics', '问答诊断'],
+  ['/knowledge-os/gold-review', 'Gold 审核'],
 ]
 
 const secondary = [

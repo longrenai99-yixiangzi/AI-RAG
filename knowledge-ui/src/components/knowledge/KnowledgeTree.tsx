@@ -14,8 +14,8 @@ export function KnowledgeTree({ selectedId, onSelect }: Props) {
     {domains.map((domain) => <div className="tree-domain" key={domain.id}>
       <button className={selectedId === domain.id ? 'selected' : ''} onClick={() => onSelect(domain)}><b>{domain.name}</b><span>{domain.childrenCount}</span></button>
       {getChildren(domain.id).map((category) => <div key={category.id} className="tree-category">
-        <button className={`tree-child ${selectedId === category.id ? 'selected' : ''}`} onClick={() => { onSelect(category); setExpandedCategoryId(expandedCategoryId === category.id ? undefined : category.id) }}><span>{category.name}</span><small>{category.knowledgeCount}</small></button>
-        {expandedCategoryId === category.id && getChildren(category.id).map((leaf) => <button className={`tree-leaf ${selectedId === leaf.id ? 'selected' : ''}`} key={leaf.id} onClick={() => onSelect(leaf)}><span>{leaf.name}</span><small>{leaf.knowledgeCount}</small></button>)}
+        <button className={`tree-child ${selectedId === category.id ? 'selected' : ''}`} onClick={() => { onSelect(category); setExpandedCategoryId(expandedCategoryId === category.id ? undefined : category.id) }}><span>{category.name}</span><small>待统计</small></button>
+        {expandedCategoryId === category.id && getChildren(category.id).map((leaf) => <button className={`tree-leaf ${selectedId === leaf.id ? 'selected' : ''}`} key={leaf.id} onClick={() => onSelect(leaf)}><span>{leaf.name}</span><small>待统计</small></button>)}
       </div>)}
     </div>)}
   </div>

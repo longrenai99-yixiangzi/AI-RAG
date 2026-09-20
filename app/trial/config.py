@@ -80,6 +80,9 @@ class TrialConfig:
                 }
                 if value.get("cache_path"):
                     row["cache_path"] = str(value["cache_path"])
+                for key in ("version_note", "registration_path", "source_type"):
+                    if value.get(key):
+                        row[key] = str(value[key])
                 rows.append(row)
             elif isinstance(value, str):
                 rows.append({"path": value, "approval_status": "USER_APPROVED_SHADOW_READ"})

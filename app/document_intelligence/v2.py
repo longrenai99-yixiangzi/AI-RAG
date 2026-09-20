@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import re
+import shutil
+import subprocess
+import tempfile
 import uuid
 from collections import defaultdict
 from pathlib import Path
@@ -22,7 +26,7 @@ from app.ingestion.loaders.markdown_loader import MarkdownLoader
 
 
 SCHEMA_VERSION = "document_intelligence.v2"
-SUPPORTED_EXTENSIONS = {".md", ".markdown", ".pdf", ".docx", ".xlsx", ".pptx"}
+SUPPORTED_EXTENSIONS = {".md", ".markdown", ".pdf", ".docx", ".doc", ".xlsx", ".pptx", ".txt", ".html", ".htm"}
 HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(.+?)\s*$")
 YEAR_RE = re.compile(r"20\d{2}")
 
@@ -304,6 +308,76 @@ class DocumentIntelligenceV2Builder:
                 result["table_rows"].append(_table_row(table_id, section["section_id"], start + offset, values, header, {"line_start": start + offset, "line_end": start + offset}))
         result["title"] = heading_specs[0][2] if heading_specs else path.stem
         result["text"] = "\n".join(lines)
+        return result
+
+    def _parse_txt(self, path: Path, did: str) -> dict[str, Any]:
+        result = self._empty_result()
+        text = path.read_text(encoding="utf-8", errors="replace")
+        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        headings, sections = _make_heading_sections(did, [], max(len(lines), 1), "txt")
+        result.update({"parse_status": "parsed", "headings": headings, "sections": sections, "title": path.stem, "text": text})
+        section = sections[0]
+        for order, line in enumerate(lines, start=1):
+            result["paragraphs"].append({"paragraph_id": stable_id("paragraph", did, order, line), "section_id": section["section_id"], "text": line, "order": order, "location": {"line_start": order, "line_end": order}, "style": "text"})
+        return result
+
+    def _parse_html(self, path: Path, did: str) -> dict[str, Any]:
+        result = self._empty_result()
+        source = path.read_text(encoding="utf-8", errors="replace")
+        def clean(fragment: str) -> str:
+            return html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", fragment))).strip()
+        heading_specs = [(index, int(level), clean(body)) for index, (level, body) in enumerate(re.findall(r"<h([1-6])[^>]*>(.*?)</h\1>", source, flags=re.IGNORECASE | re.DOTALL), start=1) if clean(body)]
+        headings, sections = _make_heading_sections(did, heading_specs, max(len(source.splitlines()), 1), "html")
+        result.update({"parse_status": "parsed", "headings": headings, "sections": sections, "title": path.stem, "text": clean(source)})
+        paragraph_number = 0
+        for match in re.finditer(r"<(?:p|li|td|th)\b[^>]*>(.*?)</(?:p|li|td|th)>", source, flags=re.IGNORECASE | re.DOTALL):
+            text = clean(match.group(1))
+            if not text:
+                continue
+            paragraph_number += 1
+            section = _section_for_location(sections, paragraph_number)
+            result["paragraphs"].append({"paragraph_id": stable_id("paragraph", did, paragraph_number, text), "section_id": section["section_id"], "text": text, "order": paragraph_number, "location": {"paragraph": paragraph_number}, "style": "html"})
+        return result
+
+    def _parse_doc(self, path: Path, did: str) -> dict[str, Any]:
+        result = self._empty_result()
+        converter = shutil.which("soffice") or shutil.which("libreoffice")
+        if converter:
+            with tempfile.TemporaryDirectory(prefix="knowledge_os_doc_") as directory:
+                completed = subprocess.run([converter, "--headless", "--convert-to", "docx", "--outdir", directory, str(path)], capture_output=True, text=True, timeout=120, check=False)
+                converted = Path(directory) / f"{path.stem}.docx"
+                if completed.returncode == 0 and converted.exists():
+                    return self._parse_docx(converted, did)
+                libreoffice_error = completed.stderr.strip()[:300]
+        else:
+            libreoffice_error = "soffice/libreoffice 未安装"
+
+        # ponytail: use the already-installed Windows Word converter before adding a new dependency.
+        # This is read-only against the source .doc; the converted .docx is temporary and discarded.
+        try:
+            import win32com.client  # type: ignore[import-not-found]
+
+            with tempfile.TemporaryDirectory(prefix="knowledge_os_doc_word_") as directory:
+                converted = Path(directory) / f"{path.stem}.docx"
+                word = win32com.client.DispatchEx("Word.Application")
+                word.Visible = False
+                word.DisplayAlerts = 0
+                document = None
+                try:
+                    document = word.Documents.Open(str(path), ReadOnly=True, AddToRecentFiles=False, ConfirmConversions=False)
+                    save_as = getattr(document, "SaveAs2", document.SaveAs)
+                    save_as(str(converted), FileFormat=16)
+                finally:
+                    if document is not None:
+                        document.Close(SaveChanges=False)
+                    word.Quit()
+                if converted.exists():
+                    return self._parse_docx(converted, did)
+        except Exception as error:
+            result.update(parse_status="conversion_required", error=f"OLD_DOC_CONVERSION_FAILED: {libreoffice_error}; Word COM: {type(error).__name__}: {error}")
+            return result
+
+        result.update(parse_status="conversion_required", error=f"OLD_DOC_CONVERSION_REQUIRED: {libreoffice_error}; Windows Word converter unavailable")
         return result
 
     def _parse_docx(self, path: Path, did: str) -> dict[str, Any]:

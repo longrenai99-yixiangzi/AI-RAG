@@ -30,7 +30,7 @@ from app.retrieval.query_planner_v1 import ORGANIZATION_ALIASES, plan_query
 from app.retrieval.retrieval_trace import build_trace, persist_trace
 from app.verified_answer_engine_v2 import render
 from scripts.run_verified_answer_engine_v2 import _load_authorized_docx_rows, _runtime_bundle
-from .live_shadow_v25 import run_async as run_v25_live_shadow_async
+from .live_shadow_v25 import V25LiveShadow, run_async as run_v25_live_shadow_async
 
 from .config import PROJECT_ROOT, TrialConfig, load_users
 from .knowledge_store import TrialKnowledgeStore, normalize_source_path, source_id_for_path
@@ -670,13 +670,22 @@ class V2TrialEngine:
             "atomic_candidates": _rank_atomic_candidates(question, [*approved_candidates, *retrieval["atomic_candidates"]], self.atomic),
         }
         verification_started = time.perf_counter()
-        bundle = _runtime_bundle(question, plan.to_dict(), retrieval, self.documents, self.atomic, self.structured_rows)
+        plan_dict = plan.to_dict()
+        bundle = _runtime_bundle(question, plan_dict, retrieval, self.documents, self.atomic, self.structured_rows)
+        # 只做诊断标记，不改变答案：记录"项目约束在候选里无法满足"这一状态。
+        # 2026-09-14 实测记录：此处曾实现过 A'（去掉 project 重算 bundle），130 题端到端实测
+        # 显示 11 题触发（Q44/Q46/Q49/Q50/Q51/Q59/Q66/Q67/Q68/Q78/Q127），但期望关键词命中率
+        # 零提升（kw_mean 0.174→0.174），同时把原本"未检索到可直接支撑结论的证据 + 原文摘录"的
+        # 诚实兜底，换成了对无关项目的自信断言（例：Q49 问孝感奥体中心，答成恩施某体育场馆项目）。
+        # 根因不是"项目门太严"，而是这些题的检索池里根本没有该项目文档（项目名 0/40 命中），
+        # 去掉约束只会把 top-10 的无关候选提升成 DIRECT。因此 A' 已撤回，只保留该诊断标记。
+        project_scope_unmatched = _unsatisfiable_project_scope(plan_dict, bundle)
         verification_ms = (time.perf_counter() - verification_started) * 1000
         rendering_started = time.perf_counter()
         answer = render(bundle)
         rendering_ms = (time.perf_counter() - rendering_started) * 1000
         query_id = plan.query_id
-        trace = {"question_id": query_id, "question": question, "bundle": bundle, "answer": answer}
+        trace = {"question_id": query_id, "question": question, "bundle": bundle, "answer": answer, "project_scope_unmatched": project_scope_unmatched}
         growth_started = time.perf_counter()
         candidate = candidate_for_trace(trace) if detect_growth else None
         growth_ms = (time.perf_counter() - growth_started) * 1000
@@ -700,6 +709,7 @@ class V2TrialEngine:
             "answer_mode": answer_mode, "knowledge_ids": knowledge_ids, "source_versions": list(dict.fromkeys(str(item.get("source_version")) for item in used_evidence if item.get("source_version"))),
             "generation_mode": synthesis["generation_mode"], "synthesis": synthesis,
             "failure_reason": failure_reason, "failure_message": _failure_message(bundle), "review_candidates": _review_candidates(bundle),
+            "project_scope_unmatched": project_scope_unmatched,
         }
 
 def _sync_trial_sources() -> None:
@@ -863,6 +873,24 @@ def _asks_organization_alias_relationship(question: str) -> bool:
     return relationship and any(sum(alias in question for alias in aliases) >= 2 for aliases in ORGANIZATION_ALIASES.values())
 
 
+# 诊断：项目约束不可满足（project scope unmatched）。
+# 背景：_direct_candidate 要求 scope.project == "MATCH"，而 _scope 只有在项目名（或去掉"项目"
+# 后缀的别名）出现在候选正文 / 文件名 / 路径里时才判 MATCH。当知识库把项目做了匿名化处理
+# （如"孝感某体育场馆项目"），或检索根本没命中该项目文档时，40 个候选里没有任何一个能满足该
+# 约束，bundle 落到 SOURCE_SCOPE_MISSING，用户拿到的是兜底摘录而不是直接答案。
+# 这个判定被保留下来只作诊断/埋点用途（响应里 project_scope_unmatched），用来区分
+# "资料里有、只是门槛严" 和 "检索池里根本没有该项目" 两种完全不同的失败——后者必须靠修检索
+# 解决，靠放宽验证门只会放进无关文档（见 answer() 内 2026-09-14 的 A' 实测记录）。
+def _unsatisfiable_project_scope(plan: dict[str, Any], bundle: dict[str, Any]) -> bool:
+    projects = [str(value) for value in (plan.get("project") or []) if str(value).strip()]
+    if not projects:
+        return False
+    candidates = bundle.get("candidate_evidence") or []
+    if not candidates:
+        return False
+    return not any((candidate.get("scope") or {}).get("project") == "MATCH" for candidate in candidates)
+
+
 def _synthesis_trace(bundle: dict[str, Any], answer_mode: str) -> dict[str, Any]:
     evidence = bundle.get("verified_evidence", [])
     return {
@@ -925,6 +953,24 @@ def _matches_reviewed_question(item: dict[str, Any], question: str) -> bool:
 
 _engine: V2TrialEngine | None = None
 _engine_lock = threading.Lock()
+_candidate_primary_engine: V25LiveShadow | None = None
+_candidate_primary_dense: BGEM3DenseProvider | None = None
+_candidate_primary_lock = threading.Lock()
+V1_PRIMARY_MODE = "V1_PRIMARY"
+V262_CANDIDATE_MODE = "V2_6_2_CANDIDATE"
+
+
+def _current_candidate_hash() -> str:
+    path = PROJECT_ROOT / "evaluation" / "knowledge_os_v2_6" / "remediation_candidate_v2_6_2.json"
+    try:
+        return str(json.loads(path.read_text(encoding="utf-8")).get("candidate_hash") or "")
+    except (OSError, ValueError):
+        return ""
+
+
+def _should_emit_live_shadow(primary_mode: str, primary_hash: str, shadow_hash: str) -> bool:
+    # Skip only when primary and shadow are literally the same candidate.
+    return primary_mode != V262_CANDIDATE_MODE or not primary_hash or primary_hash != shadow_hash
 
 
 def _engine_instance() -> V2TrialEngine:
@@ -936,11 +982,67 @@ def _engine_instance() -> V2TrialEngine:
     return _engine
 
 
+def _primary_mode() -> str:
+    return str(CONFIG.get("v2_primary_mode", V1_PRIMARY_MODE)).upper()
+
+
+def _candidate_primary_runtime() -> tuple[V25LiveShadow, BGEM3DenseProvider]:
+    global _candidate_primary_engine, _candidate_primary_dense
+    with _candidate_primary_lock:
+        if _candidate_primary_engine is None:
+            _candidate_primary_engine = V25LiveShadow()
+        if _candidate_primary_dense is None:
+            _candidate_primary_dense = BGEM3DenseProvider(Settings.load().embedding_model, collection_name="v2_6_2_primary_query_embeddings", use_fp16=False, batch_size=1)
+    return _candidate_primary_engine, _candidate_primary_dense
+
+
+def _candidate_primary_answer(question: str) -> dict[str, Any]:
+    """Expose the frozen V2.6.2 candidate through the same 8010 response contract."""
+    started = time.perf_counter()
+    candidate, dense = _candidate_primary_runtime()
+    shadow = candidate.run(question, {"answer_status": "NOT_RUN", "citations": []}, query_vector=dense.embed_query(question))
+    citations = list(shadow.get("v2_citations") or [])
+    status = str(shadow.get("v2_status") or "INSUFFICIENT_EVIDENCE")
+    return {
+        "query_id": "Q_" + uuid.uuid4().hex,
+        "question": question,
+        "mode": V262_CANDIDATE_MODE,
+        "pipeline_version": str(shadow.get("candidate_revision") or V262_CANDIDATE_MODE),
+        "answer": str(shadow.get("v2_answer") or "当前候选资料未形成可直接支持问题的证据。"),
+        "answer_status": status,
+        "status_label": "已回答" if status == "ANSWERED" else "部分回答" if status == "PARTIAL_ANSWER" else status,
+        "claims": [],
+        "claim_evidence_map": {},
+        "citations": citations,
+        "debug": {
+            "runtime_pointer": {"mode": V262_CANDIDATE_MODE, "candidate_hash": shadow.get("candidate_hash"), "candidate_revision": shadow.get("candidate_revision")},
+            "evidence_bundle": {"bundle_status": shadow.get("v2_bundle_status"), "candidate_evidence": citations, "verified_evidence": citations, "supporting_evidence": [], "conflicting_evidence": []},
+        },
+        "growth_candidate_ids": [],
+        "latency": {"total_ms": round((time.perf_counter() - started) * 1000, 3)},
+        "dense_runtime": "LOCAL_BGE_M3_FP32",
+        "provider_http_requests": 0,
+        "gold_runtime_injection": 0,
+        "answer_mode": "EVIDENCE_SYNTHESIS",
+        "knowledge_ids": [],
+        "source_versions": list(dict.fromkeys(str(item.get("source_version") or "") for item in citations if item.get("source_version"))),
+        "generation_mode": "DETERMINISTIC_EVIDENCE",
+        "synthesis": {"generation_mode": "DETERMINISTIC_EVIDENCE"},
+        "failure_reason": None if status == "ANSWERED" else str(shadow.get("v2_bundle_status") or "EVIDENCE_INSUFFICIENT"),
+        "failure_message": None,
+        "review_candidates": [],
+        "project_scope_unmatched": False,
+    }
+
+
 def reset_trial_engine() -> None:
-    global _engine
+    global _engine, _candidate_primary_engine, _candidate_primary_dense
     with _engine_lock:
         _engine = None
         LOADED_SHADOW_PATHS.clear()
+    with _candidate_primary_lock:
+        _candidate_primary_engine = None
+        _candidate_primary_dense = None
 
 
 def _with_exact_atomic_rescue(retrieval: dict[str, Any], question: str, atomic: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1010,7 +1112,10 @@ def warmup() -> dict[str, Any]:
         return {"ready": False, "reason": "V2_VERIFIED_RAG_DISABLED"}
     started = time.perf_counter()
     try:
-        _engine_instance().dense.load()
+        if _primary_mode() == V262_CANDIDATE_MODE:
+            _candidate_primary_runtime()[1].load()
+        else:
+            _engine_instance().dense.load()
     except Exception as error:
         raise HTTPException(status_code=503, detail=f"V2_DENSE_WARMUP_FAILED:{type(error).__name__}") from error
     return {"ready": True, "dense_runtime": "LOCAL_BGE_M3_FP32", "warmup_ms": round((time.perf_counter() - started) * 1000, 3), "provider_http_requests": 0}
@@ -1023,23 +1128,26 @@ def query(request: V2QueryRequest) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail="V2_VERIFIED_RAG_DISABLED")
     previous = KNOWLEDGE_STORE.last_query_for_conversation(request.conversation_id)
     resolved_question = _resolve_followup(request.question, previous)
-    result = _engine_instance().answer(resolved_question)
+    candidate_primary = _primary_mode() == V262_CANDIDATE_MODE
+    result = _candidate_primary_answer(resolved_question) if candidate_primary else _engine_instance().answer(resolved_question)
     result["question"] = request.question
     result["resolved_question"] = resolved_question
     query_run_id = "QR_" + uuid.uuid4().hex
     result["query_run_id"] = query_run_id
-    # V1/V2 primary response is returned unchanged; V2.5 runs in a background
-    # read-only branch and appends only the comparison record.
-    try:
-        run_v25_live_shadow_async(
-            question=str(request.question or ""),
-            query_run_id=query_run_id,
-            conversation_id=str(request.conversation_id or ""),
-            primary=result,
-            query_encoder=_engine_instance().dense.embed_query,
-        )
-    except Exception:
-        pass
+    # Only V1 Primary is shadowed. When V2.6.2 is the temporary Primary during
+    # a rollback drill, emitting V2.6.2-vs-V2.6.2 comparison rows is meaningless.
+    primary_hash = str(((result.get("debug") or {}).get("runtime_pointer") or {}).get("candidate_hash") or "")
+    if _should_emit_live_shadow(_primary_mode(), primary_hash, _current_candidate_hash()):
+        try:
+            run_v25_live_shadow_async(
+                question=str(request.question or ""),
+                query_run_id=query_run_id,
+                conversation_id=str(request.conversation_id or ""),
+                primary=result,
+                query_encoder=_engine_instance().dense.embed_query,
+            )
+        except Exception:
+            pass
     audit = {"timestamp": _now(), "trial_user": request.trial_user, "query_id": result["query_id"], "query_run_id": query_run_id, "conversation_id": request.conversation_id, "node_id": request.node_id, "question": request.question, "resolved_question": resolved_question, "pipeline_version": result["pipeline_version"], "answer_status": result["answer_status"], "document_ids": sorted({item.get("document_id") for item in result["debug"]["evidence_bundle"]["candidate_evidence"] if item.get("document_id")}), "evidence_ids": [item["evidence_id"] for item in result["citations"]], "citation_ids": [item["citation_id"] for item in result["citations"]], "bundle_status": result["debug"]["evidence_bundle"]["bundle_status"], "growth_candidate_ids": result["growth_candidate_ids"], "latency": result["latency"], "feedback": None, "gold_runtime_injection": 0}
     _append_jsonl(TRIAL / "trial_audit.jsonl", audit)
     KNOWLEDGE_STORE.record_query(query_run_id, audit)
@@ -1232,7 +1340,8 @@ def knowledge_search(q: str, limit: int = 20) -> dict[str, Any]:
         str((item.get("source") or {}).get("source_id") or (item.get("knowledge") or {}).get("knowledge_id") or "")
         for item in items
     }
-    for match in search_atomic_evidence(q, _engine_instance().atomic.values(), limit=maximum * 2):
+    evidence_pool = _candidate_primary_runtime()[0].atomic.values() if _primary_mode() == V262_CANDIDATE_MODE else _engine_instance().atomic.values()
+    for match in search_atomic_evidence(q, evidence_pool, limit=maximum * 2):
         evidence = match["record"]
         source_id = str(evidence.get("source_id") or source_id_for_path(str(evidence.get("source_path") or "")))
         key = f"EVIDENCE:{evidence.get('evidence_id')}"

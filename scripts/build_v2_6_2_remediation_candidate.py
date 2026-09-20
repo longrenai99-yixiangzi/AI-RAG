@@ -38,7 +38,32 @@ SOURCES = {
     "EPC设计管理经验总结(丰台崔村旧改项目)2026.5.6.docx": "2b738077c1a52520200a5566e2fdec7ac3992b67ee3c29bc54b21a6f9efae64c",
     "EPC设计管理经验总结(泸州垃圾焚烧发电厂项目)20260309.docx": "7fa0d0ef34a3c93d697bd8125a4945a23e8305249e98d5bb6aa8bdc0d74582eb",
     "2024年度总结2.md": "34396ccfd2031f1f7d320d9278b91b2345ca2916d42c5320ce4b1f51377febfc",
+    "关于举办新能源项目设计知识的培训通知(1).pdf": "3e3d69d372b4137d42fa8a149bfd639da6783411bf89b34140ef6bf23e7699a6",
+    "关于举办设计能力提升季度培训（主体专业设计优化要点）的通知.pdf": "c49ea2cb27e00b6fd4ec6a3da457053be5cfb4f1df131a72d97e4bb3e8f33758",
+    "关于举办设计能力提升季度培训（钢结构基坑专项设计知识培训）的通知.pdf": "f07d78b992843d3d53b28489fda507ba892c6ff8a0d1dc9bcb4d77d2a56b70b7",
+    "关于举办设计能力提升季度培训（市政桥梁、水厂专项设计知识培训）的通知.pdf": "3500514b3f08d454ba8e317dee34ec1f6f6506a64292ec2967ac7843642cc4f0",
+    "萧县厂房项目汇报资料12.14.pptx": "47ee05dc3f06e607081f51d205c5baec29e573efc28b0e1ea59720b745f54ef5",
+    # Previously approved sources preserved after the count-based snapshot name collided.
+    "武汉国家航天产业基地星谷科创中心建设项目11.14.docx": "6f785865051d472f2e14d50d8e5c2affe726cfd60609cdcea10fba2b39262d42",
+    "投标文件.docx": "74d0a52da89faf75260f4be3924b7f54539ae108c7684cb4dba32453e9c5df35",
+    "建造业务设计管理体系执行评价表(中船哈密).docx": "bf57ce5db1abf75d1f9293f08d43dfe3f5939e4d392e4f24526c49760ac5c80f",
 }
+SOURCE_PATH_OVERRIDES = {
+    "关于举办新能源项目设计知识的培训通知(1).pdf": Path(r"[LOCAL_PATH_REDACTED]�建设\关于举办新能源项目设计知识的培训通知(1).pdf"),
+    "关于举办设计能力提升季度培训（主体专业设计优化要点）的通知.pdf": Path(r"[LOCAL_PATH_REDACTED]�建设\关于举办设计能力提升季度培训（主体专业设计优化要点）的通知.pdf"),
+    "关于举办设计能力提升季度培训（钢结构基坑专项设计知识培训）的通知.pdf": Path(r"[LOCAL_PATH_REDACTED]�建设\关于举办设计能力提升季度培训（钢结构基坑专项设计知识培训）的通知.pdf"),
+    "关于举办设计能力提升季度培训（市政桥梁、水厂专项设计知识培训）的通知.pdf": Path(r"[LOCAL_PATH_REDACTED]�建设\关于举办设计能力提升季度培训（市政桥梁、水厂专项设计知识培训）的通知.pdf"),
+    "萧县厂房项目汇报资料12.14.pptx": Path(r"[LOCAL_PATH_REDACTED]�房项目汇报资料12.14.pptx"),
+    "武汉国家航天产业基地星谷科创中心建设项目11.14.docx": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2025\投标\武汉国家航天产业基地星谷科创中心建设项目11.14.docx"),
+    "投标文件.docx": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2025\季度检查\四季度\光谷实验中学\3设计评估管理\投标文件.docx"),
+    "建造业务设计管理体系执行评价表(中船哈密).docx": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2025\季度检查\四季度\建造业务设计管理体系执行评价表(中船哈密).docx"),
+}
+SOURCE_ROLE_APPROVAL_BATCH = V26 / "v2_6_2_source_role_approval_batch.json"
+MISSING_CONTENT_PROPOSAL = V26 / "v2_6_2_missing_content_source_proposal.json"
+REMAINING_SOURCE_PROPOSAL = V26 / "v2_6_2_remaining_source_proposal.json"
+REMAINING_GOVERNANCE_PROPOSAL = V26 / "v2_6_2_remaining_governance_proposal.json"
+CURRENT_CANDIDATE = V26 / "remediation_candidate_v2_6_2.json"
+PRIOR_SOURCE_RECOVERY = V26 / "v2_6_2_prior_candidate_source_recovery.json"
 
 
 def _sha(path: Path) -> str:
@@ -57,15 +82,79 @@ def _read_jsonl(path: Path) -> list[dict]:
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n" for row in rows), encoding="utf-8")
+    path.write_text("".join(json.dumps(row, ensure_ascii=False, separators=(",", ":"), default=str) + "\n" for row in rows), encoding="utf-8")
 
 
 def main() -> int:
-    paths = [APPROVED / name for name in SOURCES]
+    source_records = [{"file_name": name, "path": SOURCE_PATH_OVERRIDES.get(name, APPROVED / name), "sha256": digest} for name, digest in SOURCES.items()]
+    if CURRENT_CANDIDATE.exists():
+        current_candidate = json.loads(CURRENT_CANDIDATE.read_text(encoding="utf-8"))
+        for item in current_candidate.get("sources") or []:
+            path = Path(str(item.get("source_path") or ""))
+            digest = str(item.get("sha256") or "")
+            if path and digest:
+                source_records.append({"file_name": path.name, "path": path, "sha256": digest})
+    if PRIOR_SOURCE_RECOVERY.exists():
+        recovery = json.loads(PRIOR_SOURCE_RECOVERY.read_text(encoding="utf-8"))
+        for item in recovery.get("records") or []:
+            path = Path(str(item.get("source_path") or ""))
+            digest = str(item.get("sha256") or "")
+            if path and digest:
+                source_records.append({"file_name": path.name, "path": path, "sha256": digest})
+    if SOURCE_ROLE_APPROVAL_BATCH.exists():
+        batch = json.loads(SOURCE_ROLE_APPROVAL_BATCH.read_text(encoding="utf-8"))
+        if batch.get("approval_status") == "PENDING_OWNER_APPROVAL":
+            raise RuntimeError("SOURCE_ROLE_APPROVAL_BATCH_PENDING")
+        for item in batch.get("records") or []:
+            path = Path(str(item.get("source_path") or ""))
+            if not item.get("sha256") or not path:
+                continue
+            source_records.append({"file_name": path.name, "path": path, "sha256": str(item["sha256"])})
+    if MISSING_CONTENT_PROPOSAL.exists():
+        proposal = json.loads(MISSING_CONTENT_PROPOSAL.read_text(encoding="utf-8"))
+        if proposal.get("approval_status") == "PENDING_OWNER_APPROVAL":
+            raise RuntimeError("MISSING_CONTENT_SOURCE_PROPOSAL_PENDING")
+        for item in proposal.get("records") or []:
+            path = Path(str(item.get("source_path") or ""))
+            if not item.get("sha256") or not path:
+                continue
+            source_records.append({"file_name": path.name, "path": path, "sha256": str(item["sha256"])})
+    if REMAINING_SOURCE_PROPOSAL.exists():
+        proposal = json.loads(REMAINING_SOURCE_PROPOSAL.read_text(encoding="utf-8"))
+        if proposal.get("approval_status") == "PENDING_OWNER_APPROVAL":
+            raise RuntimeError("REMAINING_SOURCE_PROPOSAL_PENDING")
+        for item in proposal.get("records") or []:
+            path = Path(str(item.get("source_path") or ""))
+            if not item.get("sha256") or not path:
+                continue
+            source_records.append({"file_name": path.name, "path": path, "sha256": str(item["sha256"])})
+    for proposal_path in sorted(V26.glob("v2_6_2_*source_proposal_approved*.json"), key=lambda path: str(path).casefold()):
+        proposal = json.loads(proposal_path.read_text(encoding="utf-8"))
+        if proposal.get("approval_status") != "APPROVED":
+            continue
+        for item in proposal.get("records") or []:
+            path = Path(str(item.get("source_path") or ""))
+            if not item.get("sha256") or not path:
+                continue
+            source_records.append({"file_name": path.name, "path": path, "sha256": str(item["sha256"])})
+    for proposal_path in sorted(V26.glob("v2_6_2_*governance_proposal*.json"), key=lambda path: str(path).casefold()):
+        proposal = json.loads(proposal_path.read_text(encoding="utf-8"))
+        if proposal.get("approval_status") != "APPROVED":
+            continue
+        for item in proposal.get("records") or []:
+            path = Path(str(item.get("source_path") or ""))
+            if not item.get("sha256") or not path:
+                continue
+            source_records.append({"file_name": path.name, "path": path, "sha256": str(item["sha256"])})
+    deduped: dict[str, dict] = {}
+    for record in source_records:
+        deduped[str(record["path"].resolve()).casefold()] = record
+    source_records = list(deduped.values())
+    paths = [record["path"] for record in source_records]
     missing = [str(path) for path in paths if not path.is_file()]
     if missing:
         raise FileNotFoundError(missing)
-    mismatched = [{"path": str(path), "expected": SOURCES[path.name], "actual": _sha(path)} for path in paths if _sha(path) != SOURCES[path.name]]
+    mismatched = [{"path": str(record["path"]), "expected": record["sha256"], "actual": _sha(record["path"])} for record in source_records if _sha(record["path"]) != record["sha256"]]
     if mismatched:
         raise RuntimeError(f"SOURCE_SHA256_MISMATCH:{mismatched}")
     builder = DocumentIntelligenceV2Builder(APPROVED.parents[1])
@@ -75,14 +164,15 @@ def main() -> int:
     parsed = builder.build(paths, atomic)
     registry = {}
     admitted = []
+    digest_by_path = {str(record["path"].resolve()).casefold(): record["sha256"] for record in source_records}
     for path in paths:
-        digest = SOURCES[path.name]
+        digest = digest_by_path[str(path.resolve()).casefold()]
         source_id = "V262-" + hashlib.sha256(str(path.resolve()).casefold().encode("utf-8")).hexdigest()[:24]
         registry[str(path).casefold()] = {"source_id": source_id, "source_path": str(path), "current_hash": digest, "body_status": "APPROVED_DEV_REMEDIATION", "index_status": "DEV_REMEDIATION_ONLY"}
         admitted.append({"source_id": source_id, "source_path": str(path), "file_name": path.name, "sha256": digest, "approval_status": "APPROVED", "approved_by": "USER_CONFIRMED"})
     for document in parsed["documents"]:
         path = Path(str(document.get("source_path") or ""))
-        document.update({"source_id": registry[str(path).casefold()]["source_id"], "source_version": SOURCES[path.name], "source_hash": SOURCES[path.name], "effective_status": "APPROVED_DEV_REMEDIATION"})
+        document.update({"source_id": registry[str(path).casefold()]["source_id"], "source_version": digest_by_path[str(path.resolve()).casefold()], "source_hash": digest_by_path[str(path.resolve()).casefold()], "effective_status": "APPROVED_DEV_REMEDIATION"})
     layer = build_structured_layer(parsed["documents"], parsed["sections"], parsed["paragraphs"], parsed["tables"], parsed["table_rows"], parsed["atomic_evidence"], registry)
     STAGING.mkdir(parents=True, exist_ok=True)
     for name in ("documents", "headings", "sections", "paragraphs", "tables", "table_rows", "lineage", "metadata_conflicts", "atomic_evidence"):
@@ -107,10 +197,16 @@ def main() -> int:
         "embedding_status": "PENDING_NEW_SOURCE_EMBEDDING",
         "formal_8000_touched": False,
         "8010_switch_performed": False,
-        "approval_scope": "User approved twenty-one SHA-256 versions for V2.6.2_DEV_REMEDIATION only.",
+        "approval_scope": "User approved all listed SHA-256 versions for V2.6.2 source-role remediation only.",
     }
     (V26 / "remediation_candidate_v2_6_2.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     (V26 / "remediation_source_approval_v2_6_2.json").write_text(json.dumps({"schema_version": "knowledge_os_v2_6_2.source_approval", "captured_at": now, "approval_status": "APPROVED", "approved_by": "USER_CONFIRMED", "records": admitted, "formal_8000_touched": False, "8010_switch_authorized": False}, ensure_ascii=False, indent=2), encoding="utf-8")
+    if SOURCE_ROLE_APPROVAL_BATCH.exists():
+        batch = json.loads(SOURCE_ROLE_APPROVAL_BATCH.read_text(encoding="utf-8"))
+        batch.update({"captured_at": now, "approval_status": "APPROVED", "approved_by": "USER_CONFIRMED", "approved_scope": "V2.6.2 source-role remediation only"})
+        for item in batch.get("records") or []:
+            item.update({"approval_status": "APPROVED", "approved_by": "USER_CONFIRMED"})
+        SOURCE_ROLE_APPROVAL_BATCH.write_text(json.dumps(batch, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"status": manifest["status"], "source_count_added": len(paths), "parse_counts_added": manifest["parse_counts_added"], "semantic_chunks": manifest["semantic_chunks"]}, ensure_ascii=False, indent=2))
     return 0
 

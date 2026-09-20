@@ -728,11 +728,11 @@ def _soft_boost(record: dict[str, Any], plan: QueryPlan) -> tuple[float, dict[st
     metadata_match = []
     score = 0.0
     for field, values, weight in (
-        ("organization", plan.organization, 0.06),
-        ("project", plan.project, 0.10),
-        ("year", plan.year, 0.05),
-        ("specialty", plan.specialty, 0.04),
-        ("metric", plan.metric, 0.03),
+        ("organization", plan.organization, 0.004),
+        ("project", plan.project, 0.006),
+        ("year", plan.year, 0.003),
+        ("specialty", plan.specialty, 0.002),
+        ("metric", plan.metric, 0.002),
     ):
         matched = [value for value in values if value.casefold() in searchable]
         if matched:
@@ -742,16 +742,16 @@ def _soft_boost(record: dict[str, Any], plan: QueryPlan) -> tuple[float, dict[st
     document_types.update(str(value) for value in record.get("document_type_facets", []))
     matched_document_types = [value for value in plan.document_type_hint if value in document_types]
     if matched_document_types:
-        score += 0.04
-        metadata_match.append({"field": "document_type", "values": matched_document_types, "boost": 0.04})
+        score += 0.003
+        metadata_match.append({"field": "document_type", "values": matched_document_types, "boost": 0.003})
     if record.get("document_role") in plan.document_role_hint:
-        score += 0.03
-        metadata_match.append({"field": "document_role", "values": [record.get("document_role")], "boost": 0.03})
+        score += 0.003
+        metadata_match.append({"field": "document_role", "values": [record.get("document_role")], "boost": 0.003})
     if record.get("document_type") == "REGISTER_PAGE":
-        score -= 0.12
-        metadata_match.append({"field": "registration_page_penalty", "values": ["REGISTER_PAGE"], "boost": -0.12})
+        score -= 0.02
+        metadata_match.append({"field": "registration_page_penalty", "values": ["REGISTER_PAGE"], "boost": -0.02})
     if plan.authority_requirement != "ANY" and metadata_match:
-        authority = {"L1": 0.06, "L2": 0.05, "L3": 0.025}.get(str(record.get("authority_level")), 0.0)
+        authority = {"L1": 0.004, "L2": 0.003, "L3": 0.002}.get(str(record.get("authority_level")), 0.0)
         score += authority
         if authority:
             metadata_match.append({"field": "authority_same_scope", "values": [record.get("authority_level")], "boost": authority})

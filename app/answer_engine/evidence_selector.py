@@ -9,6 +9,43 @@ from app.ingestion.metadata.governance import GovernanceMetadata
 from .answer_policy import AnswerPolicy
 
 
+# Navigation / registration pages (entity index pages, "file://" registration
+# stubs, update/change logs) are useful for provenance lookup, but they must not
+# outrank real body documents when the user asks a substantive question. A page
+# that merely points elsewhere yields a plausible-looking but empty answer.
+# These signals mirror the trial-service registration detector
+# (app/trial/main.py::_atomic_record_is_registration) so both layers agree.
+NAVIGATION_PATH_MARKERS = ("\\wiki\\entities\\", "/wiki/entities/")
+NAVIGATION_TEXT_MARKERS = (
+    "file://",
+    "原库业务目录",
+    "更新日志",
+    "变更记录",
+    "变更日志",
+    "维护记录",
+    "维护日志",
+)
+NAVIGATION_PENALTY = 0.25
+
+
+def _navigation_penalty(aggregate: "DocumentAggregate") -> float:
+    """Demote registration / index / change-log documents below real body pages.
+
+    Only documents that governance could not classify (role ``其他``) or that live
+    in the entity-index path are demoted, so well-classified concept pages under
+    ``wiki/concepts/`` are never affected.
+    """
+    path = str(aggregate.source_path or "").casefold()
+    if any(marker.casefold() in path for marker in NAVIGATION_PATH_MARKERS):
+        return NAVIGATION_PENALTY
+    if aggregate.document_role != "其他":
+        return 0.0
+    blob = "\n".join(str(hit.chunk.text or "") for hit in aggregate.hits[:3])
+    if any(marker in blob for marker in NAVIGATION_TEXT_MARKERS):
+        return NAVIGATION_PENALTY
+    return 0.0
+
+
 @dataclass(slots=True)
 class EvidenceItem:
     source_id: str
@@ -238,6 +275,7 @@ def _aggregate_documents(
             0.55 * aggregate.highest_score
             + 0.25 * role_score
             + 0.20 * chunk_support
+            - _navigation_penalty(aggregate)
         )
     return grouped
 

@@ -94,9 +94,11 @@ def approve_sources(request: BatchPathsRequest) -> dict[str, Any]:
         }
         if not any(item.get("source_path") == source_path and item.get("status") == "APPROVED" for item in v2._read_jsonl(v2.BATCH_SOURCE_REGISTER)):
             v2._append_jsonl(v2.BATCH_SOURCE_REGISTER, row)
+        registered = v2.KNOWLEDGE_STORE.register_source(path, reactivate=True)
+        row["source_id"] = registered["source_id"]
         approved.append(row)
-    if approved and v2._engine is not None:
-        v2._engine.load_approved_sources()
+    if approved:
+        v2.reset_trial_engine()
     return {"approved_count": len(approved), "approved": approved, "errors": errors, "formal_knowledge_publish": 0}
 
 

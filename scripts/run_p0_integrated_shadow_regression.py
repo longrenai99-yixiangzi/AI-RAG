@@ -144,20 +144,39 @@ def claim_preflight(
         for row in evidence_rows
     )
     combined = " ".join(f"{row.get('file_name', '')} {row.get('source_path', '')} {row.get('excerpt', '')}" for row in evidence_rows)
+    # A ".md" row is a *registration* page only when it POINTS elsewhere instead of
+    # carrying body text: a "file://" external link, the 原始资料/原库业务目录
+    # marker, or an index page under wiki/sources or wiki/queries. Curated pages
+    # under wiki/concepts DO carry the answer body — treating every "\wiki\" path
+    # as a registration stub wrongly refused wiki-sourced questions with
+    # SOURCE_BODY_MISSING (observed on ~15/130 benchmark questions).
     registration_rows = [
         row for row in evidence_rows
         if str(row.get("file_name", "")).lower().endswith(".md")
         and (
-            "\\wiki\\" in str(row.get("source_path", "")).casefold()
-            or "file://" in str(row.get("excerpt", "")).casefold()
+            "file://" in str(row.get("excerpt", "")).casefold()
             or "\u539f\u59cb\u8d44\u6599" in str(row.get("excerpt", ""))
+            or "\u539f\u5e93\u4e1a\u52a1\u76ee\u5f55" in str(row.get("excerpt", ""))
+            or "\\wiki\\sources\\" in str(row.get("source_path", "")).casefold()
+            or "/wiki/sources/" in str(row.get("source_path", "")).casefold()
+            or "\\wiki\\queries\\" in str(row.get("source_path", "")).casefold()
+            or "/wiki/queries/" in str(row.get("source_path", "")).casefold()
         )
+    ]
+    # "Body" evidence is anything that actually carries text: binary documents,
+    # anything under raw/, AND Markdown pages that are not registration stubs
+    # (e.g. wiki/concepts/**). Without the Markdown arm the guard below collapses
+    # to "registration_rows and not body_rows" being true for any all-Markdown
+    # evidence set, which refused every wiki-sourced question.
+    content_md_rows = [
+        row for row in evidence_rows
+        if str(row.get("file_name", "")).lower().endswith(".md") and row not in registration_rows
     ]
     body_rows = [
         row for row in evidence_rows
         if str(row.get("file_name", "")).lower().endswith((".pdf", ".docx", ".xlsx", ".pptx"))
         or "\\raw\\" in str(row.get("source_path", "")).casefold()
-    ]
+    ] + content_md_rows
     link_targets = [
         match.group(1).rstrip(" )]；;，,。")
         for row in registration_rows

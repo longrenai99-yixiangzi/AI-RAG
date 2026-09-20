@@ -5,12 +5,14 @@
 ## 当前状态
 
 - 开发目录：`[LOCAL_PATH_REDACTED]
-- Git 基线：`rag-v1-refactor`，当前 HEAD 为 `0492754`
+- Git 基线：`rag-v1-refactor`
 - 知识源：`[LOCAL_PATH_REDACTED]，只读
 - 正式服务：`127.0.0.1:8000`，保持未切换
 - 内部试用：`127.0.0.1:8010`，V2 Verified RAG 已启用
 - Provider 依赖的生成式回答：试用策略关闭；证据展示和确定性事实路径仍可用
 - 生产状态：`PRODUCTION_READY = FALSE`
+
+V2.6.2 当前候选哈希为 `d6bc010ac8c06057e79c6c8ae6c0a82083d78b2f88125a769f10033a5c2061f9`；8010 Smoke/Canary 已通过，但正式 Release 仍需 Owner 事实/来源复核和当前候选回滚演练。交接入口见 [`docs/V2_6_2_HANDOFF_20260920.md`](docs/V2_6_2_HANDOFF_20260920.md)。
 
 内部试用的冻结点、来源范围和安全边界见 [`docs/V2_INTERNAL_TRIAL_BASELINE.md`](docs/V2_INTERNAL_TRIAL_BASELINE.md)。
 
@@ -114,6 +116,6 @@ V2 内部试用服务（8010）使用：
 
 - Qdrant Local 仅限单进程：启动服务时只能用一个 worker；索引与服务不能同时运行。
 - `BGE-M3` 和可选 `bge-reranker-v2-m3` 首次加载需要较多内存。程序采用小批量，重排模型加载失败时自动退回 RRF 排序，并在接口中提示。
-- 不支持旧版 `.doc/.xls/.ppt`、RAR、图片与扫描件 OCR；这些会在索引报告中显式保留为后续处理项。
+- 旧版 `.xls/.ppt`、RAR、图片与扫描件仍不支持；`.doc` 通过 LibreOffice 或 Windows Word COM 转换为临时 `.docx` 后解析，原始文件不改写。
 - 当前索引仍采用全量 staging 构建与发布，不做在线增量写入；这是为了避免 Qdrant Local 进程锁和部分写入风险。
 - `knowledge-ui` 当前仍主要使用 Mock 数据；真实知识接入要等 V2 试用和业务验收稳定后再做。

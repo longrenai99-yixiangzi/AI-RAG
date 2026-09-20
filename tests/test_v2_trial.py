@@ -2,13 +2,61 @@ import json
 
 import app.trial.v2 as v2
 from openpyxl import Workbook
+from app.trial.knowledge_store import TrialKnowledgeStore
 from scripts.build_verified_evidence_bundle_v1 import _direct_candidate, _scope
-from app.trial.v2 import _closure_status, _core_phrases, _display_location, _evaluate_feedback_regression, _feedback_profile, _friendly_status, _with_exact_atomic_rescue
+from app.trial.v2 import _closure_status, _core_phrases, _display_location, _evaluate_feedback_regression, _feedback_profile, _friendly_status, _should_emit_live_shadow, _with_exact_atomic_rescue
+from app.trial.live_shadow_v25 import _owner_answer_gold_source_rescue
 
 
 def test_v2_status_is_user_friendly():
     assert _friendly_status("CONFLICTING_ANSWER") == "资料存在冲突"
     assert _friendly_status("SOURCE_SCOPE_MISSING") == "当前知识范围暂无可靠来源"
+
+
+def test_candidate_primary_shadows_when_primary_hash_differs_from_current_candidate():
+    assert _should_emit_live_shadow("V2_6_2_CANDIDATE", "f1c49", "f972") is True
+    assert _should_emit_live_shadow("V2_6_2_CANDIDATE", "f972", "f972") is False
+
+
+def test_shared_source_role_rescue_prefers_body_evidence_for_dop_dimensions_and_rank():
+    atomic = {
+        "dop": {
+            "evidence_id": "DOP-BODY",
+            "source_id": "V262-dop",
+            "file_name": "2025年设计管理总结.md",
+            "source_path": "[LOCAL_PATH_REDACTED]��结.md",
+            "heading_path": "正文",
+            "text": "DOP设计管理模块适配及应用，共完成41个项目，DOP设计管理平台新开项目上线覆盖率100%。",
+        },
+        "dimensions": {
+            "evidence_id": "DIM-BODY",
+            "source_id": "V262-dim",
+            "file_name": "光谷实验中学项目.md",
+            "source_path": "[LOCAL_PATH_REDACTED]�中学项目.md",
+            "heading_path": "光谷实验中学项目 > 设计管理工作中涉及的方面",
+            "text": "设计管理工作中涉及的方面：报批报建、方案比选、相关方沟通、设计策划、设计任务书、限额设计。",
+        },
+        "rank": {
+            "evidence_id": "RANK-BODY",
+            "source_id": "V262-rank",
+            "file_name": "2025年EPC项目设计管理四季度检查暨EPC设计管理示范项目验收的通报.docx",
+            "source_path": "[LOCAL_PATH_REDACTED]",
+            "heading_path": "Document Body",
+            "text": "表名：EPC项目设计管理检查评价排名表 行：1 | 华中师范大学南湖训练馆项目 | 华中公司 | 97.1",
+        },
+        "huaibei": {
+            "evidence_id": "HUAIBEI-BODY",
+            "source_id": "V262-huaibei",
+            "file_name": "淮北科创项目含超塔（安徽）.md",
+            "source_path": "[LOCAL_PATH_REDACTED]��科创项目含超塔（安徽）.md",
+            "heading_path": "第 3 页/段",
+            "text": "总投资额12.2亿元；仍有超概4000万元风险；设计方案优化35项，设计优化率达到3.6%。",
+        },
+    }
+    assert _owner_answer_gold_source_rescue("2025 年上半年二公司 DOP 设计管理模块应用情况如何？", atomic)[0]["evidence_id"] == "DOP-BODY"
+    assert _owner_answer_gold_source_rescue("光谷实验中学项目设计管理共涉及几个维度的工作？分别是哪些？", atomic)[0]["evidence_id"] == "DIM-BODY"
+    assert _owner_answer_gold_source_rescue("2025年EPC项目设计管理检查评价排名，第一名是哪个项目", atomic)[0]["evidence_id"] == "RANK-BODY"
+    assert _owner_answer_gold_source_rescue("某科创基地项目投标期间的投资预算是多少？化解多少超概风险、效益提升到多少？", atomic)[0]["evidence_id"] == "HUAIBEI-BODY"
 
 
 def test_v2_docx_table_citation_keeps_table_and_row_range():
@@ -77,6 +125,7 @@ def test_feedback_to_review_to_shadow_regression_closes_without_formal_publish(t
     monkeypatch.setattr(v2, "FEEDBACK_CANDIDATES", growth / "feedback_growth_candidates.jsonl")
     monkeypatch.setattr(v2, "FEEDBACK_CASES", growth / "feedback_regression_cases.jsonl")
     monkeypatch.setattr(v2, "FEEDBACK_RUNS", growth / "feedback_regression_runs.jsonl")
+    monkeypatch.setattr(v2, "KNOWLEDGE_STORE", TrialKnowledgeStore(tmp_path / "knowledge-store.json"))
     monkeypatch.setattr(v2, "_source_runtime_status", lambda _: "INDEXED_SHADOW")
     v2._append_jsonl(trial / "trial_audit.jsonl", {"query_id": "Q-1", "question": "二级设计进度计划包含哪些节点？", "answer_status": "ANSWERED", "document_ids": [], "evidence_ids": []})
     feedback = v2.feedback(v2.V2FeedbackRequest(query_id="Q-1", feedback_type="回答不完整", source_path="[LOCAL_PATH_REDACTED]", source_location="第19页", required_terms=["初步设计完成"], expected_answer="仅供审核"))

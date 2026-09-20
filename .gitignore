@@ -8,6 +8,11 @@ data/shadow/
 data/indexes/
 data/reports/
 data/*.sqlite3
+data/cache/
+data/trial_feedback/
+data/trial_shadow_sources/
+logs/
+.pytest-tmp-v2/
 *.log
 .env
 .env.local

@@ -1,4 +1,4 @@
-from app.verified_answer_engine_v2 import render, validate
+from app.verified_answer_engine_v2 import _narrative_count_document_score, render, validate
 
 
 def test_verified_answer_has_direct_claim_and_citation():
@@ -221,7 +221,7 @@ def test_citation_must_bind_same_evidence():
 
 def test_structured_table_answer_uses_table_counts():
     evidence = _evidence("DIRECT", text="建筑 | A\n建筑 | B\n结构 | C", location={"table": 1, "rows": 3})
-    bundle = _bundle("VERIFIED_PARTIAL", [evidence], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], query_type="AGGREGATION_QUERY")
+    bundle = _bundle("VERIFIED_PARTIAL", [evidence], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], query_type="AGGREGATION_QUERY", question="各专业分别有多少条？")
     answer = render(bundle)
     assert answer["answer_text"].startswith("结论：")
     assert "建筑2条" in answer["answer_text"]
@@ -233,6 +233,132 @@ def test_partial_validator_blocks_direct_claim_for_insufficient_subquestion():
     answer["claims"] = [{"claim_id": "C1", "claim_type": "DIRECT", "subquestion_id": "SQ1", "evidence_ids": ["E1"], "citation_ids": ["S1"]}]
     answer["citations"] = [{"citation_id": "S1", "evidence_id": "E1"}]
     assert not validate(answer, bundle)["valid"]
+
+
+def test_organization_structure_keeps_common_and_optional_boundaries():
+    question = "中建三局二公司设计与技术支持中心的组织架构是什么样的"
+    text = (
+        "由公司设计与技术管理部统筹全司设计与技术支持工作，公司总部设置设计与技术支持中心，作为公司设计与技术管理部二级部室。"
+        "司属各分公司（事业部）均设置设计与技术支持中心，作为各分公司（事业部）设计与技术管理部二级部室。"
+        "各分公司（事业部）设计与技术支持中心均设置设计支持岗、深化设计岗、方案支持岗。"
+        "区域分公司中心选择设置技术投标岗、钢筋翻样岗，专业公司中心选择设置技术投标岗。"
+    )
+    answer = render(_bundle("VERIFIED", [_evidence("DIRECT", text=text)], [
+        {"subquestion_id": "SQ1", "coverage_status": "COVERED"},
+        {"subquestion_id": "SQ2", "coverage_status": "COVERED"},
+        {"subquestion_id": "SQ3", "coverage_status": "COVERED"},
+    ], question=question))
+    assert answer["answer_status"] == "ANSWERED"
+    assert "均设置设计支持岗、深化设计岗、方案支持岗" in answer["answer_text"]
+    assert "区域分公司中心选择设置技术投标岗、钢筋翻样岗" in answer["answer_text"]
+    assert "专业公司中心选择设置技术投标岗" in answer["answer_text"]
+
+
+def test_organization_boundary_question_does_not_turn_optional_into_required():
+    question = "专业公司中心必须设钢筋翻样岗吗？"
+    text = "各分公司中心均设置设计支持岗、深化设计岗、方案支持岗。区域分公司中心选择设置技术投标岗、钢筋翻样岗，专业公司中心选择设置技术投标岗。"
+    answer = render(_bundle("VERIFIED", [_evidence("DIRECT", text=text)], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question))
+    assert "不能认定专业公司中心必须设置钢筋翻样岗" in answer["answer_text"]
+
+
+def test_all_branches_boundary_question_is_corrected():
+    question = "所有分公司都必须设置钢筋翻样岗吗？"
+    text = "各分公司（事业部）设计与技术支持中心均设置设计支持岗、深化设计岗、方案支持岗。区域分公司中心选择设置技术投标岗、钢筋翻样岗，专业公司中心选择设置技术投标岗。"
+    answer = render(_bundle("VERIFIED", [_evidence("DIRECT", text=text)], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question))
+    assert "该说法不准确" in answer["answer_text"]
+    assert "选择设置" in answer["answer_text"]
+
+
+def test_organization_alias_answer_is_labeled_as_search_configuration():
+    question = "中建三局第二建设公司设计与技术支持中心与二公司设计与技术支持中心是什么关系？"
+    evidence = _evidence("DIRECT", text="中建三局第二建设公司：中建三局二公司,第二建设公司,二公司")
+    evidence.update({"source_id": "SYS_ORGANIZATION_ALIASES", "file_name": "组织别名配置（系统）", "location": {"config_key": "ORGANIZATION_ALIASES"}})
+    answer = render(_bundle("VERIFIED", [evidence], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question))
+    assert "归一为同一组织称谓" in answer["answer_text"]
+    assert "只用于查询和范围识别" in answer["answer_text"]
+
+
+def test_reviewed_standard_answer_beats_unrelated_high_relevance_evidence():
+    question = "各经营实体的设计技术支持团队是什么管理层级？"
+    wrong = _evidence("DIRECT", text="设计与技术支持团队开展服务品质比拼。")
+    reviewed = _evidence("DIRECT", text="司属各分公司（事业部）的设计与技术支持中心作为设计与技术管理部二级部室。")
+    reviewed.update({"evidence_id": "K1", "approved_trial_knowledge": True, "knowledge_id": "KN1", "search_context": question, "candidate_rank": 2})
+    answer = render(_bundle("VERIFIED", [wrong, reviewed], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question))
+    assert "二级部室" in answer["answer_text"]
+    assert answer["citations"][0]["evidence_id"] == "K1"
+
+
+def test_other_organization_relationship_is_rendered_from_its_own_evidence():
+    question = "华东公司设计中心隶属哪个部门？"
+    evidence = _evidence("DIRECT", text="华东公司设计中心作为华东公司技术质量部二级部室。")
+    answer = render(_bundle("VERIFIED", [evidence], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question))
+    assert "华东公司技术质量部二级部室" in answer["answer_text"]
+    assert "中建三局第二建设公司" not in answer["answer_text"]
+
+
+def test_generic_planning_list_prefers_explicit_top_ranked_sentence():
+    question = "设计管理策划包括哪些核心清单？"
+    correct = _evidence("DIRECT", text="开展设计管理策划工作，形成设计合约规划、方案比选、设计风险识别、设计价值创造等核心任务清单。")
+    wrong = _evidence("DIRECT", text="3.1 总体管理 3.2 核心业务管理 3.3 监督与检查")
+    wrong.update({"evidence_id": "E2", "candidate_rank": 2})
+    answer = render(_bundle("VERIFIED", [correct, wrong], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], query_type="STRUCTURED_QUERY", question=question))
+    assert all(term in answer["answer_text"] for term in ("设计合约规划", "方案比选", "设计风险识别", "设计价值创造"))
+
+
+def test_generic_evaluation_aspects_do_not_turn_an_unrelated_table_into_counts():
+    question = "设计评估报告通常应包括哪些方面？"
+    correct = _evidence("DIRECT", text="设计评估包括设计完整性、设计深度、技术可行性评估。")
+    table = _evidence("DIRECT", text="建筑 | A", location={"table": 1, "rows": 1})
+    table.update({"evidence_id": "E2", "candidate_rank": 2})
+    answer = render(_bundle("VERIFIED", [correct, table], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], query_type="STRUCTURED_QUERY", question=question))
+    assert all(term in answer["answer_text"] for term in ("设计完整性", "设计深度", "技术可行性"))
+    assert "建筑1条" not in answer["answer_text"]
+
+
+def test_narrative_project_count_uses_the_best_direct_source_sentence():
+    question = "2025年度多少个项目成功打造为设计管理示范项目？"
+    summary = _evidence("DIRECT", text="二是打造设计管理示范项目。通过设计赋能，成功打造4个设计增效7%以上的标杆项目。")
+    exact = _evidence("DIRECT", text="发布设计管理示范项目打造方案，最终4个项目成功打造为设计管理示范项目，设计效益增量达7%以上。")
+    exact.update({"evidence_id": "E2", "candidate_rank": 2})
+    bundle = _bundle("VERIFIED", [summary, exact], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], query_type="AGGREGATION_QUERY", question=question)
+    bundle["query_plan"]["aggregation_plan"] = ["COUNT"]
+    answer = render(bundle)
+    assert answer["answer_status"] == "ANSWERED"
+    assert "最终4个项目成功打造为设计管理示范项目" in answer["answer_text"]
+    assert answer["citations"][0]["evidence_id"] == "E2"
+
+
+def test_narrative_project_count_accepts_rephrasing_and_rejects_another_demo_domain():
+    question = "2025年有几个项目完成了设计管理示范项目打造？"
+    correct = _evidence("DIRECT", text="最终4个项目成功打造为设计管理示范项目。")
+    wrong = _evidence("DIRECT", text="成功打造1项省级智能建造试点企业、9个智能建造试点示范项目。")
+    wrong.update({"evidence_id": "E2", "candidate_rank": 1})
+    correct["candidate_rank"] = 2
+    bundle = _bundle("VERIFIED", [wrong, correct], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], query_type="AGGREGATION_QUERY", question=question)
+    bundle["query_plan"]["aggregation_plan"] = ["COUNT"]
+    answer = render(bundle)
+    assert "最终4个项目成功打造为设计管理示范项目" in answer["answer_text"]
+    assert answer["citations"][0]["evidence_id"] == "E1"
+    unrelated = "前文提到设计管理示范项目。另举办观摩会，成功打造9个智能建造试点示范项目。"
+    assert _narrative_count_document_score(unrelated, question) == 0
+
+
+def test_inventory_register_multi_fact_claim_keeps_all_counts_in_one_source_window():
+    question = "设计支持中心资料登记共登记多少份资料？其中设计策划和责任状各多少份？"
+    first = _evidence("DIRECT", text="登记设计管理资料（共 1110 份）。")
+    second = {**_evidence("DIRECT", text="设计策划：76；责任状：337"), "evidence_id": "E2", "source_id": "SAME-SOURCE"}
+    first["source_id"] = "SAME-SOURCE"
+    bundle = _bundle(
+        "VERIFIED",
+        [first, second],
+        [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}],
+        query_type="AGGREGATION_QUERY",
+        question=question,
+    )
+    bundle["query_plan"]["aggregation_plan"] = ["COUNT", "FILTER", "GROUP_BY"]
+    answer = render(bundle)
+    assert answer["answer_status"] == "ANSWERED"
+    assert "1110" in answer["answer_text"] and "76" in answer["answer_text"] and "337" in answer["answer_text"]
 
 
 def _bundle(status, evidence, coverage, query_type="SOURCE_LOOKUP", question="测试问题"):

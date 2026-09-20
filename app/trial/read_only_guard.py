@@ -49,6 +49,30 @@ def read_circuit_state() -> str:
     return str(value.get("state", "UNKNOWN"))
 
 
+def _provider_posture_ok(config_values: dict[str, Any]) -> bool:
+    """Provider-dependent Claim is either off, or on only inside the read-only
+    trial with an explicit positive request budget cap. Any other posture blocks
+    startup, so enabling generation can never silently drop the budget guard."""
+    enabled = config_values.get("provider_claim_answer_enabled")
+    if enabled is False:
+        return True
+    if enabled is not True:
+        return False
+    cap = config_values.get("provider_max_real_requests")
+    return (
+        config_values.get("read_only") is True
+        and isinstance(cap, int)
+        and not isinstance(cap, bool)
+        and cap > 0
+    )
+
+
+def _budget_ledger_readable() -> bool:
+    """The budget ledger must be parseable; its concrete status is reported
+    separately so ACTIVE and EXHAUSTED are both acceptable inside the trial."""
+    return read_budget_status().get("status") not in {None, "INVALID"}
+
+
 def check_trial_readiness(config: TrialConfig) -> dict[str, Any]:
     config_values = config.values
     expected_true = (
@@ -73,9 +97,9 @@ def check_trial_readiness(config: TrialConfig) -> dict[str, Any]:
         "Root-001 writable": False,
         "Root-002 governance = PENDING_APPROVAL": config.root002_governance == "PENDING_APPROVAL",
         "Root-003 disabled": config_values.get("root003_enabled") is False,
-        "Provider-dependent Claim = disabled": config_values.get("provider_claim_answer_enabled") is False,
+        "Provider-dependent Claim posture": _provider_posture_ok(config_values),
         "V2 Verified RAG = 8010 only": config_values.get("V2_VERIFIED_RAG_ENABLED") is True and config_values.get("v2_verified_rag_8010_only") is True,
-        "Provider Budget status": read_budget_status().get("status") in {"EXHAUSTED", "CLOSED", "NOT_FOUND"},
+        "Provider Budget ledger readable": _budget_ledger_readable(),
         "Circuit state readable": read_circuit_state() != "INVALID",
         "Shadow index readable": shadow_readable,
         "Knowledge OS frontend built": knowledge_ui_built,

@@ -11,11 +11,13 @@ root003_enabled: false
 auto_root_discovery: false
 auto_ocr: false
 knowledge_writeback: false
-provider_claim_answer_enabled: false
+provider_claim_answer_enabled: true
+provider_max_real_requests: 200
 deterministic_answer_enabled: true
 safe_refusal_enabled: true
 V2_VERIFIED_RAG_ENABLED: true
 v2_verified_rag_8010_only: true
+v2_primary_mode: 'V2_6_2_CANDIDATE'
 audit_logging_enabled: true
 formal_port: 8000
 formal_qdrant_path: 'data/qdrant'
@@ -26,6 +28,11 @@ trial_feedback_path: 'data/trial_feedback'
 trial_audit_path: 'logs/trial/trial_audit.jsonl'
 trial_pid_path: 'logs/trial/trial_service.pid'
 approved_shadow_sources:
+  - path: '[LOCAL_PATH_REDACTED]�公司技术部\2025\制度文件\设计中心运行方案\上会\中建三局第二建设公司设计与技术支持中心组织优化及运行方案.pdf'
+    approval_status: 'USER_APPROVED_SHADOW_READ'
+    source_type: '制度方案'
+    version_note: '上会路径，现行有效性待核实'
+    registration_path: '[LOCAL_PATH_REDACTED]��文件\管理指南\二公司设计与技术中心运行方案.md'
   - path: '[LOCAL_PATH_REDACTED]�公司技术部\2025\设计知识库\设计风险清单\二公司\能源环保\2.高频设计风险清单编制模板(能源环保）.docx'
     approval_status: 'USER_APPROVED_SHADOW_READ'
   - path: '[LOCAL_PATH_REDACTED]�公司技术部\2026\知识库\高频设计风险清单\工业厂房\高频设计风险清单-工业厂房.docx'

@@ -17,10 +17,18 @@ from docx import Document as WordDocument
 from pydantic import BaseModel, Field
 
 from app.chunker import chunk_blocks
+from app.config import Settings
 from app.domain import SourceBlock
 from app.ingestion.atomic_search import search_atomic_evidence
 from app.ingestion.loaders.docx_loader import load_docx
 from app.ingestion.loaders.xlsx_loader import load_xlsx
+from app.llm import LLMError
+from app.answer_engine.llm.llm_provider import GenerationResult
+from app.answer_engine.llm.provider_runtime_guard import (
+    ProviderCircuitBreaker,
+    ProviderRequestBudget,
+    ShadowProviderRuntimeGuard,
+)
 from scripts.run_p0_integrated_shadow_regression import (
     ShadowIntegratedAnswerPipeline,
     deterministic_option_answer,
@@ -34,6 +42,7 @@ from .config import PROJECT_ROOT, TrialConfig, load_users
 from .read_only_guard import check_trial_readiness
 from .v2 import STATIC as V2_TRIAL_STATIC, router as v2_router
 from .batch import router as batch_router
+from .gold_review import router as gold_review_router
 
 
 app = FastAPI(title="AI设计管理知识库 V1.0 Internal Trial", version="1.0-trial")
@@ -47,6 +56,7 @@ _readiness = check_trial_readiness(CONFIG)
 app.mount("/assets", StaticFiles(directory=str(KNOWLEDGE_UI_DIST / "assets"), check_dir=True), name="knowledge-ui-assets")
 app.include_router(v2_router)
 app.include_router(batch_router)
+app.include_router(gold_review_router)
 _approved_source_status: list[dict[str, Any]] = []
 _approved_paragraph_locations: dict[str, int] = {}
 _approved_workbook_records: list[dict[str, Any]] = []
@@ -76,6 +86,105 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _guard_telemetry_sink(record: dict[str, Any]) -> None:
+    path = PROJECT_ROOT / "evaluation" / "provider_runtime_guard" / "runtime_guard_telemetry.jsonl"
+    try:
+        append_jsonl(path, record)
+    except OSError:
+        pass
+
+
+class GuardedTrialProvider:
+    """Trial Claim provider routed through the persistent request budget and circuit guard.
+
+    Exposes the same surface the answer generator expects (``available`` /
+    ``last_error`` / ``last_diagnostics`` / ``call_count`` / ``generate``) but every
+    real HTTP call must first reserve a unit from the shared budget ledger, so the
+    200-request cap is enforced across questions and restarts.
+    """
+
+    name = "openai_compatible_shadow_guarded"
+
+    def __init__(self, settings: Settings, guard: ShadowProviderRuntimeGuard) -> None:
+        self.settings = settings
+        self.guard = guard
+        self.available = bool(settings.api_ready)
+        self.last_error: str | None = None
+        self.last_diagnostics: dict[str, Any] = {}
+        self.call_count = 0
+
+    def probe(self) -> bool:
+        return self.available
+
+    def generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        temperature: float = 0.1,
+        max_tokens: int = 2_048,
+    ) -> GenerationResult:
+        self.call_count += 1
+        result = self.guard.generate(
+            system_prompt,
+            user_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        self.last_diagnostics = {
+            "runtime_status": result.final_status,
+            "provider_status": result.final_provider_status,
+            "attempt_count": result.attempt_count,
+            "http_requests": result.http_requests,
+            "budget_before": result.budget_before,
+            "budget_after": result.budget_after,
+            "circuit_state_after": result.circuit_state_after,
+        }
+        if result.final_status == "GENERATION_READY":
+            self.last_error = None
+            return GenerationResult(
+                content=result.content,
+                request_id=result.provider_request_id,
+                elapsed_ms=0,
+                diagnostics=self.last_diagnostics,
+            )
+        self.last_error = f"{result.final_status}: {result.final_provider_status}"
+        raise LLMError(self.last_error)
+
+
+def _disallowed_provider(reason: str) -> Any:
+    class DisabledProvider:
+        name = "trial_provider_disabled"
+        available = False
+        last_error = reason
+        last_diagnostics: dict[str, Any] = {}
+        call_count = 0
+
+    return DisabledProvider()
+
+
+def _build_guarded_trial_provider() -> GuardedTrialProvider:
+    settings = Settings.load()
+    guard_root = PROJECT_ROOT / "evaluation" / "provider_runtime_guard"
+    budget = ProviderRequestBudget(
+        guard_root / "provider_budget.json",
+        task_id="TASK-TRIAL-GUARDED-200",
+        provider="openai_compatible_shadow_reliable",
+        model=settings.chat_model,
+        max_real_requests=int(CONFIG.get("provider_max_real_requests", 200)),
+    )
+    budget.create_or_load()
+    circuit = ProviderCircuitBreaker(guard_root / "trial_circuit.json")
+    guard = ShadowProviderRuntimeGuard(
+        settings,
+        budget,
+        circuit,
+        max_attempts=1,
+        telemetry_sink=_guard_telemetry_sink,
+    )
+    return GuardedTrialProvider(settings, guard)
+
+
 def get_pipeline() -> ShadowIntegratedAnswerPipeline:
     global _pipeline
     if _pipeline is None:
@@ -85,14 +194,17 @@ def get_pipeline() -> ShadowIntegratedAnswerPipeline:
 
                 _load_approved_shadow_sources(_pipeline)
 
-                class DisabledProvider:
-                    name = "trial_provider_disabled"
-                    available = False
-                    last_error = "Provider-dependent Claim Answer disabled by Internal Trial Mode"
-                    last_diagnostics: dict[str, Any] = {}
-                    call_count = 0
-
-                _pipeline.provider = DisabledProvider()
+                if CONFIG.get("provider_claim_answer_enabled") is True:
+                    try:
+                        _pipeline.provider = _build_guarded_trial_provider()
+                    except Exception as error:  # noqa: BLE001 - keep the trial read-only on any init failure
+                        _pipeline.provider = _disallowed_provider(
+                            f"Provider init failed: {type(error).__name__}: {error}"
+                        )
+                else:
+                    _pipeline.provider = _disallowed_provider(
+                        "Provider-dependent Claim Answer disabled by Internal Trial Mode"
+                    )
     return _pipeline
 
 
@@ -534,7 +646,18 @@ def registration_only_evidence(rows: list[dict[str, Any]]) -> bool:
         return False
     registration_markers = ("file://", "原始资料", "原库业务目录", "wikilink")
     has_registration = any(any(marker in str(row.get("excerpt", "")) for marker in registration_markers) for row in rows)
-    has_body = any(Path(str(row.get("file_name") or "")).suffix.lower() in {".pdf", ".doc", ".docx", ".xlsx", ".pptx"} for row in rows)
+    body_extensions = {".pdf", ".doc", ".docx", ".xlsx", ".pptx"}
+    has_body = any(
+        Path(str(row.get("file_name") or "")).suffix.lower() in body_extensions
+        # A Markdown page carrying no registration marker is a content page
+        # (e.g. wiki/concepts/**), so it counts as real body evidence rather than
+        # being lumped in with "file://" registration stubs.
+        or (
+            str(row.get("file_name") or "").lower().endswith(".md")
+            and not any(marker in str(row.get("excerpt", "")) for marker in registration_markers)
+        )
+        for row in rows
+    )
     return has_registration and not has_body
 
 
@@ -734,6 +857,58 @@ def deterministic_atomic_evidence_fallback(question: str) -> dict[str, Any] | No
     }
 
 
+def render_retrieved_excerpts(rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Last-resort renderer: never dead-end the user.
+
+    Used when generation, every deterministic path and the strong-hit atomic fallback
+    have all failed. Instead of a refusal (or a bare `evidence_insufficient` marker),
+    surface the excerpts that were actually retrieved, clearly labelled as
+    unverified so the evidence boundary stays honest.
+    """
+    picked: list[tuple[dict[str, Any], str]] = []
+    for row in rows:
+        text = str(row.get("excerpt") or "").strip()
+        if text:
+            picked.append((row, text))
+        if len(picked) >= 3:
+            break
+    if not picked:
+        return None
+    claims: list[dict[str, Any]] = []
+    citations: list[dict[str, Any]] = []
+    lines = [
+        "未检索到足以形成结论的证据。以下为本次检索命中的原文摘录，未做事实扩展，请以原文为准：",
+        "",
+    ]
+    for index, (row, text) in enumerate(picked, start=1):
+        source_id = str(row.get("source_id") or f"R{index}")
+        lines.append(f"- {text} [{source_id}]")
+        claims.append(
+            {
+                "claim_id": f"C{index}",
+                "claim_type": "EVIDENCE_EXCERPT",
+                "claim_text": text,
+                "evidence_ids": [source_id],
+            }
+        )
+        citations.append(
+            {
+                "claim_id": f"C{index}",
+                "evidence_id": source_id,
+                "excerpt": row.get("excerpt", ""),
+                "location": row.get("location", {}),
+            }
+        )
+    return {
+        "final_status": "EVIDENCE_ONLY",
+        "answer": "\n".join(lines),
+        "claims": claims,
+        "citations": citations,
+        "provider_status": "NOT_REQUIRED",
+        "generation_mode": "ATOMIC_EVIDENCE_ONLY",
+    }
+
+
 def _atomic_record_is_registration(record: dict[str, Any]) -> bool:
     if record.get("file_type") != ".md":
         return False
@@ -794,17 +969,32 @@ def _claim_location(claim: dict[str, Any], rows: list[dict[str, Any]]) -> dict[s
 
 
 def state_for(result: dict[str, Any], *, source_body_missing: bool = False) -> tuple[str, str]:
+    """Map the pipeline verdict to a user-facing state.
+
+    Policy for this trial environment (explicit user requirement): **never refuse and
+    never leave the user without output**. Every branch returns a state that the UI
+    renders as a normal answer; the honest boundary is carried in the message and in
+    the answer body itself, not by withholding the content.
+    """
     final_status = str(result.get("final_status") or "")
     provider_status = str(result.get("answer", {}).get("provider_status") or "")
-    if source_body_missing:
-        return "SAFE_REFUSAL", "已找到知识登记页，但目标资料正文尚未进入当前试用范围，暂不能据此生成答案。"
+    has_body = bool(str(result.get("answer", {}).get("answer") or "").strip())
     if final_status in {"PROVIDER_TEMPORARY_FAILURE", "PROVIDER_PERMANENT_FAILURE", "PROVIDER_CIRCUIT_OPEN", "PROVIDER_TEST_BUDGET_EXHAUSTED", "LLM_ERROR"} or provider_status in {"PROVIDER_TEMPORARY_FAILURE", "PROVIDER_PERMANENT_FAILURE"}:
+        if has_body:
+            # The last-resort excerpt renderer already produced something to look at.
+            return "NORMAL_ANSWER", "生成服务暂不可用，已改为返回可核查的原文证据摘录。"
         return "GENERATION_SERVICE_UNAVAILABLE", "已找到相关资料，但当前生成服务暂不可用。"
     if final_status in {"GENERATED", "FACT_RESULT"}:
         return "NORMAL_ANSWER", "已生成答案"
     if final_status == "EVIDENCE_ONLY":
         return "NORMAL_ANSWER", "已返回可核查原文证据"
-    return "SAFE_REFUSAL", "当前知识库证据不足"
+    if final_status == "PARTIAL_EVIDENCE":
+        # The model did answer — only some sub-points lacked evidence, and it said so
+        # in the answer body. Refusing here used to throw away a perfectly usable answer.
+        return "NORMAL_ANSWER", "已生成答案（部分要点证据不足，已在答案中标注）"
+    if source_body_missing:
+        return "NORMAL_ANSWER", "已找到知识登记页，目标资料正文尚未进入试用范围，以下为已检索到的原文摘录。"
+    return "NORMAL_ANSWER", "未检索到足以形成结论的证据，已返回本次检索命中的原文摘录，请以原文为准。"
 
 
 def append_jsonl(path: Path, value: dict[str, Any]) -> None:
@@ -868,6 +1058,8 @@ def audit_record(result: dict[str, Any], trial_user: str, answer_state: str) -> 
         "preflight_status": result.get("claim_preflight", {}).get("claim_preflight_status"),
         "provider_status": answer.get("provider_status"),
         "final_status": result.get("final_status"),
+        "pre_fallback_status": result.get("pre_fallback_status"),
+        "pre_fallback_provider_status": result.get("pre_fallback_provider_status"),
         "answer_state": answer_state,
         "citation": answer.get("citations", []),
         "feedback": None,
@@ -957,6 +1149,24 @@ def query(request: QueryRequest) -> dict[str, Any]:
             selected_rows = [*selected_rows, *atomic_fallback.pop("evidence_rows", [])]
             source_body_missing = False
             deterministic = atomic_fallback
+    # Last resort: the user preference for this environment is explicit — never dead-end
+    # with a refusal and never return a bare `evidence_insufficient` marker. Whatever was
+    # actually retrieved gets surfaced as clearly-labelled, unverified excerpts.
+    if deterministic is None and (
+        provider_failed
+        or source_body_missing
+        or result.get("final_status") in {"NO_EVIDENCE", "STRUCTURE_INVALID"}
+    ):
+        rendered = render_retrieved_excerpts(selected_rows)
+        if rendered is not None:
+            deterministic = rendered
+    # Preserve the pre-substitution verdict. The deterministic/atomic fallback below
+    # rewrites final_status and provider_status, which previously erased the real reason
+    # the claim path failed (NO_EVIDENCE vs STRUCTURE_INVALID vs an LLM schema error).
+    pre_fallback_status = result.get("final_status")
+    pre_fallback_provider_status = answer.get("provider_status")
+    result["pre_fallback_status"] = pre_fallback_status
+    result["pre_fallback_provider_status"] = pre_fallback_provider_status
     if deterministic is not None:
         answer = deterministic
         result["answer"] = deterministic
@@ -969,7 +1179,9 @@ def query(request: QueryRequest) -> dict[str, Any]:
         "question": request.question,
         "answer_state": answer_state,
         "user_message": user_message,
-        "answer": "" if source_body_missing else answer.get("answer", ""),
+        # Never blank the body: when the source body is missing we now render the
+        # registration info / retrieved excerpts instead of an empty string.
+        "answer": answer.get("answer", "") or user_message,
         "final_status": result.get("final_status"),
         "route": result.get("route"),
         "answer_path": result.get("answer_path"),
@@ -977,6 +1189,8 @@ def query(request: QueryRequest) -> dict[str, Any]:
         "retrieval_status": "RETRIEVAL_COMPLETE" if result.get("retrieval", {}).get("rrf_count", 0) else "RETRIEVAL_EMPTY",
         "preflight_status": result.get("claim_preflight", {}).get("claim_preflight_status"),
         "provider_status": answer.get("provider_status", "NOT_REQUIRED"),
+        "pre_fallback_status": pre_fallback_status,
+        "pre_fallback_provider_status": pre_fallback_provider_status,
         "trial_diagnostic": "SOURCE_BODY_MISSING" if source_body_missing else None,
         "approved_shadow_sources": _approved_source_status,
         "evidence": selected,

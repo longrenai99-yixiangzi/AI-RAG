@@ -1,6 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
 import type { ReactNode } from 'react'
-import { CoverageBar } from '../components/knowledge/CoverageBar'
 import { getAncestors, getChildren, getNode } from '../data/mock/knowledgeTree'
 import { getKnowledgeNodeSample } from '../data/mock/sampleContent'
 
@@ -12,7 +11,7 @@ export function KnowledgeSpace() {
   if (sample) return <TechnicalConstructionSpace sample={sample} />
   const children = getChildren(node.id)
   const ancestors = getAncestors(node.id)
-  return <section><div className="breadcrumbs page-breadcrumbs">{ancestors.map((item) => <Link key={item.id} to={`/knowledge/${item.id}`}>{item.name}</Link>)}</div><section className="space-hero"><span className="eyebrow">KNOWLEDGE SPACE</span><h1>{node.name}</h1><p>{node.description}</p></section><div className="space-grid">{children.length ? children.map((child) => <Link className="space-card" key={child.id} to={child.childrenCount ? `/knowledge/${child.id}` : `/node/${child.id}`}><span className="space-type">{child.childrenCount ? '知识空间' : '知识节点'}</span><h3>{child.name}</h3><p>{child.description}</p><div><span>{child.childrenCount} 个子节点</span><span>{child.knowledgeCount} 个知识</span></div><CoverageBar value={child.coverage} /></Link>) : <Link className="space-card" to={`/node/${node.id}`}><span className="space-type">知识节点</span><h3>查看结构化知识</h3><p>进入该节点的知识概述、要点、案例与来源。</p></Link>}</div></section>
+  return <section><div className="breadcrumbs page-breadcrumbs">{ancestors.map((item) => <Link key={item.id} to={`/knowledge/${item.id}`}>{item.name}</Link>)}</div><section className="space-hero"><span className="eyebrow">KNOWLEDGE SPACE</span><h1>{node.name}</h1><p>{node.description}</p></section><div className="space-grid">{children.length ? children.map((child) => <Link className="space-card" key={child.id} to={child.childrenCount ? `/knowledge/${child.id}` : `/node/${child.id}`}><span className="space-type">{child.childrenCount ? '知识空间' : '知识节点'}</span><h3>{child.name}</h3><p>{child.description}</p><div><span>{child.childrenCount} 个配置子节点</span><span>运行统计待关联</span></div></Link>) : <Link className="space-card" to={`/node/${node.id}`}><span className="space-type">知识节点</span><h3>查看已生效知识</h3><p>进入该节点查看已审核知识；空白区域不会用示例内容冒充事实。</p></Link>}</div></section>
 }
 
 function TechnicalConstructionSpace({ sample }: { sample: NonNullable<ReturnType<typeof getKnowledgeNodeSample>> }) {
@@ -20,8 +19,8 @@ function TechnicalConstructionSpace({ sample }: { sample: NonNullable<ReturnType
   const templateSources = sample.sources.filter((source) => source.type === '模板' || source.type === '评价工具')
   return <section className="sample-space">
     <div className="breadcrumbs page-breadcrumbs"><Link to={`/framework?node=${sample.graph.node.id}`}>{sample.graph.domain.name} / {sample.graph.category.name} / {sample.graph.node.name}</Link></div>
-    <header className="space-hero"><span className="eyebrow">KNOWLEDGE SPACE · MOCK SAMPLE</span><h1>{sample.graph.node.name}</h1><p>{sample.space.overview}</p><div className="space-stat-row"><span>{sample.cards.length} 张知识卡片</span><span>{sample.sources.length} 条资料来源</span><span>{sample.cases.length} 个项目案例</span></div></header>
-    <SpaceSection title="概览"><p>本空间以“总体施组”这一叶子节点为样板，完整保留知识卡片、来源和案例之间的引用关系。</p></SpaceSection>
+    <header className="space-hero"><span className="eyebrow">KNOWLEDGE SPACE · 待接入样例</span><h1>{sample.graph.node.name}</h1><p>{sample.space.overview}</p><div className="space-stat-row"><span>{sample.cards.length} 张样例卡片</span><span>{sample.sources.length} 条样例来源</span><span>{sample.cases.length} 个样例案例</span></div></header>
+    <SpaceSection title="概览"><p>本页展示人工整理的待接入样例。真实来源、索引和已生效知识以“知识资产”及“已生效知识”区域为准。</p></SpaceSection>
     <SpaceSection title="核心知识"><div className="sample-card-grid">{sample.cards.map((card) => <article key={card.id}><span>KnowledgeCard</span><h3>{card.title}</h3><p>{card.summary}</p><ul>{card.keyPoints.map((item) => <li key={item}>{item}</li>)}</ul><small>依据：{card.sourceIds.map((sourceId) => sourceById.get(sourceId)?.name).join('；')}</small></article>)}</div></SpaceSection>
     <SpaceSection title="管理要点"><ol className="management-list">{sample.space.managementPoints.map((point) => <li key={point}>{point}</li>)}</ol></SpaceSection>
     <SpaceSection title="模板工具">{templateSources.length ? <div className="tool-list">{templateSources.map((source) => <SourceItem key={source.id} source={source} />)}</div> : <EmptySampleSection text="当前节点暂无已抽取的模板工具，相关来源已保留在下方知识来源中。" />}</SpaceSection>

@@ -1,16 +1,16 @@
 # 8010 Controlled Switch Plan（GATED）
 
-状态：`BLOCKED`，尚未获得执行授权。
+状态：`V2.6.2` 已按授权切换为 8010 常驻主答；即时 Smoke 与 10 题 Canary 已通过。8000 仍关闭。
 
 前置条件：
 
 - Owner Source Version Gate：必须 5/5 `APPROVED`
 - Live Shadow Gate：必须 PASS
-- Rollback Drill：必须 PASS
+- Rollback Drill：已 PASS（8010-only V1 → V2.6.2 → V1）
 - Candidate Integrity：必须 PASS
-- 用户明确授权“允许切换 8010”
+- 用户明确授权“允许切换 8010”：已确认，仅限 8010，不包含 8000。
 
-当前不执行任何切换。8010 保持 V1 Primary，8000 保持 OFF。
+当前运行状态：8010 为 `V2.6.2` Primary，8000 保持 OFF；关键失败时按 Rollback Plan 恢复 V1。
 
 获授权后的最小切换顺序：
 

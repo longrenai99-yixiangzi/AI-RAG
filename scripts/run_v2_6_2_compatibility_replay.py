@@ -12,15 +12,21 @@ from app.trial.live_shadow_v25 import V25LiveShadow
 ROOT = Path(__file__).resolve().parents[1]
 V26 = ROOT / "evaluation" / "knowledge_os_v2_6"
 RUNS = V26 / "live_shadow_runs.jsonl"
+EXCLUSIONS = V26 / "v2_6_2_owner_exclusions.json"
 MODEL = ROOT / "models" / "bge-m3"
 
 
 def _load_history() -> tuple[list[dict], dict[str, list[dict]]]:
     rows = [json.loads(line) for line in RUNS.read_text(encoding="utf-8").splitlines() if line.strip()]
+    excluded = set()
+    if EXCLUSIONS.exists():
+        excluded = {str(item.get("question_hash")) for item in (json.loads(EXCLUSIONS.read_text(encoding="utf-8")).get("records") or [])}
     by_question: dict[str, list[dict]] = defaultdict(list)
     for row in rows:
         question = str(row.get("question") or "").strip()
         if not question:
+            continue
+        if str(row.get("question_hash") or question) in excluded:
             continue
         by_question[str(row.get("question_hash") or question)].append(row)
     latest = [sorted(items, key=lambda item: str(item.get("timestamp") or ""))[-1] for items in by_question.values()]
@@ -31,7 +37,12 @@ def _load_history() -> tuple[list[dict], dict[str, list[dict]]]:
 def main() -> int:
     historical, history_by_question = _load_history()
     engine = V25LiveShadow()
-    provider = BGEM3DenseProvider(MODEL, collection_name="v2_6_2_compatibility_replay", use_fp16=False, batch_size=32)
+    try:
+        import torch
+        cuda_available = bool(torch.cuda.is_available())
+    except Exception:
+        cuda_available = False
+    provider = BGEM3DenseProvider(MODEL, collection_name="v2_6_2_compatibility_replay", use_fp16=cuda_available, batch_size=64 if cuda_available else 32)
     records: list[dict] = []
     try:
         vectors = provider.embed_documents([str(row["question"]) for row in historical])
@@ -68,7 +79,7 @@ def main() -> int:
         "schema_version": "knowledge_os_v2_6_2.compatibility_replay",
         "captured_at": datetime.now(timezone.utc).astimezone().isoformat(),
         "status": "CONDITIONAL_COMPATIBILITY_ONLY_NOT_RELEASE_GATE",
-        "basis": "352 previously recorded real questions, deduplicated by question_hash; current answers are offline replay, not Live Shadow.",
+        "basis": "Previously recorded real questions, deduplicated by question_hash and excluding Owner-invalid questions listed in v2_6_2_owner_exclusions.json; current answers are offline replay, not Live Shadow.",
         "current_candidate_hash": engine.candidate_hash,
         "historical_question_count": len(records),
         "transition_counts": {f"{old} -> {new}": count for (old, new), count in sorted(transitions.items())},

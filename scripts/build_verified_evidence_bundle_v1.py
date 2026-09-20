@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from app.retrieval.hierarchical_v1 import HierarchicalIndex
+from app.ingestion.atomic_search import query_terms
 from app.retrieval.query_planner_v1 import ORGANIZATION_ALIASES
 
 
@@ -62,6 +63,9 @@ def _bundle(trace: dict[str, Any], gold: dict[str, Any], baseline: dict[str, Any
         if candidate["evidence_id"] in conflicts:
             candidate["role"] = "CONFLICTING"
             candidate["why_conflicting"] = conflicts[candidate["evidence_id"]]
+        elif _inventory_register_direct(question, candidate):
+            candidate["role"] = "DIRECT"
+            candidate["why_direct"] = "Inventory register body directly states the requested file counts; substantive facts remain excluded from register pages."
         elif candidate["registration_page_flag"]:
             candidate["role"] = "EXCLUDED"
             candidate["why_excluded"] = "REGISTER_PAGE cannot directly support a fact."
@@ -99,8 +103,9 @@ def _candidate(row: dict[str, Any], plan: dict[str, Any], documents: dict[str, d
     document = documents.get(str(row.get("document_id")), {})
     path = str(row.get("source_path") or source.get("source_path") or "").replace("/", "\\").casefold()
     scope, scope_reason = _scope(plan, document, source, row)
-    text = str(source.get("text") or row.get("text") or "")
-    return {"evidence_id": evidence_id, "source_id": row.get("source_id") or source.get("source_id"), "source_version": row.get("source_version") or source.get("source_version"), "knowledge_id": row.get("knowledge_id") or source.get("knowledge_id"), "approved_trial_knowledge": bool(row.get("approved_trial_knowledge") or source.get("approved_trial_knowledge")), "parent_evidence_id": row.get("parent_evidence_id") or source.get("parent_evidence_id"), "raw_text": str(source.get("raw_text") or row.get("raw_text") or text), "search_context": str(source.get("search_context") or row.get("search_context") or ""), "negative_questions": list(source.get("negative_questions") or row.get("negative_questions") or []), "document_id": row.get("document_id"), "section_id": row.get("section_id"), "table_id": source.get("table_id"), "file_name": row.get("file_name"), "source_path": row.get("source_path"), "heading_path": row.get("heading_path") or source.get("heading_path"), "location": row.get("location") or source.get("location"), "text": text, "candidate_rank": row.get("rank"), "candidate_origin": row.get("candidate_origin"), "exact_core_phrase_matches": row.get("exact_core_phrase_matches") or [], "document_role": row.get("document_role") or document.get("document_role"), "document_type": row.get("document_type") or document.get("document_type"), "authority": row.get("authority") or document.get("authority_level"), "scope": scope, "scope_reason": scope_reason, "lineage_status": row.get("lineage_status") or source.get("lineage_status") or "LINEAGE_NOT_APPLICABLE", "registration_page_flag": document.get("document_type") == "REGISTER_PAGE" or "\\wiki\\sources\\" in path, "query_page_flag": "\\wiki\\queries\\" in path, "link_only": _link_only(text), "role": "INSUFFICIENT", "why_selected": "Selected by 020C hierarchical candidate generation."}
+    text = str(row.get("text_override") or source.get("text") or row.get("text") or "")
+    raw_text = str(row.get("raw_text_override") or source.get("raw_text") or row.get("raw_text") or text)
+    return {"evidence_id": evidence_id, "source_id": row.get("source_id") or source.get("source_id"), "source_version": row.get("source_version") or source.get("source_version"), "knowledge_id": row.get("knowledge_id") or source.get("knowledge_id"), "approved_trial_knowledge": bool(row.get("approved_trial_knowledge") or source.get("approved_trial_knowledge")), "parent_evidence_id": row.get("parent_evidence_id") or source.get("parent_evidence_id"), "raw_text": raw_text, "search_context": str(source.get("search_context") or row.get("search_context") or ""), "negative_questions": list(source.get("negative_questions") or row.get("negative_questions") or []), "document_id": row.get("document_id"), "section_id": row.get("section_id"), "table_id": source.get("table_id"), "file_name": row.get("file_name"), "source_path": row.get("source_path"), "heading_path": row.get("heading_path") or source.get("heading_path"), "location": row.get("location") or source.get("location"), "text": text, "focus_markers": row.get("focus_markers") or [], "candidate_rank": row.get("rank"), "candidate_origin": row.get("candidate_origin"), "exact_core_phrase_matches": row.get("exact_core_phrase_matches") or [], "document_role": row.get("document_role") or document.get("document_role"), "document_type": row.get("document_type") or document.get("document_type"), "authority": row.get("authority") or document.get("authority_level"), "scope": scope, "scope_reason": scope_reason, "lineage_status": row.get("lineage_status") or source.get("lineage_status") or "LINEAGE_NOT_APPLICABLE", "registration_page_flag": document.get("document_type") == "REGISTER_PAGE" or "\\wiki\\sources\\" in path, "query_page_flag": "\\wiki\\queries\\" in path, "link_only": _link_only(text), "role": "INSUFFICIENT", "why_selected": "Selected by 020C hierarchical candidate generation."}
 
 
 def _scope(plan: dict[str, Any], document: dict[str, Any], source: dict[str, Any], row: dict[str, Any]) -> tuple[dict[str, str], str]:
@@ -130,7 +135,17 @@ def _scope(plan: dict[str, Any], document: dict[str, Any], source: dict[str, Any
             result[field] = "UNKNOWN"
     text = " ".join(str(value or "") for value in (row.get("file_name"), row.get("heading_path"), row.get("text"), source.get("text"))).casefold()
     metrics = plan.get("metric", [])
-    result["metric"] = "NOT_APPLICABLE" if not metrics else "MATCH" if all(str(value).casefold() in text for value in metrics) else "MISMATCH"
+    metric_aliases = {
+        "数量": ("数量", "条数", "条目", "项", "个", "份", "家", "人"),
+        "条数": ("条数", "条目", "数量", "项", "个"),
+        "金额": ("金额", "万元", "万", "亿元", "亿", "合同额", "投资"),
+        "工期": ("工期", "个月", "天"),
+        "装机容量": ("装机容量", "MW", "兆瓦"),
+        "比例": ("比例", "%", "率", "占比"),
+        "创效": ("创效", "效益", "收益"),
+        "排名": ("排名", "第一名", "第二名", "第三名"),
+    }
+    result["metric"] = "NOT_APPLICABLE" if not metrics else "MATCH" if all(any(alias.casefold() in text for alias in metric_aliases.get(str(value), (str(value),))) for value in metrics) else "MISMATCH"
     period = str(plan.get("period") or "")
     result["period"] = "NOT_APPLICABLE" if not period else _period_status(period, f"{identity} {evidence_text}")
     return result, "Field-level scope is recorded; MATCH alone does not resolve same-scope fact conflicts."
@@ -194,8 +209,14 @@ def _direct_candidate(candidate: dict[str, Any], plan: dict[str, Any]) -> bool:
     question = str(plan.get("original_question") or "")
     if "任务书" in question and not plan.get("project") and candidate.get("document_role") in {"项目案例", "项目复盘"}:
         return False
+    rank = int(candidate.get("candidate_rank") or 10**6)
+    strong_scope_relevance = rank <= 20 and all(
+        not plan.get(field) or candidate["scope"].get(field) == "MATCH"
+        for field in ("organization", "project", "year", "specialty")
+    ) and sum(term.casefold() in str(candidate.get("text") or "").casefold() for term in query_terms(question) if len(term) >= 2) >= 3
     return (
-        int(candidate.get("candidate_rank") or 10**6) <= 10
+        rank <= 10
+        or strong_scope_relevance
         or candidate.get("document_role") in set(plan.get("document_role_hint", []))
         or _role_fact_candidate(candidate, plan)
     )
@@ -237,7 +258,7 @@ def _metric_values(text: str, metrics: list[str]) -> tuple[str, ...]:
     return tuple(sorted(set(values)))
 
 
-def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[dict[str, Any]], structured_rows: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[dict[str, Any]], structured_rows: list[dict[str, Any]] | None = None, *, inventory_direct: bool = False) -> list[dict[str, Any]]:
     direct = [candidate for candidate in candidates if candidate["role"] == "DIRECT"]
     conflicts = [candidate for candidate in candidates if candidate["role"] == "CONFLICTING"]
     rows = []
@@ -245,7 +266,7 @@ def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[di
         if conflicts:
             status = "CONFLICTED"
             evidence = [candidate["evidence_id"] for candidate in conflicts]
-        elif plan.get("query_type") in {"AGGREGATION_QUERY", "STRUCTURED_QUERY"} and "FILTER" in plan.get("aggregation_plan", []) and index == len(subquestions) and not structured_rows:
+        elif plan.get("query_type") in {"AGGREGATION_QUERY", "STRUCTURED_QUERY"} and "FILTER" in plan.get("aggregation_plan", []) and index == len(subquestions) and not structured_rows and not inventory_direct:
             status = "EVIDENCE_INSUFFICIENT"
             evidence = []
         elif direct:
@@ -268,6 +289,17 @@ def _supports_subquestion(candidate: dict[str, Any], subquestion: str) -> bool:
     if "选设边界" in subquestion:
         return any(marker in text for marker in ("选择设置", "选设", "可设置"))
     return True
+
+
+def _inventory_register_direct(question: str, candidate: dict[str, Any]) -> bool:
+    compact_question = re.sub(r"\s+", "", question)
+    if "资料登记" not in compact_question or not any(marker in compact_question for marker in ("多少份", "多少个", "各多少", "共登记")):
+        return False
+    page_marker = "设计支持中心资料登记" if "设计支持中心" in compact_question else "法人管项目资料登记" if "法人管项目" in compact_question else "资料登记"
+    if not candidate.get("registration_page_flag") or page_marker not in str(candidate.get("file_name") or ""):
+        return False
+    compact_text = re.sub(r"\s+", "", str(candidate.get("text") or candidate.get("raw_text") or ""))
+    return bool(re.search(r"(?:共|source_count|文件数)[：:]?\d+", compact_text, re.IGNORECASE) or any(marker in compact_text for marker in ("设计策划", "责任状")))
 
 
 def _structured_facts(plan: dict[str, Any], candidates: list[dict[str, Any]], coverage: list[dict[str, Any]]) -> dict[str, Any]:

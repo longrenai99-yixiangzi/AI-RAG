@@ -18,6 +18,30 @@ def test_rule_planner_covers_single_policy_aggregation_comparison_and_multifact(
     assert multi.subquestions
 
 
+def test_organization_center_is_not_a_project_but_named_center_project_is():
+    organization = plan_query("中建三局二公司设计与技术支持中心的组织架构是什么样的")
+    assert organization.project == []
+    assert organization.organization == ["中建三局第二建设公司", "中建三局"]
+    project = plan_query("星谷科创中心项目有哪些信息？")
+    assert project.project == ["星谷科创中心项目"]
+
+
+def test_project_count_questions_do_not_invent_a_named_project_scope():
+    questions = (
+        "2025年度多少个项目成功打造为设计管理示范项目？",
+        "2025年有几个项目完成了示范项目打造？",
+        "2025年成功打造了哪些设计管理示范项目？",
+        "2025年度设计管理示范项目打造结果是多少项？",
+    )
+    for question in questions:
+        plan = plan_query(question)
+        assert plan.project == []
+        assert plan.year == ["2025"]
+        if "几个" in question:
+            assert "COUNT" in plan.aggregation_plan
+    assert plan_query("星谷科创中心项目有哪些信息？").project == ["星谷科创中心项目"]
+
+
 def test_hierarchical_document_section_table_and_registration_penalty():
     documents = [
         _document("body", "年度述职.md", "年度述职 公司 2025 创效金额 4.45亿元", "RETROSPECTIVE"),

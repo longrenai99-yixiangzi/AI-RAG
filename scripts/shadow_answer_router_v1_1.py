@@ -188,7 +188,20 @@ def route_question(question: str, capability: dict[str, Any]) -> dict[str, Any]:
             "provider_status": "NOT_RUN",
         }
     if not direct and not derived:
-        reasons.append("普通制度/方法/案例/定义说明，不要求直接事实提取或多行聚合")
+        # Aggregation-flavoured questions ("多少个" / "合计" / "按专业统计") that did
+        # NOT match a structured-table capability used to fall through here and be
+        # described as "不要求直接事实提取或多行聚合" — a self-contradictory trace.
+        # We keep the Claim path (the LLM can still answer from prose evidence),
+        # but report the aggregation semantics honestly so diagnostics are usable.
+        aggregation_ops = [op for op in ops if op in {"COUNT", "SUM", "GROUP_BY", "FILTER"}]
+        if aggregation_ops:
+            reasons.append(
+                "问题含跨记录聚合语义（"
+                + "/".join(aggregation_ops)
+                + "），但未匹配到该目标的结构化表能力；改由 Claim 路径基于正文证据作答，不做确定性聚合"
+            )
+        else:
+            reasons.append("普通制度/方法/案例/定义说明，不要求直接事实提取或多行聚合")
         return {
             "query": question,
             "route": "CLAIM_ANSWER_PATH",
@@ -198,8 +211,8 @@ def route_question(question: str, capability: dict[str, Any]) -> dict[str, Any]:
             "intent": intent,
             "fact_types": facts,
             "operations": [],
-            "aggregation_operations": [],
-            "requires_aggregation": False,
+            "aggregation_operations": aggregation_ops,
+            "requires_aggregation": bool(aggregation_ops),
             "direct_fact_type": None,
             "target_entity": entity,
             "target_document": document,

@@ -39,13 +39,28 @@ def infer_knowledge_type(text: str) -> str:
 
 
 def chunk_units(units: Iterable[str], *, target: int = TARGET_CHARS, maximum: int = MAX_CHARS) -> list[str]:
-    """Keep each parsed paragraph/list unit intact; length balances but never cuts a unit."""
+    """Keep parsed units intact and PDF page content together when it fits the limit."""
+    grouped: list[str] = []
+    page: list[str] | None = None
+    for raw in units:
+        unit = raw.strip()
+        if not unit:
+            continue
+        if re.fullmatch(r"---\s*Page\s+\d+\s*---", unit, re.IGNORECASE):
+            if page:
+                grouped.append("\n".join(page))
+            page = [unit]
+        elif page is None:
+            grouped.append(unit)
+        else:
+            page.append(unit)
+    if page:
+        grouped.append("\n".join(page))
+
     chunks: list[str] = []
     current: list[str] = []
     current_size = 0
-    for unit in (item.strip() for item in units):
-        if not unit:
-            continue
+    for unit in grouped:
         projected = current_size + len(unit) + (1 if current else 0)
         if current and projected > target and current_size >= MIN_CHARS:
             chunks.append("\n".join(current))
@@ -142,18 +157,33 @@ def build_structured_layer(documents: list[dict[str, Any]], sections: list[dict[
                 for row in rows_by_table[str(table.get("table_id") or "")]:
                     values = " | ".join(str(item.get("value") or "") for item in row.get("cells") or [])
                     raw = f"表名：{table_name}\n表头：{header}\n行：{values}"
-                    _append_chunk(chunks, bindings, doc, source_id, source_version, section, path_value, raw, int(row.get("row_number") or 0), evidence_by_section[section_id], is_table=True, table_id=str(table.get("table_id") or ""))
+                    _append_chunk(chunks, bindings, doc, source_id, source_version, section, path_value, raw, int(row.get("row_number") or 0), evidence_by_section[section_id], is_table=True, table_id=str(table.get("table_id") or ""), row_location=row.get("source_location") or {})
     exact_duplicates(chunks)
     for chunk in chunks: chunk["index_status"] = "QUARANTINED" if int(chunk["chunk_quality_score"]) < 70 else "STAGING_CANDIDATE"
     return {"sources": sources, "documents": staged_docs, "sections": staged_sections, "semantic_chunks": chunks, "knowledge_node_bindings": bindings}
 
 
-def _append_chunk(chunks: list[dict[str, Any]], bindings: list[dict[str, Any]], doc: dict[str, Any], source_id: str, source_version: str, section: dict[str, Any], section_path: str, raw_text: str, ordinal: int, evidence: list[dict[str, Any]], *, is_table: bool, table_id: str = "") -> None:
+def _append_chunk(chunks: list[dict[str, Any]], bindings: list[dict[str, Any]], doc: dict[str, Any], source_id: str, source_version: str, section: dict[str, Any], section_path: str, raw_text: str, ordinal: int, evidence: list[dict[str, Any]], *, is_table: bool, table_id: str = "", row_location: dict[str, Any] | None = None) -> None:
     score, reasons = quality_for(raw_text, has_context=bool(section_path), is_table=is_table)
     document_id, section_id = str(doc["document_id"]), str(section["section_id"])
     chunk_id = stable_id("semantic-chunk", document_id, section_id, table_id or "paragraph", ordinal, hashlib.sha256(raw_text.encode("utf-8")).hexdigest())
     normalized = normalize_text(raw_text)
-    evidence_ids = [str(item.get("evidence_id")) for item in evidence if normalize_text(str(item.get("text") or "")) and normalize_text(str(item.get("text") or "")) in normalized]
+    row_location = row_location or {}
+    row_key = next((key for key in ("row_start", "line_start", "row") if row_location.get(key) is not None), None)
+    row_index = row_location.get(row_key) if row_key else None
+    row_evidence = []
+    if is_table and table_id and row_index is not None:
+        for item in evidence:
+            if item.get("table_id") != table_id:
+                continue
+            item_location = item.get("location") or {}
+            if any(row_location.get(key) is not None and item_location.get(key) != row_location[key] for key in ("sheet_name", "table", "slide")):
+                continue
+            item_index = next((item_location.get(key) for key in ("row_start", "line_start", "row") if item_location.get(key) is not None), None)
+            if item_index == row_index:
+                row_evidence.append(item)
+    matching_evidence = row_evidence or [item for item in evidence if normalize_text(str(item.get("text") or "")) and normalize_text(str(item.get("text") or "")) in normalized]
+    evidence_ids = [str(item.get("evidence_id")) for item in matching_evidence]
     profile = doc.get("document_profile") or {}
     domain = profile.get("business_domain", {}).get("value") or "设计管理"
     token_count = len(re.findall(r"[\u4e00-\u9fff]|[A-Za-z0-9]+", raw_text))

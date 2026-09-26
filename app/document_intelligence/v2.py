@@ -23,10 +23,11 @@ from app.ingestion.metadata.classifier import MetadataClassifier
 from app.ingestion.metadata.governance import GovernanceClassifier
 from app.ingestion.metadata.schema import MetadataRecord
 from app.ingestion.loaders.markdown_loader import MarkdownLoader
+from app.ingestion.loaders.wps_loader import WPSLoader
 
 
 SCHEMA_VERSION = "document_intelligence.v2"
-SUPPORTED_EXTENSIONS = {".md", ".markdown", ".pdf", ".docx", ".doc", ".xlsx", ".pptx", ".txt", ".html", ".htm"}
+SUPPORTED_EXTENSIONS = {".md", ".markdown", ".pdf", ".docx", ".doc", ".wps", ".xlsx", ".pptx", ".txt", ".html", ".htm"}
 HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(.+?)\s*$")
 YEAR_RE = re.compile(r"20\d{2}")
 
@@ -287,7 +288,7 @@ class DocumentIntelligenceV2Builder:
                 "source_block_id": stable_id("source-block", did, line_number),
             })
         for start, end in table_ranges:
-            raw = [lines[i - 1] for i in range(start, end)]
+            raw = [lines[i - 1] for i in range(start, end + 1)]
             header = _split_pipe(raw[0]) if raw else []
             section = _section_for_location(sections, start)
             table_id = stable_id("table", did, start, end)
@@ -301,7 +302,7 @@ class DocumentIntelligenceV2Builder:
                 "column_count": len(header),
                 "source_location": {"line_start": start, "line_end": end},
                 "semantic": {"title": "", "header": header, "semantic_summary": "Markdown table", "business_fields": header, "representative_rows": []},
-                "structured": {"columns": header, "rows": [], "cells": [], "formulas": [], "cached_values": [], "source_row_numbers": list(range(start, end))},
+                "structured": {"columns": header, "rows": [], "cells": [], "formulas": [], "cached_values": [], "source_row_numbers": list(range(start, end + 1))},
             })
             for offset, row_text in enumerate(raw[2:], start=2):
                 values = _split_pipe(row_text)
@@ -433,6 +434,40 @@ class DocumentIntelligenceV2Builder:
         result["title"] = next((p.text for p in document.paragraphs if clean_text(p.text)), path.stem)
         result["text"] = "\n".join([p["text"] for p in result["paragraphs"]] + [t["semantic"]["semantic_summary"] for t in result["tables"]])
         result["parse_status"] = "parsed"
+        return result
+
+    def _parse_wps(self, path: Path, did: str) -> dict[str, Any]:
+        result = self._empty_result()
+        loaded = WPSLoader().load(path, did)
+        result.update({"parse_status": loaded.status, "error": loaded.error})
+        if loaded.status != "parsed":
+            return result
+        paragraphs = loaded.paragraphs
+        heading_specs = [
+            (int(item["paragraph_number"]), level, clean_text(item["text"]))
+            for item in paragraphs
+            if (level := _heading_level(str(item.get("style") or ""))) is not None
+        ]
+        max_location = max((int(item["paragraph_number"]) for item in paragraphs), default=1)
+        headings, sections = _make_heading_sections(did, heading_specs, max_location, "wps")
+        result["headings"], result["sections"] = headings, sections
+        for item in paragraphs:
+            index = int(item["paragraph_number"])
+            text = clean_text(item["text"])
+            if not text or _heading_level(str(item.get("style") or "")) is not None:
+                continue
+            section = _section_for_location(sections, index)
+            result["paragraphs"].append({
+                "paragraph_id": stable_id("paragraph", did, index),
+                "section_id": section["section_id"],
+                "text": text,
+                "order": index,
+                "location": {"paragraph_start": index, "paragraph_end": index},
+                "style": str(item.get("style") or "Normal"),
+                "source_block_id": stable_id("source-block", did, index),
+            })
+        result["title"] = next((clean_text(item["text"]) for item in paragraphs if clean_text(item["text"])), path.stem)
+        result["text"] = "\n".join(clean_text(item["text"]) for item in paragraphs if clean_text(item["text"]))
         return result
 
     def _parse_pdf(self, path: Path, did: str) -> dict[str, Any]:
@@ -844,7 +879,7 @@ def _split_pipe(value: str) -> list[str]:
 
 
 def _in_ranges(value: int, ranges: list[tuple[int, int]]) -> bool:
-    return any(start <= value < end for start, end in ranges)
+    return any(start <= value <= end for start, end in ranges)
 
 
 def _table_row(table_id: str, section_id: str, row_number: int, values: list[Any], headers: list[str], location: dict[str, Any]) -> dict[str, Any]:
@@ -1006,10 +1041,22 @@ def _parent_table(record: dict[str, Any], tables: list[dict[str, Any]]) -> str |
         if table.get("document_id") != did:
             continue
         source = table.get("source_location") or {}
-        if location.get("table") == source.get("table"):
+        table_index = location.get("table")
+        if table_index is not None and table_index == source.get("table"):
             return table["table_id"]
-        if location.get("sheet_name") == source.get("sheet_name") and location.get("row_start", 0) >= source.get("row_start", 0) and location.get("row_end", 0) <= source.get("row_end", 10**9):
+        sheet_name = location.get("sheet_name")
+        row_start, row_end = location.get("row_start"), location.get("row_end")
+        source_start, source_end = source.get("row_start"), source.get("row_end")
+        if (sheet_name is not None and sheet_name == source.get("sheet_name")
+                and None not in (row_start, row_end, source_start, source_end)
+                and row_start >= source_start and row_end <= source_end):
             return table["table_id"]
-        if location.get("slide") == source.get("slide"):
+        line_start, line_end = location.get("line_start"), location.get("line_end")
+        source_line_start, source_line_end = source.get("line_start"), source.get("line_end")
+        if (None not in (line_start, line_end, source_line_start, source_line_end)
+                and line_start >= source_line_start and line_end <= source_line_end):
+            return table["table_id"]
+        slide = location.get("slide")
+        if slide is not None and slide == source.get("slide"):
             return table["table_id"]
     return None

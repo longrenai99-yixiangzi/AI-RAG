@@ -8,6 +8,7 @@ from typing import Any
 
 from app.retrieval.hierarchical_v1 import HierarchicalIndex
 from app.ingestion.atomic_search import query_terms
+from app.ingestion.normalization.markdown_normalizer import strip_markdown_links
 from app.retrieval.query_planner_v1 import ORGANIZATION_ALIASES
 
 
@@ -182,9 +183,9 @@ def _period_status(period: str, text: str) -> str:
 
 
 def _link_only(text: str) -> bool:
-    if not any(marker in text for marker in ("[[", "file://", "http://", "https://")):
+    if not any(marker in text for marker in ("[[", "file://", "http://", "https://")) and not re.search(r"!?\[[^\]]*\]\([^)]+\)", text):
         return False
-    body = re.sub(r"\[\[[^\]]+\]\]|file://\S+|https?://\S+", "", text)
+    body = strip_markdown_links(text)
     return len(re.sub(r"\s+", "", body)) < 40
 
 
@@ -282,6 +283,12 @@ def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[di
 
 def _supports_subquestion(candidate: dict[str, Any], subquestion: str) -> bool:
     text = str(candidate.get("text") or "")
+    body = strip_markdown_links(text)
+    compact_body = re.sub(r"\s+", "", body)
+    if subquestion == "任务书汇编收录的项目数量":
+        return bool(re.search(r"\d+个项目", compact_body) and any(marker in compact_body for marker in ("收录", "汇编", "包含")))
+    if subquestion == "任务书覆盖的业态范围":
+        return bool(re.search(r"(?:覆盖|涵盖)[^。；\n]{1,80}(?:业态|专业)|(?:业态|专业)(?:包括|有|为)[^。；\n]{1,80}", body))
     if "组织定位" in subquestion:
         return any(marker in text for marker in ("作为", "隶属", "统筹"))
     if "岗位或机构设置" in subquestion:
@@ -298,7 +305,7 @@ def _inventory_register_direct(question: str, candidate: dict[str, Any]) -> bool
     page_marker = "设计支持中心资料登记" if "设计支持中心" in compact_question else "法人管项目资料登记" if "法人管项目" in compact_question else "资料登记"
     if not candidate.get("registration_page_flag") or page_marker not in str(candidate.get("file_name") or ""):
         return False
-    compact_text = re.sub(r"\s+", "", str(candidate.get("text") or candidate.get("raw_text") or ""))
+    compact_text = re.sub(r"\s+", "", strip_markdown_links(str(candidate.get("text") or candidate.get("raw_text") or "")))
     return bool(re.search(r"(?:共|source_count|文件数)[：:]?\d+", compact_text, re.IGNORECASE) or any(marker in compact_text for marker in ("设计策划", "责任状")))
 
 

@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse
 from openpyxl import load_workbook
 from pydantic import BaseModel, Field
 
+from app.bm25 import tokenize
 from app.chunker import chunk_blocks
 from app.domain import SourceBlock
 from app.knowledge_growth_v1 import candidate_for_trace
@@ -996,12 +997,28 @@ def _candidate_primary_runtime() -> tuple[V25LiveShadow, BGEM3DenseProvider]:
     return _candidate_primary_engine, _candidate_primary_dense
 
 
+def _search_candidate_atomic_evidence(candidate: V25LiveShadow, query: str, limit: int) -> list[dict[str, Any]]:
+    scores = candidate.bm25.get_scores(tokenize(query) or ["_empty_"])
+    ranked = []
+    for score, chunk in zip(scores, candidate.chunks, strict=True):
+        chunk_id = str(chunk.get("chunk_id") or "")
+        record = candidate.atomic.get(chunk_id)
+        if score > 0 and record is not None:
+            ranked.append((float(score), chunk_id, record))
+    ranked.sort(key=lambda item: (-item[0], item[1]))
+    return [{"score": score, "record": record} for score, _, record in ranked[:limit]]
+
+
 def _candidate_primary_answer(question: str) -> dict[str, Any]:
     """Expose the frozen V2.6.2 candidate through the same 8010 response contract."""
     started = time.perf_counter()
     candidate, dense = _candidate_primary_runtime()
-    shadow = candidate.run(question, {"answer_status": "NOT_RUN", "citations": []}, query_vector=dense.embed_query(question))
+    embedding_started = time.perf_counter()
+    query_vector = dense.embed_query(question)
+    embedding_ms = (time.perf_counter() - embedding_started) * 1000
+    shadow = candidate.run(question, {"answer_status": "NOT_RUN", "citations": []}, query_vector=query_vector, include_trace=True)
     citations = list(shadow.get("v2_citations") or [])
+    trace_context = shadow.get("trace_context") or {}
     status = str(shadow.get("v2_status") or "INSUFFICIENT_EVIDENCE")
     return {
         "query_id": "Q_" + uuid.uuid4().hex,
@@ -1011,15 +1028,17 @@ def _candidate_primary_answer(question: str) -> dict[str, Any]:
         "answer": str(shadow.get("v2_answer") or "当前候选资料未形成可直接支持问题的证据。"),
         "answer_status": status,
         "status_label": "已回答" if status == "ANSWERED" else "部分回答" if status == "PARTIAL_ANSWER" else status,
-        "claims": [],
-        "claim_evidence_map": {},
+        "claims": trace_context.get("claims") or [],
+        "claim_evidence_map": trace_context.get("claim_evidence_map") or {},
         "citations": citations,
         "debug": {
             "runtime_pointer": {"mode": V262_CANDIDATE_MODE, "candidate_hash": shadow.get("candidate_hash"), "candidate_revision": shadow.get("candidate_revision")},
-            "evidence_bundle": {"bundle_status": shadow.get("v2_bundle_status"), "candidate_evidence": citations, "verified_evidence": citations, "supporting_evidence": [], "conflicting_evidence": []},
+            "query_plan": trace_context.get("query_plan") or {},
+            "evidence_bundle": trace_context.get("evidence_bundle") or {"bundle_status": shadow.get("v2_bundle_status"), "candidate_evidence": [], "verified_evidence": []},
+            "candidate_retrieval": trace_context.get("chunk_retrieval"),
         },
         "growth_candidate_ids": [],
-        "latency": {"total_ms": round((time.perf_counter() - started) * 1000, 3)},
+        "latency": {"query_embedding_ms": round(embedding_ms, 3), "candidate_pipeline_ms": round(float(shadow.get("latency_ms") or 0), 3), "total_ms": round((time.perf_counter() - started) * 1000, 3)},
         "dense_runtime": "LOCAL_BGE_M3_FP32",
         "provider_http_requests": 0,
         "gold_runtime_injection": 0,
@@ -1028,6 +1047,7 @@ def _candidate_primary_answer(question: str) -> dict[str, Any]:
         "source_versions": list(dict.fromkeys(str(item.get("source_version") or "") for item in citations if item.get("source_version"))),
         "generation_mode": "DETERMINISTIC_EVIDENCE",
         "synthesis": {"generation_mode": "DETERMINISTIC_EVIDENCE"},
+        "answer_trace": {"validation_errors": trace_context.get("validation_errors") or []},
         "failure_reason": None if status == "ANSWERED" else str(shadow.get("v2_bundle_status") or "EVIDENCE_INSUFFICIENT"),
         "failure_message": None,
         "review_candidates": [],
@@ -1340,8 +1360,11 @@ def knowledge_search(q: str, limit: int = 20) -> dict[str, Any]:
         str((item.get("source") or {}).get("source_id") or (item.get("knowledge") or {}).get("knowledge_id") or "")
         for item in items
     }
-    evidence_pool = _candidate_primary_runtime()[0].atomic.values() if _primary_mode() == V262_CANDIDATE_MODE else _engine_instance().atomic.values()
-    for match in search_atomic_evidence(q, evidence_pool, limit=maximum * 2):
+    if _primary_mode() == V262_CANDIDATE_MODE:
+        evidence_matches = _search_candidate_atomic_evidence(_candidate_primary_runtime()[0], q, maximum * 2)
+    else:
+        evidence_matches = search_atomic_evidence(q, _engine_instance().atomic.values(), limit=maximum * 2)
+    for match in evidence_matches:
         evidence = match["record"]
         source_id = str(evidence.get("source_id") or source_id_for_path(str(evidence.get("source_path") or "")))
         key = f"EVIDENCE:{evidence.get('evidence_id')}"

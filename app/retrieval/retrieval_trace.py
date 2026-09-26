@@ -205,6 +205,7 @@ def build_trace(
     bundle = debug.get("evidence_bundle") or {}
     answer_status = result.get("answer_status")
     citations = result.get("citations") or []
+    runtime_pointer = debug.get("runtime_pointer") or {}
 
     document_candidates = debug.get("document_candidates") or []
     section_candidates = debug.get("section_candidates") or []
@@ -231,6 +232,39 @@ def build_trace(
         scope_mismatch_in_top=scope_mismatch_in_top,
     )
 
+    stages = {
+        "query_understanding": _query_understanding(plan, question, resolved_question),
+        "retrieval_plan": _retrieval_plan(plan),
+        "lexical_retrieval": _lexical(document_candidates),
+        "dense_retrieval": _dense(document_candidates),
+        "hybrid": _hybrid(document_candidates),
+        "reranker": _reranker(),
+        "section_retrieval": [
+            {
+                "chunk_id": item.get("section_id"),
+                "document_id": item.get("document_id"),
+                "rank": item.get("rank"),
+                "score": item.get("score"),
+                "candidate_origin": item.get("candidate_origin"),
+            }
+            for item in section_candidates[:MAX_CANDIDATES]
+        ],
+        "table_retrieval": [
+            {
+                "chunk_id": item.get("table_id"),
+                "document_id": item.get("document_id"),
+                "rank": item.get("rank"),
+                "score": item.get("score"),
+            }
+            for item in table_candidates[:MAX_CANDIDATES]
+        ],
+        "evidence_validation": validation_rows,
+        "final_evidence": _final_evidence(result, citations),
+    }
+    candidate_retrieval = debug.get("candidate_retrieval")
+    if candidate_retrieval is not None:
+        stages["chunk_retrieval"] = candidate_retrieval
+
     return {
         "query_run_id": query_run_id,
         "timestamp": _now(),
@@ -238,38 +272,11 @@ def build_trace(
         "resolved_question": resolved_question,
         "conversation_id": conversation_id,
         "pipeline_version": result.get("pipeline_version"),
+        "candidate_hash": result.get("candidate_hash") or runtime_pointer.get("candidate_hash"),
         "answer_status": answer_status,
         "answer_mode": result.get("answer_mode"),
         "dense_runtime": result.get("dense_runtime"),
-        "stages": {
-            "query_understanding": _query_understanding(plan, question, resolved_question),
-            "retrieval_plan": _retrieval_plan(plan),
-            "lexical_retrieval": _lexical(document_candidates),
-            "dense_retrieval": _dense(document_candidates),
-            "hybrid": _hybrid(document_candidates),
-            "reranker": _reranker(),
-            "section_retrieval": [
-                {
-                    "chunk_id": item.get("section_id"),
-                    "document_id": item.get("document_id"),
-                    "rank": item.get("rank"),
-                    "score": item.get("score"),
-                    "candidate_origin": item.get("candidate_origin"),
-                }
-                for item in section_candidates[:MAX_CANDIDATES]
-            ],
-            "table_retrieval": [
-                {
-                    "chunk_id": item.get("table_id"),
-                    "document_id": item.get("document_id"),
-                    "rank": item.get("rank"),
-                    "score": item.get("score"),
-                }
-                for item in table_candidates[:MAX_CANDIDATES]
-            ],
-            "evidence_validation": validation_rows,
-            "final_evidence": _final_evidence(result, citations),
-        },
+        "stages": stages,
         "counts": {
             "document_candidates": len(document_candidates),
             "section_candidates": len(section_candidates),

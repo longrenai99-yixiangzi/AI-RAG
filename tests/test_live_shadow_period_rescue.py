@@ -1,5 +1,6 @@
 from app.retrieval.query_planner_v1 import plan_query
-from app.trial.live_shadow_v25 import _named_source_rescue, _period_scope_rescue
+from app.ingestion.atomic_search import scoring_target_phrase
+from app.trial.live_shadow_v25 import _exact_phrase_rescue, _named_source_rescue, _period_scope_rescue
 
 
 def test_h1_period_rescue_excludes_full_year_metric() -> None:
@@ -20,3 +21,25 @@ def test_exact_named_source_rescue_keeps_only_direct_evidence() -> None:
         "other": {"evidence_id": "other", "file_name": "04.\u4e2d\u5efa\u4e09\u5c40\u9879\u76ee\u6570\u5b57\u5efa\u9020\u7cfb\u7edf\u89e3\u51b3\u65b9\u6848.pdf", "text": "\u9879\u76ee\u80cc\u666f\u3002"},
     }
     assert [row["evidence_id"] for row in _named_source_rescue(question, records)] == ["architecture"]
+
+
+def test_scoring_question_rescues_the_matching_table_row() -> None:
+    question = "中建三局局对二公司的2026年设计与技术系统专项责任书中，关于设计建设标准参考手册的评分标准是什么"
+    records = {
+        "wrong": {
+            "evidence_id": "wrong",
+            "file_name": "3.二公司：2026年设计与技术专项责任书 .docx",
+            "text": "行：1 | 设计与技术支持中心能力建设 | 发布《深化设计能力建设实施细则》 | 20 | 未制定细则扣10分。",
+        },
+        "right": {
+            "evidence_id": "right",
+            "file_name": "3.二公司：2026年设计与技术专项责任书 .docx",
+            "text": "行：4 | 设计管理 | 新增不少于2个业态项目设计建设标准参考手册。 | 20 | 每少建立一个业态项目设计建设标准参考手册扣1分。",
+        },
+    }
+    assert [row["evidence_id"] for row in _exact_phrase_rescue(question, records)] == ["right"]
+
+
+def test_scoring_target_phrase_handles_explicit_and_quoted_subjects() -> None:
+    assert scoring_target_phrase("关于设计建设标准参考手册的评分标准是什么") == "设计建设标准参考手册"
+    assert scoring_target_phrase("《设计优化案例汇编》未发布扣几分") == "设计优化案例汇编"

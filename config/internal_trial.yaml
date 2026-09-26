@@ -17,7 +17,7 @@ deterministic_answer_enabled: true
 safe_refusal_enabled: true
 V2_VERIFIED_RAG_ENABLED: true
 v2_verified_rag_8010_only: true
-v2_primary_mode: 'V2_6_2_CANDIDATE'
+v2_primary_mode: 'V1_PRIMARY'
 audit_logging_enabled: true
 formal_port: 8000
 formal_qdrant_path: 'data/qdrant'

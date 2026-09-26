@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,10 +25,49 @@ GOLD_MARKERS = {
     "V262-LSR-019": ("物理文件总数", "可解析文档", "压缩包"),
     "V262-LSR-021": ("投标建安工程费下浮6%",),
 }
+RUNTIME_CODE_FILES = (
+    "app/trial/live_shadow_v25.py",
+    "app/retrieval/query_planner_v1.py",
+    "app/verified_answer_engine_v2.py",
+    "app/ingestion/normalization/markdown_normalizer.py",
+    "scripts/build_verified_evidence_bundle_v1.py",
+    "scripts/run_verified_answer_engine_v2.py",
+    "scripts/run_v2_6_2_answer_gold_replay.py",
+)
 
 
 def compact(value: str) -> str:
     return re.sub(r"\s+", "", str(value or "")).replace("。", "").replace("，", ",")
+
+
+def _code_sha256() -> str:
+    digest = hashlib.sha256()
+    for relative in RUNTIME_CODE_FILES:
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update((ROOT / relative).read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _run_fingerprints(*, code_sha256: str, candidate_hash: str, candidate_revision: str, question_id: str, question: str, answer: str, citations: list[dict]) -> dict[str, str]:
+    citation_fields = ("citation_id", "evidence_id", "source_id", "source_version", "source_path", "location")
+    citation_identity = [{key: citation.get(key) for key in citation_fields} for citation in citations]
+    answer_citation = json.dumps({"answer": answer, "citations": citation_identity}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    answer_citation_sha256 = hashlib.sha256(answer_citation.encode("utf-8")).hexdigest()
+    run_identity = json.dumps({"code_sha256": code_sha256, "candidate_hash": candidate_hash, "candidate_revision": candidate_revision, "question_id": question_id, "question": question, "answer_citation_sha256": answer_citation_sha256}, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return {"answer_citation_sha256": answer_citation_sha256, "run_fingerprint": hashlib.sha256(run_identity.encode("utf-8")).hexdigest()}
+
+
+def _current_manual_review(prior: dict, run_fingerprint: str) -> dict:
+    decision = prior.get("manual_decision")
+    if not decision:
+        return {"manual_decision": None, "reviewer": None, "reviewed_at": None, "review_status": "PENDING_OWNER_RUNTIME_REVIEW"}
+    if prior.get("run_fingerprint") == run_fingerprint:
+        return {"manual_decision": decision, "reviewer": prior.get("reviewer"), "reviewed_at": prior.get("reviewed_at"), "review_status": "OWNER_REVIEWED"}
+    previous_review = {key: prior.get(key) for key in ("manual_decision", "reviewer", "reviewed_at", "run_fingerprint")}
+    previous_review["carry_status"] = "STALE_FINGERPRINT_MISSING" if not prior.get("run_fingerprint") else "FINGERPRINT_CHANGED"
+    return {"manual_decision": None, "reviewer": None, "reviewed_at": None, "review_status": "PENDING_OWNER_RUNTIME_REVIEW", "previous_review": previous_review}
 
 
 def main() -> int:
@@ -36,6 +76,7 @@ def main() -> int:
     previous = {}
     if output.exists():
         previous = {row.get("question_id"): row for row in json.loads(output.read_text(encoding="utf-8")).get("records", [])}
+    code_sha256 = _code_sha256()
     engine = V25LiveShadow()
     provider = BGEM3DenseProvider(MODEL, collection_name="v2_6_2_answer_gold_replay", use_fp16=False, batch_size=1)
     records = []
@@ -62,12 +103,11 @@ def main() -> int:
                 "gold_marker_hits": marker_hits,
                 "gold_marker_coverage": round(len(marker_hits) / len(markers), 4) if markers else None,
                 "validation": result.get("validation"),
-                "review_status": "PENDING_OWNER_RUNTIME_REVIEW",
+                "code_sha256": code_sha256,
             }
             prior = previous.get(item["question_id"], {})
-            if prior.get("manual_decision"):
-                record.update({key: prior[key] for key in ("manual_decision", "reviewer", "reviewed_at") if key in prior})
-                record["review_status"] = "OWNER_REVIEWED"
+            record.update(_run_fingerprints(code_sha256=code_sha256, candidate_hash=str(result.get("candidate_hash") or ""), candidate_revision=str(result.get("candidate_revision") or ""), question_id=str(item["question_id"]), question=question, answer=answer, citations=record["citations"]))
+            record.update(_current_manual_review(prior, record["run_fingerprint"]))
             records.append(record)
     finally:
         provider.close()
@@ -78,13 +118,14 @@ def main() -> int:
         "status": "REPLAY_COMPLETE_NOT_RELEASE_GATE",
         "candidate_revision": engine.candidate_revision,
         "candidate_hash": engine.candidate_hash,
+        "code_sha256": code_sha256,
         "gold_source": str(GOLD),
         "formal_8000_touched": False,
         "8010_switch_authorized": False,
         "records": records,
     }
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    lines = ["# V2.6.2 Answer Gold 候选重放", "", "> 只重放已确认的 9 条 Answer Gold；不计入 Live Shadow，不解除发布闸门。", ""]
+    lines = ["# V2.6.2 Answer Gold 候选重放", "", "> 重放已确认的 10 条 Answer Gold；不计入 Live Shadow，不解除发布闸门。", ""]
     for row in records:
         lines += [
             f"## {row['question_id']}",
@@ -92,7 +133,7 @@ def main() -> int:
             f"- 问题：{row['question']}",
             f"- 候选状态：`{row['candidate_status']}`；证据包：`{row['bundle_status']}`；Gold 关键事实覆盖：`{row['gold_marker_coverage']}`。",
             f"- 候选答案：{row['candidate_answer']}",
-            f"- 引用数：`{len(row['citations'])}`；人工核验：`{row['review_status']}`。",
+            f"- 引用数：`{len(row['citations'])}`；人工核验：`{row['review_status']}`；历史审核：`{(row.get('previous_review') or {}).get('carry_status', 'NONE')}。",
             "",
         ]
     (ROOT / "docs" / "V2_6_2_ANSWER_GOLD_REPLAY.md").write_text("\n".join(lines), encoding="utf-8")

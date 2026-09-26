@@ -46,6 +46,7 @@ def test_exact_reviewed_question_is_ranked_first_without_duplicate_answer_text()
 
 def test_body_with_link_is_not_link_only_but_registration_stub_is():
     assert _link_only("来源：[[制度原文]]") is True
+    assert _link_only("[设计任务书汇编（26个项目）](raw/设计任务书汇编.md)") is True
     assert _link_only("区域分公司中心选择设置技术投标岗。") is False
     assert _link_only("本条款明确公司总部中心的职责、工作边界和运行要求，详见[[制度原文]]。后续执行应保留审核记录。") is False
 

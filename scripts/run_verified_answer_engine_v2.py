@@ -10,6 +10,7 @@ from typing import Any
 import yaml
 
 from app.ingestion.atomic_search import query_terms
+from app.ingestion.normalization.markdown_normalizer import strip_markdown_links
 from app.retrieval.hierarchical_v1 import HierarchicalIndex
 from app.retrieval.query_planner_v1 import plan_query
 from app.verified_answer_engine_v2 import _narrative_count_document_score, render
@@ -203,7 +204,7 @@ def _runtime_bundle(question: str, plan: dict[str, Any], result: dict[str, Any],
         for candidate in candidates
         if candidate.get("role") == "DIRECT"
     )
-    structured_completion = bool(matched_structured) if structured_rows and has_structured_candidate and plan.get("query_type") == "AGGREGATION_QUERY" else None
+    structured_completion = _structured_rows_complete(matched_structured) if structured_rows and has_structured_candidate and plan.get("query_type") == "AGGREGATION_QUERY" else None
     return {"query_id": plan["query_id"], "question": question, "query_plan": plan, "subquestions": subquestions, "bundle_status": status, "candidate_evidence": candidates, "verified_evidence": direct, "supporting_evidence": [candidate for candidate in candidates if candidate["role"] == "SUPPORTING"], "context_only_evidence": [candidate for candidate in candidates if candidate["role"] == "CONTEXT_ONLY"], "conflicting_evidence": [candidate for candidate in candidates if candidate["role"] == "CONFLICTING"], "excluded_evidence": [candidate for candidate in candidates if candidate["role"] == "EXCLUDED"], "coverage_map": coverage, "conflict_map": conflicts, "scope_map": [], "authority_map": [], "lineage_map": [], "structured_rows": matched_structured, "structured_evidence_complete": structured_completion, "structured_fact_map": _structured_facts(plan, candidates, coverage), "evidence_sufficiency": _sufficiency(coverage, conflicts), "failure_reason": "SCOPE_CONFLICT" if source_scope_missing else "RETRIEVAL_MISS" if not candidates else "EVIDENCE_INSUFFICIENT" if not direct else None, "verification_trace": {"fresh_runtime_bundle": True, "gold_runtime_injection": 0, "lineage_auto_join": False}}
 
 
@@ -215,12 +216,28 @@ def _inventory_register_direct(question: str, candidate: dict[str, Any]) -> bool
     page_marker = "设计支持中心资料登记" if "设计支持中心" in compact_question else "法人管项目资料登记" if "法人管项目" in compact_question else "资料登记"
     if not candidate.get("registration_page_flag") or page_marker not in str(candidate.get("file_name") or ""):
         return False
-    compact_text = re.sub(r"\s+", "", str(candidate.get("text") or candidate.get("raw_text") or ""))
+    compact_text = re.sub(r"\s+", "", strip_markdown_links(str(candidate.get("text") or candidate.get("raw_text") or "")))
     return bool(re.search(r"(?:共|source_count|文件数)[：:]?\d+", compact_text, re.IGNORECASE) or any(marker in compact_text for marker in ("设计策划", "责任状")))
 
 
 def _answer_relevant(candidate: dict[str, Any], question: str, plan: dict[str, Any]) -> bool:
-    text = candidate["text"]
+    text = strip_markdown_links(str(candidate["text"]))
+    expected_list = re.search(r"(?:哪|哪些)\s*([0-9]+|[一二三四五六七八九十]+)\s*(?:个|项|条|步|维度|方面)", question)
+    if expected_list:
+        value = expected_list.group(1)
+        expected_count = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}.get(value, int(value) if value.isdigit() else 0)
+        bullet_items = [line for line in text.splitlines() if re.match(r"\s*(?:[-*•]|[0-9]+[、.)]|[一二三四五六七八九十]+[、.])", line)]
+        delimited_items = [item for item in re.split(r"[、；;/\n]", text) if len(item.strip()) >= 2]
+        if expected_count and max(len(bullet_items), len(delimited_items)) < expected_count:
+            return False
+        if expected_count:
+            return True
+    if "任务书" in question and ("多少个项目" in question or "收录了多少" in question or "覆盖" in question and "业态" in question):
+        body = text
+        compact_body = re.sub(r"\s+", "", body)
+        supports_count = bool(re.search(r"\d+个项目", compact_body) and any(marker in compact_body for marker in ("收录", "汇编", "包含")))
+        supports_coverage = bool(re.search(r"(?:覆盖|涵盖)[^。；\n]{1,80}(?:业态|专业)|(?:业态|专业)(?:包括|有|为)[^。；\n]{1,80}", body))
+        return supports_count or supports_coverage
     if candidate.get("source_id") == "SYS_ORGANIZATION_ALIASES":
         return "中建三局第二建设公司" in question and "二公司" in question and any(marker in question for marker in ("关系", "同一个", "全称", "简称"))
     if candidate.get("approved_trial_knowledge") and re.sub(r"\s+", "", question).casefold() in re.sub(r"\s+", "", str(candidate.get("search_context") or "")).casefold():
@@ -320,6 +337,25 @@ def _matched_structured_rows(candidates: list[dict[str, Any]], structured_rows: 
     return [row for row in structured_rows if any(candidate.get("role") == "DIRECT" and _same_structured_source(candidate, row) for candidate in candidates)]
 
 
+def _structured_rows_complete(rows: list[dict[str, Any]]) -> bool:
+    groups: dict[tuple[str, str, str], tuple[int, set[str], int]] = {}
+    for row in rows:
+        table_id = str(row.get("table_id") or (row.get("source_location") or {}).get("table_id") or "")
+        expected = row.get("expected_table_row_count")
+        if not table_id or expected is None:
+            return False
+        key = (str(row.get("source_path") or ""), table_id, str(row.get("source_version") or ""))
+        expected_count, row_ids, count = groups.setdefault(key, (int(expected), set(), 0))
+        if expected_count != int(expected):
+            return False
+        row_id = str(row.get("row_id") or row.get("row_number") or "")
+        if row_id in row_ids:
+            return False
+        row_ids.add(row_id)
+        groups[key] = (expected_count, row_ids, count + 1)
+    return bool(groups) and all(expected == count == len(row_ids) for expected, row_ids, count in groups.values())
+
+
 def _attach_structured_rows(candidates: list[dict[str, Any]], structured_rows: list[dict[str, Any]]) -> None:
     matched = _matched_structured_rows(candidates, structured_rows)
     if not matched:
@@ -336,6 +372,9 @@ def _attach_structured_rows(candidates: list[dict[str, Any]], structured_rows: l
 def _same_structured_source(candidate: dict[str, Any], row: dict[str, Any]) -> bool:
     location = candidate.get("location") or {}
     if candidate.get("source_path") != row.get("source_path"):
+        return False
+    candidate_version, row_version = str(candidate.get("source_version") or ""), str(row.get("source_version") or "")
+    if candidate_version and row_version and candidate_version != row_version:
         return False
     row_table_id = row.get("table_id") or (row.get("source_location") or {}).get("table_id")
     candidate_table_id = candidate.get("table_id") or location.get("table_id")

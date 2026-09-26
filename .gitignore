@@ -1,5 +1,6 @@
 .venv/
 data/
+evaluation/
 __pycache__/
 *.py[cod]
 .pytest_cache/

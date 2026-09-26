@@ -8,11 +8,11 @@
 - Git 基线：`rag-v1-refactor`
 - 知识源：`[LOCAL_PATH_REDACTED]，只读
 - 正式服务：`127.0.0.1:8000`，保持未切换
-- 内部试用：`127.0.0.1:8010`，V2 Verified RAG 已启用
+- 内部试用配置：`127.0.0.1:8010`，V2 Verified RAG 已启用；`v2_primary_mode` 当前为 `V1_PRIMARY`
 - Provider 依赖的生成式回答：试用策略关闭；证据展示和确定性事实路径仍可用
 - 生产状态：`PRODUCTION_READY = FALSE`
 
-V2.6.2 当前候选哈希为 `d6bc010ac8c06057e79c6c8ae6c0a82083d78b2f88125a769f10033a5c2061f9`；8010 Smoke/Canary 已通过，但正式 Release 仍需 Owner 事实/来源复核和当前候选回滚演练。交接入口见 [`docs/V2_6_2_HANDOFF_20260920.md`](docs/V2_6_2_HANDOFF_20260920.md)。
+V2.6.2 候选 `823d3b32b68f84ba397b9035556cc252cf075ea09b2d7df3923e125f1a74b73a` 已获 Owner 版本批准，但尚未部署。33/30 Live Shadow、当前候选 T5 与 T6 报告均已完成；这不表示8000已切换。2026-09-27 00:52（Asia/Shanghai）核验时8000和8010都没有进程监听；8000仍未获启动、写入或切换授权。当前摘要见 [`docs/V2_6_2_GITHUB_SUMMARY.md`](docs/V2_6_2_GITHUB_SUMMARY.md)，详细交接见 [`docs/V2_6_2_HANDOFF_20260920.md`](docs/V2_6_2_HANDOFF_20260920.md)。
 
 内部试用的冻结点、来源范围和安全边界见 [`docs/V2_INTERNAL_TRIAL_BASELINE.md`](docs/V2_INTERNAL_TRIAL_BASELINE.md)。
 

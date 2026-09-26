@@ -133,6 +133,20 @@ def query_terms(query: str) -> list[str]:
     )
 
 
+def scoring_target_phrase(query: str) -> str | None:
+    if not any(marker in query for marker in ("评分", "扣分", "得分", "扣几分", "扣多少分")):
+        return None
+    match = re.search(
+        r"(?:关于|针对|围绕|就)\s*([^，,。；;：:？?！!]{2,32}?)\s*(?:的)?(?:评分标准|评分办法|评分规则|扣分标准|得分标准|扣几分|扣多少分)",
+        query,
+    )
+    if match:
+        target = match.group(1).strip().removeprefix("关于").strip(" 的")
+        return re.sub(r"[\s（）()《》〈〉“”\"'「」『』]", "", target) or None
+    quoted = re.search(r"[《〈“\"「『]([^》〉”\"」』]{2,40})[》〉”\"」』]", query)
+    return re.sub(r"\s+", "", quoted.group(1)) if quoted else None
+
+
 def phrases(query: str) -> list[str]:
     tokens = [term for term in tokenize(query) if len(term.strip()) > 1 and term.strip() not in COMMON_TERMS]
     phrases = [term for term in tokens if len(term) >= 3]

@@ -11,11 +11,14 @@ from app.document_intelligence.v2 import DocumentIntelligenceV2Builder, document
 
 def test_markdown_heading_tree_and_table(tmp_path: Path):
     path = tmp_path / "知识.md"
-    path.write_text("# 根\n## 子节\n正文\n\n|字段|值|\n|---|---|\n|A|B|\n", encoding="utf-8")
+    path.write_text("# 根\n## 子节\n正文\n\n|字段|值|\n|---|---|\n|A|B|\n|C|D|\n", encoding="utf-8")
     result = DocumentIntelligenceV2Builder(tmp_path)._parse_md(path, document_id(path))
     assert [item["heading_level"] for item in result["headings"]] == [1, 2]
     assert result["sections"][1]["parent_section_id"] == result["sections"][0]["section_id"]
     assert result["tables"][0]["header"] == ["字段", "值"]
+    assert result["tables"][0]["row_count"] == 2
+    assert [row["values"] for row in result["table_rows"]] == [["A", "B"], ["C", "D"]]
+    assert all("|C|D|" not in paragraph["text"] for paragraph in result["paragraphs"])
 
 
 def test_docx_heading_and_table_parent_section(tmp_path: Path):

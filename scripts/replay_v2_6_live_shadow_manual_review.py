@@ -17,7 +17,22 @@ def read_jsonl(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def _ensure_no_manual_decisions_to_overwrite(paths: tuple[Path, ...]) -> None:
+    for path in paths:
+        if not path.exists():
+            continue
+        if path.suffix == ".jsonl":
+            rows = read_jsonl(path)
+        else:
+            rows = json.loads(path.read_text(encoding="utf-8")).get("records") or []
+        if any(row.get("manual_decision") for row in rows):
+            raise RuntimeError(f"REFUSE_TO_OVERWRITE_OWNER_REVIEW: {path}")
+
+
 def main() -> int:
+    review_jsonl = V26 / "live_shadow_manual_review.jsonl"
+    review_json = V26 / "live_shadow_manual_review.json"
+    _ensure_no_manual_decisions_to_overwrite((review_jsonl, review_json))
     runs = [row for row in read_jsonl(RUNS) if row.get("execution_mode") == "LIVE_REQUEST_BACKGROUND_V2_5_SHADOW"]
     latest = {}
     for row in runs:
@@ -40,8 +55,8 @@ def main() -> int:
         reviews.append(review)
         print(f"manual_replay={index}/{len(candidates)} status={(review.get('replayed_v2_5') or {}).get('status', 'ERROR')}", flush=True)
     payload = {"schema_version": "knowledge_os_v2_6.live_shadow_manual_review", "captured_at": now, "review_count": len(reviews), "new_hit_count": sum(row["candidate_type"] == "NEW_HIT" for row in reviews), "lost_hit_count": sum(row["candidate_type"] == "LOST_HIT" for row in reviews), "replayed_ok": sum(row.get("replayed_v2_5") is not None for row in reviews), "replayed_errors": sum(row.get("replayed_v2_5") is None for row in reviews), "manual_decision_status": "PENDING_OWNER_REVIEW", "warning": "重放使用当前 Primary/V2.5 代码，不修改原始 Live Shadow 记录，也不将重放结果自动计为 Gate PASS。", "records_path": str(V26 / "live_shadow_manual_review.jsonl"), "records": reviews}
-    (V26 / "live_shadow_manual_review.jsonl").write_text("".join(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n" for row in reviews), encoding="utf-8")
-    (V26 / "live_shadow_manual_review.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    review_jsonl.write_text("".join(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n" for row in reviews), encoding="utf-8")
+    review_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({key: payload[key] for key in ("review_count", "new_hit_count", "lost_hit_count", "replayed_ok", "replayed_errors", "manual_decision_status")}, ensure_ascii=False, indent=2))
     return 0
 

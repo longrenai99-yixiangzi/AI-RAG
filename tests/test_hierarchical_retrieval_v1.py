@@ -42,6 +42,55 @@ def test_project_count_questions_do_not_invent_a_named_project_scope():
     assert plan_query("星谷科创中心项目有哪些信息？").project == ["星谷科创中心项目"]
 
 
+def test_value_creation_ledger_uses_parenthesized_project_scope():
+    question = "直属分公司EPC项目设计价值创造统计台账（无锡山姆）中，结构专业共列了多少条创效策划点？"
+    assert plan_query(question).project == ["无锡山姆"]
+    assert plan_query("直属分公司EPC项目有多少个？").project == []
+
+
+def test_table_maximum_is_a_source_bounded_aggregation():
+    plan = plan_query("EPC台账中建筑面积最大的项目是哪个？面积与超概风险如何？")
+    assert plan.query_type == "AGGREGATION_QUERY"
+    assert "MAX" in plan.aggregation_plan
+    assert {"面积", "风险"} <= set(plan.metric)
+    assert plan.entities == []
+
+
+def test_explicit_question_clauses_get_independent_coverage_items():
+    plan = plan_query("设计评估的流程分为哪三步？评估结论应用于哪三个方面？")
+    assert plan.subquestions == ["设计评估的流程分为哪三步", "评估结论应用于哪三个方面"]
+
+
+def test_shared_predicate_questions_split_each_requested_fact():
+    capacity = plan_query("三峡钱塘风电项目的装机容量和地点是什么？")
+    controls = plan_query("该A级数据机房的温湿度、洁净度和电磁环境控制指标分别是多少？")
+    levels = plan_query("设计进度计划体系中，\"三级\"和\"四线\"各指什么？")
+    clauses = plan_query("设计评估流程分几步并且评估结论应用于哪些方面？")
+
+    assert capacity.subquestions == ["装机容量是什么", "地点是什么"]
+    assert capacity.query_type == "MULTI_FACT"
+    assert controls.subquestions == ["温湿度分别是多少", "洁净度分别是多少", "电磁环境控制指标分别是多少"]
+    assert levels.subquestions == ['三级各指什么', '四线各指什么']
+    assert clauses.subquestions == ["设计评估流程分几步", "评估结论应用于哪些方面"]
+    assert clauses.query_type == "METHOD_QUERY"
+
+
+def test_parallel_fact_split_preserves_parenthetical_city_name():
+    plan = plan_query("中国移动（呼和浩特）方舱式数据中心项目的规模、装机能力与工期节点是多少？")
+
+    assert plan.subquestions == ["规模是多少", "装机能力是多少", "工期节点是多少"]
+
+
+def test_value_sum_is_not_misclassified_as_a_row_count():
+    plan = plan_query("项目清单各专业合计金额是多少？")
+    income_plan = plan_query("项目各分项收入合计多少元？")
+
+    assert "SUM" in plan.aggregation_plan
+    assert "COUNT" not in plan.aggregation_plan
+    assert "SUM" in income_plan.aggregation_plan
+    assert "COUNT" not in income_plan.aggregation_plan
+
+
 def test_hierarchical_document_section_table_and_registration_penalty():
     documents = [
         _document("body", "年度述职.md", "年度述职 公司 2025 创效金额 4.45亿元", "RETROSPECTIVE"),

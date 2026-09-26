@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import os
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 from app.retrieval.dense_provider import BGEM3DenseProvider
 from app.trial.live_shadow_v25 import V25LiveShadow
+from scripts.run_v2_6_2_answer_gold_replay import _code_sha256 as _runtime_code_sha256
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,6 +17,25 @@ V26 = ROOT / "evaluation" / "knowledge_os_v2_6"
 RUNS = V26 / "live_shadow_runs.jsonl"
 EXCLUSIONS = V26 / "v2_6_2_owner_exclusions.json"
 MODEL = ROOT / "models" / "bge-m3"
+
+
+def _compatibility_code_sha256() -> str:
+    digest = hashlib.sha256(_runtime_code_sha256().encode("ascii"))
+    digest.update(b"\0")
+    digest.update(Path(__file__).read_bytes())
+    return digest.hexdigest()
+
+
+def _batch_size(cuda_available: bool, override: str | None = None) -> int:
+    if not override:
+        return 64 if cuda_available else 32
+    try:
+        value = int(override)
+    except ValueError as error:
+        raise ValueError("V2_6_2_COMPATIBILITY_BATCH_SIZE must be a positive integer") from error
+    if value < 1:
+        raise ValueError("V2_6_2_COMPATIBILITY_BATCH_SIZE must be a positive integer")
+    return value
 
 
 def _load_history() -> tuple[list[dict], dict[str, list[dict]]]:
@@ -36,13 +58,16 @@ def _load_history() -> tuple[list[dict], dict[str, list[dict]]]:
 
 def main() -> int:
     historical, history_by_question = _load_history()
+    code_sha256 = _compatibility_code_sha256()
     engine = V25LiveShadow()
     try:
         import torch
         cuda_available = bool(torch.cuda.is_available())
     except Exception:
         cuda_available = False
-    provider = BGEM3DenseProvider(MODEL, collection_name="v2_6_2_compatibility_replay", use_fp16=cuda_available, batch_size=64 if cuda_available else 32)
+    batch_size = _batch_size(cuda_available, os.environ.get("V2_6_2_COMPATIBILITY_BATCH_SIZE"))
+    provider = BGEM3DenseProvider(MODEL, collection_name="v2_6_2_compatibility_replay", use_fp16=cuda_available, batch_size=batch_size)
+    provider_runtime = {"cuda_available": cuda_available, "use_fp16": cuda_available, "batch_size": provider.batch_size}
     records: list[dict] = []
     try:
         vectors = provider.embed_documents([str(row["question"]) for row in historical])
@@ -81,6 +106,8 @@ def main() -> int:
         "status": "CONDITIONAL_COMPATIBILITY_ONLY_NOT_RELEASE_GATE",
         "basis": "Previously recorded real questions, deduplicated by question_hash and excluding Owner-invalid questions listed in v2_6_2_owner_exclusions.json; current answers are offline replay, not Live Shadow.",
         "current_candidate_hash": engine.candidate_hash,
+        "code_sha256": code_sha256,
+        "provider_runtime": provider_runtime,
         "historical_question_count": len(records),
         "transition_counts": {f"{old} -> {new}": count for (old, new), count in sorted(transitions.items())},
         "current_status_counts": dict(Counter(str(row["current_status"]) for row in records)),
@@ -100,6 +127,8 @@ def main() -> int:
         "",
         f"- 历史去重问题：`{payload['historical_question_count']}`",
         f"- 当前候选哈希：`{payload['current_candidate_hash']}`",
+        f"- 运行代码 SHA-256：`{payload['code_sha256']}`",
+        f"- 向量运行配置：`{payload['provider_runtime']}`",
         f"- 当前状态：`{payload['status']}`",
         f"- 当前答案状态：`{payload['current_status_counts']}`",
         f"- 状态转移：`{payload['transition_counts']}`",

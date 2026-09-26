@@ -2,6 +2,12 @@ from __future__ import annotations
 
 import re
 
+_MARKDOWN_LINK_RE = re.compile(r"\[\[[^\]]+\]\]|!?\[[^\]]*\]\([^)]+\)|file://\S+|https?://\S+")
+
+
+def strip_markdown_links(text: str) -> str:
+    return _MARKDOWN_LINK_RE.sub("", text)
+
 
 def normalize_markdown_text(text: str) -> str:
     """Return deterministic Markdown text without removing meaningful blank lines."""

@@ -14,11 +14,12 @@ from app.ingestion.loaders.markdown_loader import MarkdownLoader
 from app.ingestion.loaders.docx_loader import DOCXLoader
 from app.ingestion.loaders.pdf_loader import PDFLoader
 from app.ingestion.loaders.ppt_loader import PPTLoader
+from app.ingestion.loaders.wps_loader import WPSLoader
 from app.ingestion.normalization.markdown_normalizer import normalize_markdown_text
 from app.ingestion.pipeline import build_metadata
 
 
-ATOMIC_EXTENSIONS = {".md", ".pdf", ".docx", ".xlsx", ".pptx"}
+ATOMIC_EXTENSIONS = {".md", ".pdf", ".docx", ".wps", ".xlsx", ".pptx"}
 _HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(.+?)\s*$")
 
 
@@ -29,6 +30,8 @@ def build_atomic_evidence(path: Path, root: Path) -> dict[str, Any]:
         return build_xlsx_records(path, root)
     if path.suffix.lower() in {".pdf", ".docx", ".pptx"}:
         return build_block_records(path, root)
+    if path.suffix.lower() == ".wps":
+        return build_wps_records(path, root)
     return {"path": str(path), "file_type": path.suffix.lower(), "status": "unsupported", "records": [], "error": None}
 
 
@@ -244,6 +247,36 @@ def build_block_records(path: Path, root: Path) -> dict[str, Any]:
     base["metadata"] = metadata
     base["records"] = records
     base["quality"] = getattr(loaded, "quality", None)
+    return base
+
+
+def build_wps_records(path: Path, root: Path) -> dict[str, Any]:
+    document_id = _document_id(path)
+    sha256 = _sha256(path)
+    loaded = WPSLoader().load(path, document_id)
+    base = _base_result(path, loaded.status, loaded.error)
+    if loaded.status != "parsed":
+        base["metadata"] = build_metadata(path, root, parse_status=loaded.status)
+        return base
+    text = "\n".join(str(item["text"]) for item in loaded.paragraphs)
+    title = next((str(item["text"]) for item in loaded.paragraphs if str(item["text"]).strip()), path.stem)
+    metadata = build_metadata(path, root, parse_status="parsed", title=title, text=text[:4_000])
+    records = [
+        _record(
+            path=path,
+            document_id=document_id,
+            sha256=sha256,
+            evidence_key=f"paragraph:{item['paragraph_number']}:{item['text']}",
+            text=str(item["text"]),
+            granularity="paragraph",
+            heading_path="",
+            location={"paragraph_start": int(item["paragraph_number"]), "paragraph_end": int(item["paragraph_number"])},
+            metadata=metadata,
+        )
+        for item in loaded.paragraphs
+        if str(item.get("text") or "").strip()
+    ]
+    base.update({"status": "parsed" if records else "empty", "metadata": metadata, "records": records})
     return base
 
 

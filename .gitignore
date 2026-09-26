@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 data/qdrant/
 data/shadow/
+evaluation/
 data/indexes/
 data/reports/
 data/*.sqlite3

@@ -46,6 +46,7 @@ const seeds: DomainSeed[] = [
 ]
 
 function makeNodes(seed: DomainSeed): KnowledgeNode[] {
+  if (seed.categories.length === 0) return []
   const domainId = `domain-${seed.id}`
   const nodes: KnowledgeNode[] = [
     {

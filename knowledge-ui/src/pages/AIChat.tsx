@@ -55,6 +55,7 @@ const workflowLabel: Record<string, string> = {
   RECORDED: '已记录，待核对',
   APPROVED: '来源已确认，待生效',
   ACTIVE: '更正已生效',
+  PENDING_CANDIDATE: '已审核，待纳入候选',
   REJECTED: '已驳回',
   DEFERRED: '已暂缓',
   WITHDRAWN: '更正知识已撤回',
@@ -309,7 +310,7 @@ function WorkflowItem({ item, onRefresh }: { item: Workflow; onRefresh: () => Pr
     setBusy(true)
     const response = await fetch(`/api/v2/feedback-workflow/${item.feedback_id}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trial_user: 'reviewer-001', decision, source_path: sourcePath, source_location: sourceLocation, required_terms: splitTerms(terms), standard_question: item.standard_question || item.question, similar_questions: item.similar_questions || [], negative_questions: item.negative_questions || [], applicability: item.applicability || '' }) })
     const payload = await response.json()
-    setNotice(response.ok ? payload.status === 'SOURCE_INDEX_FAILED' ? '来源解析或索引失败，请查看知识资产中的原因。' : decision === 'APPROVE' ? '已核对并发布到试用知识。' : decision === 'REJECT' ? '已驳回。' : '已暂缓。' : (payload.detail || '操作失败。'))
+    setNotice(response.ok ? payload.status === 'SOURCE_INDEX_FAILED' ? '来源解析或索引失败，请查看知识资产中的原因。' : decision === 'APPROVE' ? payload.knowledge?.status === 'PENDING_CANDIDATE' ? '已审核，待纳入下一版候选；当前主答尚未采用。' : '已核对并发布到试用知识。' : decision === 'REJECT' ? '已驳回。' : '已暂缓。' : (payload.detail || '操作失败。'))
     setBusy(false)
     if (response.ok) await onRefresh()
   }
@@ -334,12 +335,12 @@ function WorkflowItem({ item, onRefresh }: { item: Workflow; onRefresh: () => Pr
     setBusy(true)
     const response = await fetch(`/api/v2/knowledge/items/${item.knowledge_id}/rollback`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trial_user: 'reviewer-001', target_version: 1, reason: '业务负责人从更正记录恢复首次审核版本' }) })
     const payload = await response.json()
-    setNotice(response.ok ? payload.knowledge?.status === 'ACTIVE' ? '已回滚到首次审核版本并恢复试用。' : '已回滚内容，但来源版本已变化，需要重新核对。' : '回滚失败。')
+    setNotice(response.ok ? payload.knowledge?.status === 'ACTIVE' ? '已回滚到首次审核版本并恢复试用。' : payload.knowledge?.status === 'PENDING_CANDIDATE' ? '已回滚内容，待纳入下一版候选。' : '已回滚内容，但来源版本已变化，需要重新核对。' : '回滚失败。')
     setBusy(false)
     if (response.ok) await onRefresh()
   }
-  const active = item.status === 'ACTIVE'
-  return <article className="closure-item"><b>{item.feedback_type} · {workflowLabel[item.closure_status] || workflowLabel[item.status] || item.closure_status}</b><p>{item.question}</p>{item.failure_code && <small>{item.failure_stage || '待分类'} · {item.failure_code}：{item.root_cause}</small>}{item.system_fix_required && <p>已进入 RAG 系统缺陷池，不能发布为标准答案。</p>}{!item.system_fix_required && !active && !['REJECTED', 'DEFERRED', 'WITHDRAWN'].includes(item.status) && <><input value={sourcePath} onChange={(event) => setSourcePath(event.target.value)} placeholder="来源文件路径" /><input value={sourceLocation} onChange={(event) => setSourceLocation(event.target.value)} placeholder="页码、段落或Sheet" /><input value={terms} onChange={(event) => setTerms(event.target.value)} placeholder="关键事实，逗号分隔" /><div><button disabled={busy} onClick={() => void review('APPROVE')}>核对并发布</button><button disabled={busy} onClick={() => void review('DEFER')}>暂缓</button><button disabled={busy} onClick={() => void review('REJECT')}>驳回</button></div></>}{active && <div><button disabled={busy} onClick={() => void regress()}>运行全库回归</button><button disabled={busy} onClick={() => void withdraw()}>撤回更正知识</button></div>}{item.status === 'WITHDRAWN' && <div><button disabled={busy} onClick={() => void rollback()}>回滚到首次审核版本</button></div>}{notice && <small>{notice}</small>}</article>
+  const reviewed = ['ACTIVE', 'PENDING_CANDIDATE'].includes(item.status)
+  return <article className="closure-item"><b>{item.feedback_type} · {workflowLabel[item.closure_status] || workflowLabel[item.status] || item.closure_status}</b><p>{item.question}</p>{item.failure_code && <small>{item.failure_stage || '待分类'} · {item.failure_code}：{item.root_cause}</small>}{item.system_fix_required && <p>已进入 RAG 系统缺陷池，不能发布为标准答案。</p>}{!item.system_fix_required && !reviewed && !['REJECTED', 'DEFERRED', 'WITHDRAWN'].includes(item.status) && <><input value={sourcePath} onChange={(event) => setSourcePath(event.target.value)} placeholder="来源文件路径" /><input value={sourceLocation} onChange={(event) => setSourceLocation(event.target.value)} placeholder="页码、段落或Sheet" /><input value={terms} onChange={(event) => setTerms(event.target.value)} placeholder="关键事实，逗号分隔" /><div><button disabled={busy} onClick={() => void review('APPROVE')}>核对并发布</button><button disabled={busy} onClick={() => void review('DEFER')}>暂缓</button><button disabled={busy} onClick={() => void review('REJECT')}>驳回</button></div></>}{reviewed && <div><button disabled={busy} onClick={() => void regress()}>运行当前主答回归</button><button disabled={busy} onClick={() => void withdraw()}>撤回更正知识</button></div>}{item.status === 'WITHDRAWN' && <div><button disabled={busy} onClick={() => void rollback()}>回滚到首次审核版本</button></div>}{notice && <small>{notice}</small>}</article>
 }
 
 function SourceDetail({ citation }: { citation: Citation }) {

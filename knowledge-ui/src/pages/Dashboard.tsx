@@ -39,7 +39,7 @@ export function Dashboard() {
     {error && <p className="runtime-error">{error}</p>}
     <section className="runtime-metrics" aria-label="当前试用知识状态">
       <article><b>{overview?.sources ?? '读取中'}</b><span>已登记来源</span></article>
-      <article><b>{overview?.indexed_sources ?? '读取中'}</b><span>正文已入库</span></article>
+      <article><b>{overview?.indexed_sources ?? '读取中'}</b><span>主答已收录来源</span></article>
       <article><b>{overview?.active_knowledge ?? '读取中'}</b><span>已生效更正知识</span></article>
       <article><b>{overview?.pending_feedback ?? '读取中'}</b><span>待处理反馈</span></article>
     </section>

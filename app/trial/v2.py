@@ -723,29 +723,43 @@ def _sync_trial_sources() -> None:
 
 def _source_catalog(*, include_withdrawn: bool = False) -> list[dict[str, Any]]:
     central = {row["source_id"]: row for row in KNOWLEDGE_STORE.list_sources(include_withdrawn=include_withdrawn)}
-    for document in _engine_instance().documents.values():
-        source_path = str(document.get("source_path") or "")
+    runtime_source_ids: set[str] = set()
+    for evidence in _runtime_evidence_records():
+        source_path = str(evidence.get("source_path") or "")
         if not source_path:
             continue
-        source_id = str(document.get("source_id") or source_id_for_path(source_path))
-        if source_id in central:
-            continue
-        central[source_id] = {
-            "source_id": source_id,
-            "source_path": source_path,
-            "file_name": document.get("file_name") or Path(source_path).name,
-            "file_type": document.get("file_type") or Path(source_path).suffix.lower(),
-            "source_type": document.get("document_role") or document.get("document_type") or "待分类",
-            "knowledge_root_id": document.get("knowledge_root_id") or "Root-001",
-            "approval_status": "FROZEN_INDEX",
-            "body_status": "PARSED",
-            "index_status": "INDEXED",
-            "current_hash": document.get("sha256") or "FROZEN_INDEX",
-            "version_note": "冻结索引版本",
-            "withdrawn": False,
-            "updated_at": "",
-        }
+        source_id = str(evidence.get("source_id") or source_id_for_path(source_path))
+        runtime_source_ids.add(source_id)
+        row = central.setdefault(source_id, {
+            "source_id": source_id, "source_path": source_path,
+            "file_name": evidence.get("file_name") or Path(source_path).name,
+            "file_type": evidence.get("file_type") or Path(source_path).suffix.lower(),
+            "source_type": "当前运行证据", "knowledge_root_id": "Runtime",
+            "approval_status": "FROZEN_INDEX", "body_status": "PARSED",
+            "index_status": "INDEXED", "current_hash": evidence.get("source_version") or "FROZEN_INDEX",
+            "version_note": "当前运行版本", "withdrawn": False, "updated_at": "",
+        })
+        row["runtime_source_version"] = evidence.get("source_version") or row.get("current_hash")
+    candidate_mode = _primary_mode() == V262_CANDIDATE_MODE
+    for source_id, row in central.items():
+        included = source_id in runtime_source_ids
+        row["runtime_included"] = included
+        row["runtime_status"] = "ACTIVE_FROZEN_CANDIDATE" if included and candidate_mode else "ACTIVE_CURRENT_RUNTIME" if included else "PENDING_CANDIDATE_INCLUSION" if candidate_mode else "NOT_IN_CURRENT_RUNTIME"
     return sorted(central.values(), key=lambda row: (str(row.get("knowledge_root_id") or ""), str(row.get("file_name") or "").casefold()))
+
+
+def _runtime_evidence_records() -> list[dict[str, Any]]:
+    if _primary_mode() == V262_CANDIDATE_MODE:
+        return list(_candidate_primary_runtime()[0].atomic.values())
+    return list(_engine_instance().atomic.values())
+
+
+def _runtime_has_source(source_path: str, source_version: str = "") -> bool:
+    return any(
+        _same_source_path(source_path, row.get("source_path"))
+        and (not source_version or str(row.get("source_version") or "") == source_version)
+        for row in _runtime_evidence_records()
+    )
 
 
 def _source_scope(path: Path, chunks: list[Any]) -> dict[str, list[str]]:
@@ -1055,6 +1069,14 @@ def _candidate_primary_answer(question: str) -> dict[str, Any]:
     }
 
 
+def _answer_current_runtime(question: str, *, detect_growth: bool = False) -> dict[str, Any]:
+    if _primary_mode() == V262_CANDIDATE_MODE:
+        return _candidate_primary_answer(question)
+    result = _engine_instance().answer(question, detect_growth=detect_growth)
+    result.setdefault("debug", {}).setdefault("runtime_pointer", {"mode": V1_PRIMARY_MODE, "pipeline_version": result.get("pipeline_version")})
+    return result
+
+
 def reset_trial_engine() -> None:
     global _engine, _candidate_primary_engine, _candidate_primary_dense
     with _engine_lock:
@@ -1148,8 +1170,7 @@ def query(request: V2QueryRequest) -> dict[str, Any]:
         raise HTTPException(status_code=503, detail="V2_VERIFIED_RAG_DISABLED")
     previous = KNOWLEDGE_STORE.last_query_for_conversation(request.conversation_id)
     resolved_question = _resolve_followup(request.question, previous)
-    candidate_primary = _primary_mode() == V262_CANDIDATE_MODE
-    result = _candidate_primary_answer(resolved_question) if candidate_primary else _engine_instance().answer(resolved_question)
+    result = _answer_current_runtime(resolved_question, detect_growth=True)
     result["question"] = request.question
     result["resolved_question"] = resolved_question
     query_run_id = "QR_" + uuid.uuid4().hex
@@ -1273,7 +1294,9 @@ def knowledge_overview() -> dict[str, Any]:
     sources = _source_catalog()
     overview.update({
         "sources": len(sources),
-        "indexed_sources": sum(row.get("index_status") == "INDEXED" for row in sources),
+        "indexed_sources": sum(bool(row.get("runtime_included")) for row in sources),
+        "active_knowledge": 0 if _primary_mode() == V262_CANDIDATE_MODE else overview["active_knowledge"],
+        "runtime_mode": _primary_mode(),
     })
     return overview
 
@@ -1319,8 +1342,9 @@ def knowledge_source_evidence(source_id: str, limit: int = 10) -> dict[str, Any]
             "search_context": str(record.get("search_context") or ""),
             "excerpt": str(record.get("raw_text") or record.get("text") or "")[:900],
         }
-        for record in _engine_instance().atomic.values()
-        if str(record.get("source_id") or "") == source_id
+        for record in _runtime_evidence_records()
+        if str(record.get("source_id") or source_id_for_path(str(record.get("source_path") or ""))) == source_id
+        and str(record.get("source_version") or "") == str(source.get("runtime_source_version") or "")
     ][:max(1, min(limit, 50))]
     return {"source": source, "items": records}
 
@@ -1337,7 +1361,7 @@ def refresh_knowledge_source(source_id: str, request: WithdrawKnowledgeRequest) 
     KNOWLEDGE_STORE.register_source(path, reactivate=True)
     reset_trial_engine()
     _engine_instance()
-    return {"source": KNOWLEDGE_STORE.source(source_id), "formal_knowledge_publish": 0}
+    return {"source": next(row for row in _source_catalog(include_withdrawn=True) if row["source_id"] == source_id), "formal_knowledge_publish": 0}
 
 
 @router.post("/knowledge/sources/{source_id}/withdraw")
@@ -1355,7 +1379,15 @@ def knowledge_search(q: str, limit: int = 20) -> dict[str, Any]:
     if not q.strip():
         return {"items": [], "query": q, "message": "请输入关键词后再搜索。"}
     maximum = max(1, min(limit, 50))
-    items = KNOWLEDGE_STORE.search(q, maximum)
+    runtime_versions = {
+        (str(row.get("source_id") or source_id_for_path(str(row.get("source_path") or ""))), str(row.get("source_version") or ""))
+        for row in _runtime_evidence_records()
+    }
+    items = [
+        item for item in KNOWLEDGE_STORE.search(q, maximum)
+        if (str((item.get("source") or item.get("knowledge") or {}).get("source_id") or ""),
+            str((item.get("source") or {}).get("current_hash") or (item.get("knowledge") or {}).get("source_version") or "")) in runtime_versions
+    ] if _primary_mode() != V262_CANDIDATE_MODE else []
     seen = {
         str((item.get("source") or {}).get("source_id") or (item.get("knowledge") or {}).get("knowledge_id") or "")
         for item in items
@@ -1370,7 +1402,7 @@ def knowledge_search(q: str, limit: int = 20) -> dict[str, Any]:
         key = f"EVIDENCE:{evidence.get('evidence_id')}"
         if key in seen:
             continue
-        items.append({"type": "EVIDENCE", "score": match["score"], "evidence": {"evidence_id": evidence.get("evidence_id"), "source_id": source_id, "file_name": evidence.get("file_name"), "source_path": evidence.get("source_path"), "location": evidence.get("location") or {}, "heading_path": evidence.get("heading_path") or "", "excerpt": str(evidence.get("raw_text") or evidence.get("text") or "")[:500]}})
+        items.append({"type": "EVIDENCE", "score": match["score"], "evidence": {"evidence_id": evidence.get("evidence_id"), "source_id": source_id, "source_version": evidence.get("source_version"), "file_name": evidence.get("file_name"), "source_path": evidence.get("source_path"), "location": evidence.get("location") or {}, "heading_path": evidence.get("heading_path") or "", "excerpt": str(evidence.get("raw_text") or evidence.get("text") or "")[:500]}})
         seen.add(key)
         if len(items) >= maximum:
             break
@@ -1379,7 +1411,7 @@ def knowledge_search(q: str, limit: int = 20) -> dict[str, Any]:
 
 @router.get("/knowledge/items")
 def knowledge_items() -> dict[str, Any]:
-    return {"items": KNOWLEDGE_STORE.active_knowledge()}
+    return {"items": [] if _primary_mode() == V262_CANDIDATE_MODE else KNOWLEDGE_STORE.active_knowledge()}
 
 
 @router.get("/knowledge/change-candidates")
@@ -1461,7 +1493,7 @@ def feedback_workflow() -> dict[str, Any]:
     for feedback in KNOWLEDGE_STORE.list_feedback():
         source = KNOWLEDGE_STORE.source(str(feedback.get("source_id") or "")) if feedback.get("source_id") else None
         state = str(source.get("index_status")) if source else "SOURCE_CONFIRMATION_REQUIRED"
-        closure = "ACTIVE" if feedback.get("status") == "ACTIVE" else "SOURCE_CLOSURE_REQUIRED" if feedback.get("status") == "APPROVED" and state != "INDEXED" else str(feedback.get("status") or "RECORDED")
+        closure = "PENDING_CANDIDATE" if _primary_mode() == V262_CANDIDATE_MODE and feedback.get("status") == "ACTIVE" else "ACTIVE" if feedback.get("status") == "ACTIVE" else "SOURCE_CLOSURE_REQUIRED" if feedback.get("status") == "APPROVED" and state != "INDEXED" else str(feedback.get("status") or "RECORDED")
         rows.append({**feedback, "source": source, "source_runtime_status": state, "closure_status": closure})
     return {"items": rows}
 
@@ -1503,6 +1535,7 @@ def review_feedback_workflow(feedback_id: str, request: ReviewedFeedbackRequest)
         negative_questions=[item.strip() for item in request.negative_questions if item.strip()],
         applicability=request.applicability,
         node_id=request.node_id,
+        activate=_primary_mode() != V262_CANDIDATE_MODE,
     )
     if knowledge:
         reset_trial_engine()
@@ -1517,15 +1550,15 @@ def run_feedback_workflow_regression(feedback_id: str, request: ReviewedFeedback
         raise HTTPException(status_code=404, detail="FEEDBACK_NOT_FOUND")
     source_id = str(feedback.get("source_id") or "")
     source = KNOWLEDGE_STORE.source(source_id)
-    if not source or source.get("index_status") != "INDEXED":
-        return {"feedback_id": feedback_id, "regression_status": "NOT_READY", "reason": "来源正文尚未进入当前试用索引。", "automatic_knowledge_publish": 0}
-    result = _engine_instance().answer(str(feedback.get("question") or ""), detect_growth=False)
+    if not source or source.get("index_status") != "INDEXED" or not _runtime_has_source(str(source.get("source_path") or ""), str(source.get("current_hash") or "")):
+        return {"feedback_id": feedback_id, "regression_status": "NOT_READY", "reason": "来源当前版本尚未进入主答运行范围。", "runtime_mode": _primary_mode(), "automatic_knowledge_publish": 0}
+    result = _answer_current_runtime(str(feedback.get("question") or ""))
     citation = next((item for item in result.get("citations", []) if item.get("source_id") == source_id), None)
     location = str(feedback.get("source_location") or "").strip()
     location_hit = not location or (citation is not None and location in str(citation.get("display_location") or ""))
     missing = [term for term in feedback.get("required_terms", []) if term not in str(result.get("answer") or "")]
     passed = result.get("answer_status") == "ANSWERED" and citation is not None and location_hit and not missing
-    regression = {"run_id": "RW_" + uuid.uuid4().hex, "run_at": _now(), "answer_status": result.get("answer_status"), "citation_source_hit": citation is not None, "citation_location_hit": location_hit, "missing_required_terms": missing, "regression_status": "PASSED" if passed else "FAILED", "answer_excerpt": str(result.get("answer") or "")[:900]}
+    regression = {"run_id": "RW_" + uuid.uuid4().hex, "run_at": _now(), "answer_status": result.get("answer_status"), "runtime_pointer": (result.get("debug") or {}).get("runtime_pointer"), "citation_source_hit": citation is not None, "citation_location_hit": location_hit, "missing_required_terms": missing, "regression_status": "PASSED" if passed else "FAILED", "answer_excerpt": str(result.get("answer") or "")[:900]}
     KNOWLEDGE_STORE.record_regression(feedback_id, regression)
     return {"feedback_id": feedback_id, "regression": regression, "automatic_knowledge_publish": 0}
 
@@ -1544,7 +1577,7 @@ def withdraw_knowledge(knowledge_id: str, request: WithdrawKnowledgeRequest) -> 
 def rollback_knowledge(knowledge_id: str, request: RollbackKnowledgeRequest) -> dict[str, Any]:
     _ensure_user(request.trial_user)
     try:
-        knowledge = KNOWLEDGE_STORE.rollback_knowledge(knowledge_id, target_version=request.target_version, reviewer=request.trial_user, reason=request.reason)
+        knowledge = KNOWLEDGE_STORE.rollback_knowledge(knowledge_id, target_version=request.target_version, reviewer=request.trial_user, reason=request.reason, activate=_primary_mode() != V262_CANDIDATE_MODE)
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     if knowledge is None:
@@ -1604,7 +1637,7 @@ def growth_regression(request: GrowthRegressionRequest) -> dict[str, Any]:
     case = _case_with_readiness(case)
     if not case.get("ready"):
         return {"candidate_id": request.candidate_id, "regression_status": "NOT_READY", "reason": case["regression_ready_reason"], "source_runtime_status": case["source_runtime_status"], "invalid_required_terms": case["invalid_required_terms"], "automatic_knowledge_publish": 0}
-    result = _engine_instance().answer(str(case["question"]), detect_growth=False)
+    result = _answer_current_runtime(str(case["question"]))
     run = _evaluate_feedback_regression(case, result, request.trial_user)
     _append_jsonl(FEEDBACK_RUNS, run)
     return {"candidate_id": request.candidate_id, "regression": run, "automatic_knowledge_publish": 0}
@@ -1736,6 +1769,7 @@ def _evaluate_feedback_regression(case: dict[str, Any], result: dict[str, Any], 
         "run_at": _now(),
         "reviewer": reviewer,
         "answer_status": result.get("answer_status"),
+        "runtime_pointer": (result.get("debug") or {}).get("runtime_pointer"),
         "citation_source_hit": source_hit,
         "citation_location_hit": location_hit,
         "missing_required_terms": missing_terms,
@@ -1779,17 +1813,11 @@ def _source_runtime_status(source_path: str) -> str:
     if not source_path:
         return "PENDING_OWNER_CONFIRMATION"
     source = KNOWLEDGE_STORE.source(source_id_for_path(source_path))
-    if source:
-        if source.get("withdrawn"):
-            return "WITHDRAWN"
-        if source.get("index_status") == "INDEXED":
-            return "INDEXED_SHADOW"
-        return "SOURCE_IDENTIFIED"
-    try:
-        indexed = any(_same_source_path(source_path, row.get("source_path")) for row in _engine_instance().index.atomic)
-    except Exception:
-        indexed = False
-    return "INDEXED_SHADOW" if indexed else _declared_source_status(source_path)
+    if source and source.get("withdrawn") and _primary_mode() != V262_CANDIDATE_MODE:
+        return "WITHDRAWN"
+    if _runtime_has_source(source_path):
+        return "VERIFIED_RUNTIME" if _primary_mode() == V262_CANDIDATE_MODE else "INDEXED_SHADOW"
+    return _declared_source_status(source_path)
 
 
 def _approved_shadow_sources() -> list[dict[str, str]]:

@@ -134,7 +134,6 @@ def batch_questions(source_paths: list[str] = Query(default=[]), trial_user: str
 @router.post("/regressions/run")
 def run_batch_regressions(request: BatchRunRequest) -> dict[str, Any]:
     v2._ensure_user(request.trial_user)
-    engine = v2._engine_instance()
     cases = list(v2._latest_by_id(v2._read_jsonl(v2.BATCH_CASES), "case_id").values())
     if request.case_ids:
         wanted = set(request.case_ids)
@@ -142,10 +141,10 @@ def run_batch_regressions(request: BatchRunRequest) -> dict[str, Any]:
     runs = []
     for case in cases:
         expected_path = v2._normalize_source_path(case.get("expected_source_path"))
-        if expected_path not in v2.LOADED_SHADOW_PATHS:
+        if not v2._runtime_has_source(expected_path):
             run = _not_ready_run(case, request.trial_user)
         else:
-            result = engine.answer(str(case.get("question") or ""), detect_growth=False, source_paths=[expected_path])
+            result = v2._answer_current_runtime(str(case.get("question") or ""))
             run = _evaluate_case(case, result, request.trial_user)
         v2._append_jsonl(v2.BATCH_RUNS, run)
         runs.append(run)
@@ -460,7 +459,7 @@ def _case(path: Path, question: str, location: str, terms: list[str], generation
 
 
 def _not_ready_run(case: dict[str, Any], reviewer: str) -> dict[str, Any]:
-    return {"run_id": "BR_" + uuid.uuid4().hex, "case_id": case["case_id"], "run_at": v2._now(), "reviewer": reviewer, "regression_status": "NOT_READY", "repair_status": "SOURCE_CLOSURE_REQUIRED", "reason": "来源尚未进入当前 Shadow 索引。", "source_runtime_status": "SOURCE_IDENTIFIED", "formal_knowledge_publish": False}
+    return {"run_id": "BR_" + uuid.uuid4().hex, "case_id": case["case_id"], "run_at": v2._now(), "reviewer": reviewer, "regression_status": "NOT_READY", "repair_status": "SOURCE_CLOSURE_REQUIRED", "reason": "来源尚未进入当前主答运行范围。", "runtime_mode": v2._primary_mode(), "source_runtime_status": "SOURCE_IDENTIFIED", "formal_knowledge_publish": False}
 
 
 def _evaluate_case(case: dict[str, Any], result: dict[str, Any], reviewer: str) -> dict[str, Any]:
@@ -477,7 +476,7 @@ def _evaluate_case(case: dict[str, Any], result: dict[str, Any], reviewer: str) 
         passed = result.get("answer_status") == "ANSWERED" and source_hit and location_hit and not missing
         status = "PASSED" if passed else "FAILED"
         repair_status = "VALIDATED" if passed else "REPAIR_REQUIRED"
-    return {"run_id": "BR_" + uuid.uuid4().hex, "case_id": case["case_id"], "run_at": v2._now(), "reviewer": reviewer, "answer_status": result.get("answer_status"), "dense_runtime": result.get("dense_runtime"), "citation_source_hit": source_hit, "citation_location_hit": location_hit, "missing_required_terms": missing, "regression_status": status, "repair_status": repair_status, "answer_excerpt": answer[:1200], "citation_ids": [item.get("citation_id") for item in citations], "provider_http_requests": result.get("provider_http_requests"), "runtime_input_injection": 0, "formal_knowledge_publish": False}
+    return {"run_id": "BR_" + uuid.uuid4().hex, "case_id": case["case_id"], "run_at": v2._now(), "reviewer": reviewer, "answer_status": result.get("answer_status"), "runtime_pointer": (result.get("debug") or {}).get("runtime_pointer"), "dense_runtime": result.get("dense_runtime"), "citation_source_hit": source_hit, "citation_location_hit": location_hit, "missing_required_terms": missing, "regression_status": status, "repair_status": repair_status, "answer_excerpt": answer[:1200], "citation_ids": [item.get("citation_id") for item in citations], "provider_http_requests": result.get("provider_http_requests"), "runtime_input_injection": 0, "formal_knowledge_publish": False}
 
 
 def _sha256(path: Path) -> str:

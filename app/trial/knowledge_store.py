@@ -117,7 +117,7 @@ class TrialKnowledgeStore:
                 versions = [{**item, "active": False} for item in versions]
                 versions.append({"sha256": digest, "seen_at": _now(), "parse_status": "PENDING", "index_status": "PENDING", "active": True})
                 for knowledge in state["knowledge"].values():
-                    if knowledge.get("source_id") == source_id and knowledge.get("status") == "ACTIVE":
+                    if knowledge.get("source_id") == source_id and knowledge.get("status") in {"ACTIVE", "PENDING_CANDIDATE"}:
                         candidate_id = "KC_" + uuid.uuid5(uuid.NAMESPACE_URL, f"{knowledge['knowledge_id']}|{digest}").hex[:20]
                         state["change_candidates"][candidate_id] = {
                             "candidate_id": candidate_id,
@@ -132,6 +132,12 @@ class TrialKnowledgeStore:
                         }
                         knowledge["status"] = "REVIEW_REQUIRED"
                         knowledge["updated_at"] = _now()
+                        feedback = state["feedback"].get(str(knowledge.get("feedback_id") or ""))
+                        if feedback:
+                            feedback["status"] = "REVIEW_REQUIRED"
+                        for variant in state["question_variants"].values():
+                            if variant.get("knowledge_id") == knowledge["knowledge_id"]:
+                                variant["status"] = "INACTIVE"
             row = {
                 **current,
                 "source_id": source_id,
@@ -225,9 +231,15 @@ class TrialKnowledgeStore:
                 return None
             row.update({"withdrawn": True, "index_status": "WITHDRAWN", "withdrawn_by": reviewer, "updated_at": _now()})
             for knowledge in state["knowledge"].values():
-                if knowledge.get("source_id") == source_id and knowledge.get("status") == "ACTIVE":
+                if knowledge.get("source_id") == source_id and knowledge.get("status") in {"ACTIVE", "PENDING_CANDIDATE"}:
                     knowledge["status"] = "REVIEW_REQUIRED"
                     knowledge["updated_at"] = _now()
+                    feedback = state["feedback"].get(str(knowledge.get("feedback_id") or ""))
+                    if feedback:
+                        feedback["status"] = "REVIEW_REQUIRED"
+                    for variant in state["question_variants"].values():
+                        if variant.get("knowledge_id") == knowledge["knowledge_id"]:
+                            variant["status"] = "INACTIVE"
             state["events"].append({"event_id": "EV_" + uuid.uuid4().hex, "type": "SOURCE_WITHDRAWN", "source_id": source_id, "at": _now()})
             return dict(row)
 
@@ -299,6 +311,7 @@ class TrialKnowledgeStore:
         negative_questions: list[str] | None = None,
         applicability: str = "",
         node_id: str = "",
+        activate: bool = True,
     ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         def action(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any] | None]:
             feedback = state["feedback"].get(feedback_id)
@@ -332,7 +345,7 @@ class TrialKnowledgeStore:
                     "source_location": feedback.get("source_location", ""),
                     "evidence_refs": [{"source_id": feedback["source_id"], "location": feedback.get("source_location", ""), "source_version": source.get("current_hash", "")}],
                     "required_terms": feedback.get("required_terms", []),
-                    "status": "ACTIVE",
+                    "status": "ACTIVE" if activate else "PENDING_CANDIDATE",
                     "review_status": "APPROVED",
                     "edit_origin": "HUMAN_REVIEWED",
                     "version": 1,
@@ -348,9 +361,9 @@ class TrialKnowledgeStore:
                         if not question:
                             continue
                         variant_id = "QV_" + uuid.uuid5(uuid.NAMESPACE_URL, f"{knowledge_id}|{usage}|{question}").hex[:20]
-                        state["question_variants"][variant_id] = {"question_variant_id": variant_id, "knowledge_id": knowledge_id, "text": question, "usage": usage, "review_status": "APPROVED", "source_version": source.get("current_hash", ""), "status": "ACTIVE"}
-                feedback.update({"status": "ACTIVE", "knowledge_id": knowledge_id})
-                state["events"].append({"event_id": "EV_" + uuid.uuid4().hex, "type": "KNOWLEDGE_ACTIVATED", "knowledge_id": knowledge_id, "source_id": feedback["source_id"], "at": _now()})
+                        state["question_variants"][variant_id] = {"question_variant_id": variant_id, "knowledge_id": knowledge_id, "text": question, "usage": usage, "review_status": "APPROVED", "source_version": source.get("current_hash", ""), "status": "ACTIVE" if activate else "PENDING_CANDIDATE"}
+                feedback.update({"status": knowledge["status"], "knowledge_id": knowledge_id})
+                state["events"].append({"event_id": "EV_" + uuid.uuid4().hex, "type": "KNOWLEDGE_ACTIVATED" if activate else "KNOWLEDGE_PENDING_CANDIDATE", "knowledge_id": knowledge_id, "source_id": feedback["source_id"], "at": _now()})
             return dict(feedback), dict(knowledge) if knowledge else None
 
         return self._mutate(action)
@@ -389,7 +402,7 @@ class TrialKnowledgeStore:
 
         return self._mutate(action)
 
-    def rollback_knowledge(self, knowledge_id: str, *, target_version: int, reviewer: str, reason: str) -> dict[str, Any] | None:
+    def rollback_knowledge(self, knowledge_id: str, *, target_version: int, reviewer: str, reason: str, activate: bool = True) -> dict[str, Any] | None:
         def action(state: dict[str, Any]) -> dict[str, Any] | None:
             row = state["knowledge"].get(knowledge_id)
             if row is None:
@@ -400,15 +413,15 @@ class TrialKnowledgeStore:
             source = state["sources"].get(str(target.get("source_id") or ""), {})
             source_valid = bool(source and not source.get("withdrawn") and source.get("current_hash") == target.get("source_version"))
             versions = list(row.get("versions", []))
-            restored = {**target, "version": int(row.get("version", 1)) + 1, "status": "ACTIVE" if source_valid else "REVIEW_REQUIRED", "updated_at": _now(), "rollback_from_version": target_version, "rollback_reason": reason, "rollback_by": reviewer, "versions": versions}
+            restored = {**target, "version": int(row.get("version", 1)) + 1, "status": "ACTIVE" if source_valid and activate else "PENDING_CANDIDATE" if source_valid else "REVIEW_REQUIRED", "updated_at": _now(), "rollback_from_version": target_version, "rollback_reason": reason, "rollback_by": reviewer, "versions": versions}
             restored["versions"] = [*versions, {key: value for key, value in restored.items() if key != "versions"}]
             state["knowledge"][knowledge_id] = restored
             feedback = state["feedback"].get(str(restored.get("feedback_id") or ""))
             if feedback:
-                feedback.update({"status": "ACTIVE" if source_valid else "REVIEW_REQUIRED", "updated_at": _now()})
+                feedback.update({"status": restored["status"], "updated_at": _now()})
             for variant in state["question_variants"].values():
                 if variant.get("knowledge_id") == knowledge_id:
-                    variant["status"] = "ACTIVE" if source_valid else "INACTIVE"
+                    variant["status"] = "ACTIVE" if restored["status"] == "ACTIVE" else "PENDING_CANDIDATE" if restored["status"] == "PENDING_CANDIDATE" else "INACTIVE"
             state["events"].append({"event_id": "EV_" + uuid.uuid4().hex, "type": "KNOWLEDGE_ROLLED_BACK", "knowledge_id": knowledge_id, "target_version": target_version, "source_valid": source_valid, "at": _now()})
             return dict(restored)
 
@@ -441,6 +454,7 @@ class TrialKnowledgeStore:
             "sources": len([row for row in sources if not row.get("withdrawn")]),
             "indexed_sources": len([row for row in sources if row.get("index_status") == "INDEXED" and not row.get("withdrawn")]),
             "active_knowledge": len([row for row in knowledge if row.get("status") == "ACTIVE"]),
+            "pending_candidate_knowledge": len([row for row in knowledge if row.get("status") == "PENDING_CANDIDATE"]),
             "pending_feedback": len([row for row in feedback if row.get("status") in {"RECORDED", "APPROVED"}]),
             "recent_events": list(reversed(state["events"][-10:])),
             "state_version": hashlib.sha256(json.dumps({key: state[key] for key in ("sources", "knowledge", "question_variants")}, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:12],

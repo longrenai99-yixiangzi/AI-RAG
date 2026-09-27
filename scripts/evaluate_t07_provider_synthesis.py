@@ -23,7 +23,7 @@ from app.config import Settings
 GUARD_ROOT = ROOT / "evaluation" / "provider_runtime_guard" / "t07_knowledge_os"
 OUTPUT = ROOT / "evaluation" / "knowledge_os_optimization" / "t07_provider_synthesis.json"
 PUBLIC = ROOT / "evaluation" / "knowledge_os_optimization" / "public_acceptance.json"
-SOURCE = Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2025\制度文件\设计中心运行方案\上会\中建三局第二建设公司设计与技术支持中心组织优化及运行方案.pdf")
+SOURCE = Path(r"[LOCAL_PATH_REDACTED]")
 CASES = [
     {"id": "T07-S01", "question": "中建三局二公司设计与技术支持中心的组织架构是什么样的？", "required": ["公司总部", "各分公司（事业部）", "设计支持岗", "深化设计岗", "方案支持岗", "选择设置"]},
     {"id": "T07-S02", "question": "所有中心都必须设置五个岗位，对吗？", "required": ["均设置", "选择设置"], "required_any": [["不准确", "不对"]]},

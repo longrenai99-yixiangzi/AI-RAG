@@ -1,8 +1,8 @@
 # V1 GPU 环境验证报告
 
-> 任务：TASK-012.5 Dense 运行环境统一  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 检查日期：2026-08-22  
+> 任务：TASK-012.5 Dense 运行环境统一
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 检查日期：2026-08-22
 > 状态：验证完成，但 CUDA Torch 尚未就绪
 
 ## 1. 执行边界
@@ -15,8 +15,8 @@
 
 | 项目 | 结果 |
 |---|---|
-| 项目虚拟环境 | `[LOCAL_PATH_REDACTED]|
-| Python 可执行文件 | `[LOCAL_PATH_REDACTED]|
+| 项目虚拟环境 | `[LOCAL_PATH_REDACTED]` |
+| Python 可执行文件 | `[LOCAL_PATH_REDACTED]` |
 | Python 版本 | 3.12.13 |
 | 实现 | CPython |
 

@@ -22,11 +22,11 @@ STAGING = ROOT / "data" / "shadow" / "knowledge_v2_5_staging"
 STATE = ROOT / "data" / "shadow" / "knowledge_os" / "state.json"
 
 SOURCES = [
-    Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\各类文件\设计管理\《项目设计管理手册》.pdf"),
-    Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\知识库\全专业施工图审核要点提示汇编\全专业施工图审核要点提示汇编（2026年）.xlsx"),
-    Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\责任状\局\3.二公司：2026年设计与技术专项责任书 .docx"),
-    Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\示范工程\关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx"),
-    Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\EPC项目双周推进会\4月\EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
 ]
 
 

@@ -41,7 +41,7 @@ ROOT_CONFIG = {
     "Root-002": {
         "shadow_dir": PROJECT_ROOT / "data" / "shadow" / "root002_import" / "qdrant",
         "collection": "root002_shadow_bge_m3",
-        "source_root": r"[LOCAL_PATH_REDACTED]�公司技术部",
+        "source_root": r"[LOCAL_PATH_REDACTED]",
         "approval_status": "ROOT002_SELECTIVELY_APPROVED_SHADOW",
     },
 }

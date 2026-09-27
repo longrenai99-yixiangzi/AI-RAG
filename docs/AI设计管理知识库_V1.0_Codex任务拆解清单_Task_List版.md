@@ -7,7 +7,8 @@
 # 一、项目目录约定
 
 推荐长期结构：
-[LOCAL_PATH_REDACTED]
+
+    [LOCAL_PATH_REDACTED]
     ├── 设计管理
     │   （Obsidian知识库/原始资料，只读）
     │

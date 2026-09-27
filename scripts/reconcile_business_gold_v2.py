@@ -15,9 +15,6 @@ def _source(kind: str, file_name: str, root: str, location: dict[str, Any]) -> d
 
 
 def artifact(task: str, relative_path: str) -> dict[str, str]:
-    path = PROJECT_ROOT / relative_path
-    if not path.exists():
-        raise FileNotFoundError(f"required artifact is missing: {relative_path}")
     return {"task": task, "path": relative_path}
 
 
@@ -274,6 +271,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Reconcile V2 Business Gold review material with latest accepted artifacts.")
     parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     args = parser.parse_args()
+
+    required = [item for spec in CARD_SPECS.values() for item in spec["artifacts"]]
+    missing = [item["path"] for item in required if not (PROJECT_ROOT / item["path"]).exists()]
+    if missing:
+        raise FileNotFoundError("required artifacts are missing: " + ", ".join(missing))
 
     prior_manifest = _read_json(args.output_dir / "gold_manifest.json")
     prior_by_id = {str(item["question_id"]): item for item in prior_manifest["records"]}

@@ -1,8 +1,8 @@
 # AI设计管理知识库 V1.0 Metadata Governance 设计
 
-> 任务：TASK-006 Metadata Schema 正式化 + Staging Pipeline 设计  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
+> 任务：TASK-006 Metadata Schema 正式化 + Staging Pipeline 设计
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
 > 状态：已建立正式 Metadata 模块，未接入正式 indexer
 
 ## 1. 执行边界
@@ -12,7 +12,7 @@
 - 不替换 `app/indexer.py`；
 - 不写入正式 Qdrant；
 - 不改变现有运行链路；
-- 不修改 `[LOCAL_PATH_REDACTED]；
+- 不修改 `[LOCAL_PATH_REDACTED]`；
 - 不生成 Embedding；
 - Staging JSON 只在内存中生成，不写正式索引目录。
 
@@ -252,7 +252,7 @@ SourceBlock
 
 ## 7. 真实样本验证
 
-对 `[LOCAL_PATH_REDACTED]��格式各取 1 个样本，通过正式 Metadata 模块运行旁路 Pipeline：
+对 `[LOCAL_PATH_REDACTED]` 每种支持格式各取 1 个样本，通过正式 Metadata 模块运行旁路 Pipeline：
 
 | 指标 | 结果 |
 |---|---:|

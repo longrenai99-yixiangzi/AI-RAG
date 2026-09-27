@@ -21,8 +21,8 @@ from scripts.source_discovery.discover import (
 
 ROOTS = {
     "Root-001": Path(r"[LOCAL_PATH_REDACTED]"),
-    "Root-002": Path(r"[LOCAL_PATH_REDACTED]�公司技术部"),
-    "Root-003": Path(r"[LOCAL_PATH_REDACTED]��中心"),
+    "Root-002": Path(r"[LOCAL_PATH_REDACTED]"),
+    "Root-003": Path(r"[LOCAL_PATH_REDACTED]"),
 }
 COLLECTION_NAME = "full_corpus_shadow_bge_m3"
 
@@ -208,7 +208,7 @@ def build_report(
     lines = [
         "# Knowledge Source Closure Report",
         "",
-        "> Root-001 only: `[LOCAL_PATH_REDACTED]; it does not publish to formal Qdrant.",
+        "> Root-001 only: `[LOCAL_PATH_REDACTED]`. This task resolves and validates sources in Shadow scope; it does not publish to formal Qdrant.",
         "> Root-002 and Root-003 targets are listed for approval only and are not parsed or embedded.",
         "",
         "## 1. Closure Summary",

@@ -86,7 +86,7 @@ if (-not $ready) {
 }
 
 $v2Config = Get-Content -LiteralPath (Join-Path $projectRoot 'config\internal_trial.yaml') -Raw
-if ($v2Config -match 'V2_VERIFIED_RAG_ENABLE[LOCAL_PATH_REDACTED]*true') {
+if ($v2Config -match 'V2_VERIFIED_RAG_ENABLED:\s*true') {
     try {
         $warmup = Invoke-RestMethod -Uri "http://${healthHost}:8010/api/v2/warmup" -Method Post -UseBasicParsing -TimeoutSec 600
         if (-not $warmup.ready) { throw 'V2 warmup returned not ready.' }

@@ -139,5 +139,5 @@
 - 本次没有执行最终 Answer Evaluation 或 LLM-as-Judge。
 - 本次没有启用 Metadata 硬过滤，也没有改动正式 Retriever。
 - 模型路径：
-  - BGE-M3：`[LOCAL_PATH_REDACTED]
-  - Reranker：`[LOCAL_PATH_REDACTED]
+  - BGE-M3：`[LOCAL_PATH_REDACTED]`
+  - Reranker：`[LOCAL_PATH_REDACTED]`

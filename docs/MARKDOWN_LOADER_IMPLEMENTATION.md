@@ -1,8 +1,8 @@
 # Markdown Loader 实现说明
 
-> 任务：TASK-004B Markdown Loader 实现  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
+> 任务：TASK-004B Markdown Loader 实现
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
 > 状态：已实现，未接入正式 indexer
 
 ## 1. 实现范围
@@ -148,7 +148,7 @@ app/indexer.py
 - 修改 `app/chunker.py`；
 - 修改 `app/domain.py`；
 - 接管正式索引；
-- 修改 `[LOCAL_PATH_REDACTED]。
+- 修改 `[LOCAL_PATH_REDACTED]`。
 
 后续迁移时应先用测试 fixture 对比新旧解析结果，再通过适配器把新结果接入现有 `ParsedDocument`/`SourceBlock` 链路，避免一次性替换正式流程。
 
@@ -191,6 +191,6 @@ Markdown Loader 局部测试：7 passed
 | 标准 SourceBlock 输出 | 已完成 |
 | 未修改 `app/parsers.py` | 是 |
 | 未接入正式 indexer | 是 |
-| 未修改 `[LOCAL_PATH_REDACTED]| 是 |
+| 未修改 `[LOCAL_PATH_REDACTED]` | 是 |
 
 **TASK-004B：完成。**

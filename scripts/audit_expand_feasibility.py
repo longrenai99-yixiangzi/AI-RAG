@@ -1,4 +1,4 @@
-"""扩源可行性验证：抽样解析 [LOCAL_PATH_REDACTED]�公司技术部，测单位耗时并估算全量成本。
+"""扩源可行性验证：抽样解析 [LOCAL_PATH_REDACTED]，测单位耗时并估算全量成本。
 
 目的：在投入数十小时索引之前，先用小样本回答三个问题
     1. 现有 pipeline 能不能解析这些新文件？成功率多少？
@@ -50,7 +50,7 @@ def collect(root: Path) -> dict[str, list[Path]]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=Path, default=Path(r"[LOCAL_PATH_REDACTED]�公司技术部"))
+    parser.add_argument("--root", type=Path, default=Path(r"[LOCAL_PATH_REDACTED]"))
     parser.add_argument("--per-type", type=int, default=4, help="每种类型抽样数量")
     parser.add_argument("--seed", type=int, default=20260910)
     args = parser.parse_args()

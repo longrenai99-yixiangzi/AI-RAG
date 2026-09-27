@@ -1,8 +1,8 @@
 # AI 设计管理知识库 V1.0 Answer Engine 设计
 
-> 任务：TASK-013 Answer Engine Architecture Design  
-> 正式目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
+> 任务：TASK-013 Answer Engine Architecture Design
+> 正式目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
 > 状态：仅完成架构设计，不修改正式 Retriever、8000 服务或 Qdrant
 
 ## 1. 设计目标与现状

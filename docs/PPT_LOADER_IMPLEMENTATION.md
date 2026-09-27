@@ -1,8 +1,8 @@
 # PPT/PPTX Loader 实现说明
 
-> 任务：TASK-004C PPT/PPTX Loader 实现  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
+> 任务：TASK-004C PPT/PPTX Loader 实现
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
 > 状态：已实现，未接入正式 indexer
 
 ## 1. 实现范围
@@ -123,7 +123,7 @@ PPTLoader(max_file_size_mb=150)
 unsupported_legacy_format
 ```
 
-不自动转换、不改名、不写回 `[LOCAL_PATH_REDACTED]，也不引入转换工具。
+不自动转换、不改名、不写回 `[LOCAL_PATH_REDACTED]`，也不引入转换工具。
 
 ## 5. 与现有系统的关系
 
@@ -151,7 +151,7 @@ app/indexer.py
 - 修改 `app/chunker.py`；
 - 修改 `app/domain.py`；
 - 接管正式索引；
-- 修改 `[LOCAL_PATH_REDACTED]。
+- 修改 `[LOCAL_PATH_REDACTED]`。
 
 后续迁移时应先对比旧 Parser 与新 Loader 的页数、SourceBlock 数、文本覆盖、标题和 Citation 页号，再通过适配器接入正式流程。
 
@@ -198,6 +198,6 @@ PPTX fixture 使用现有 `.venv` 中已安装的 `python-pptx` 生成，仅用�
 | `.ppt` 不自动转换 | 已满足 |
 | 未修改 `app/parsers.py` | 是 |
 | 未接入正式 indexer | 是 |
-| 未修改 `[LOCAL_PATH_REDACTED]| 是 |
+| 未修改 `[LOCAL_PATH_REDACTED]` | 是 |
 
 **TASK-004C：完成。**

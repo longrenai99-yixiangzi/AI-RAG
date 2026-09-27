@@ -3,7 +3,7 @@
 ## Query Planner + Hierarchical Retrieval V1
 ### Document → Section → Evidence Candidate Generation
 
-项目：`[LOCAL_PATH_REDACTED]
+项目：`[LOCAL_PATH_REDACTED]`
 
 前置：
 

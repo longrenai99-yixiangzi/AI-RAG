@@ -1,8 +1,8 @@
 # AI设计管理知识库 V1.0 Document Engine 设计
 
-> 任务：TASK-004A 文档处理框架设计  
-> 正式目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
+> 任务：TASK-004A 文档处理框架设计
+> 正式目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
 > 状态：仅完成骨架和设计，未迁移代码
 
 ## 1. 设计目标与边界
@@ -25,7 +25,7 @@ Document Engine 的目标是把文件处理拆成可测试、可替换的阶段�
 - 不删除 `app/parsers.py`；
 - 不迁移现有解析代码；
 - 不改变 `app/indexer.py` 的调用链；
-- 不修改 `[LOCAL_PATH_REDACTED]；
+- 不修改 `[LOCAL_PATH_REDACTED]`；
 - 不加载模型、不执行 OCR、不执行索引构建。
 
 当前已建立：
@@ -131,7 +131,7 @@ PPT/PPTX 只有 39 个，但约占总容量 71.7%，且存在 100 MB 以上文�
 
 - 先记录 `unsupported_legacy_format` 或 `needs_conversion`；
 - 保留文件统计和后续处理队列；
-- 转换链路另行设计，不修改 `[LOCAL_PATH_REDACTED]；
+- 转换链路另行设计，不修改 `[LOCAL_PATH_REDACTED]`；
 - 没有稳定转换工具前，不强行引入新依赖。
 
 ### 5.3 当前迁移边界
@@ -316,7 +316,7 @@ TASK-004A 不执行以上第 2 步之后的代码迁移，也不改变当前索�
 - 未删除 `app/parsers.py`；
 - 未迁移现有解析代码；
 - 未改变当前索引流程；
-- 未修改 `[LOCAL_PATH_REDACTED]；
+- 未修改 `[LOCAL_PATH_REDACTED]`；
 - 未下载模型、执行 OCR 或建立新索引。
 
 **TASK-004A：Document Engine 骨架和设计完成，未执行代码迁移。**

@@ -10,7 +10,7 @@ from docx import Document
 
 
 ROOT = Path(__file__).resolve().parents[1]
-AUTHORIZED_SOURCE = Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\新洲星谷\设计管理策划书-星谷科创中心项目.docx")
+AUTHORIZED_SOURCE = Path(r"[LOCAL_PATH_REDACTED]")
 OUT = ROOT / "data" / "shadow" / "document_intelligence_v2" / "authorized_source_updates" / "ba010_docx_table11"
 TABLE_RECORDS = ROOT / "data" / "shadow" / "hierarchical_retrieval_v1_stabilization" / "table_index" / "records.jsonl"
 

@@ -12,7 +12,7 @@ DOCS = ROOT / "docs"
 REGISTRY = DATA / "business_acceptance_registry.jsonl"
 SOURCES = DATA / "source_closure_register.jsonl"
 
-MANUAL = r"[LOCAL_PATH_REDACTED]�公司技术部\2026\各类文件\设计管理\《项目设计管理手册》.pdf"
+MANUAL = r"[LOCAL_PATH_REDACTED]"
 
 
 def _now() -> str:

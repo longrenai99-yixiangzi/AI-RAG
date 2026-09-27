@@ -49,14 +49,14 @@ SOURCES = {
     "建造业务设计管理体系执行评价表(中船哈密).docx": "bf57ce5db1abf75d1f9293f08d43dfe3f5939e4d392e4f24526c49760ac5c80f",
 }
 SOURCE_PATH_OVERRIDES = {
-    "关于举办新能源项目设计知识的培训通知(1).pdf": Path(r"[LOCAL_PATH_REDACTED]�建设\关于举办新能源项目设计知识的培训通知(1).pdf"),
-    "关于举办设计能力提升季度培训（主体专业设计优化要点）的通知.pdf": Path(r"[LOCAL_PATH_REDACTED]�建设\关于举办设计能力提升季度培训（主体专业设计优化要点）的通知.pdf"),
-    "关于举办设计能力提升季度培训（钢结构基坑专项设计知识培训）的通知.pdf": Path(r"[LOCAL_PATH_REDACTED]�建设\关于举办设计能力提升季度培训（钢结构基坑专项设计知识培训）的通知.pdf"),
-    "关于举办设计能力提升季度培训（市政桥梁、水厂专项设计知识培训）的通知.pdf": Path(r"[LOCAL_PATH_REDACTED]�建设\关于举办设计能力提升季度培训（市政桥梁、水厂专项设计知识培训）的通知.pdf"),
-    "萧县厂房项目汇报资料12.14.pptx": Path(r"[LOCAL_PATH_REDACTED]�房项目汇报资料12.14.pptx"),
-    "武汉国家航天产业基地星谷科创中心建设项目11.14.docx": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2025\投标\武汉国家航天产业基地星谷科创中心建设项目11.14.docx"),
-    "投标文件.docx": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2025\季度检查\四季度\光谷实验中学\3设计评估管理\投标文件.docx"),
-    "建造业务设计管理体系执行评价表(中船哈密).docx": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2025\季度检查\四季度\建造业务设计管理体系执行评价表(中船哈密).docx"),
+    "关于举办新能源项目设计知识的培训通知(1).pdf": Path(r"[LOCAL_PATH_REDACTED]"),
+    "关于举办设计能力提升季度培训（主体专业设计优化要点）的通知.pdf": Path(r"[LOCAL_PATH_REDACTED]"),
+    "关于举办设计能力提升季度培训（钢结构基坑专项设计知识培训）的通知.pdf": Path(r"[LOCAL_PATH_REDACTED]"),
+    "关于举办设计能力提升季度培训（市政桥梁、水厂专项设计知识培训）的通知.pdf": Path(r"[LOCAL_PATH_REDACTED]"),
+    "萧县厂房项目汇报资料12.14.pptx": Path(r"[LOCAL_PATH_REDACTED]"),
+    "武汉国家航天产业基地星谷科创中心建设项目11.14.docx": Path(r"[LOCAL_PATH_REDACTED]"),
+    "投标文件.docx": Path(r"[LOCAL_PATH_REDACTED]"),
+    "建造业务设计管理体系执行评价表(中船哈密).docx": Path(r"[LOCAL_PATH_REDACTED]"),
 }
 SOURCE_ROLE_APPROVAL_BATCH = V26 / "v2_6_2_source_role_approval_batch.json"
 MISSING_CONTENT_PROPOSAL = V26 / "v2_6_2_missing_content_source_proposal.json"

@@ -92,7 +92,7 @@ def test_v2_synthesis_contract_exposes_provider_posture_and_deterministic_fallba
 
 
 def test_failed_answer_exposes_actionable_reason_and_review_candidates():
-    bundle = {"failure_reason": "EVIDENCE_INSUFFICIENT", "candidate_evidence": [{"evidence_id": "E1", "source_id": "S1", "source_version": "V1", "file_name": "2025年总结.md", "source_path": "[LOCAL_PATH_REDACTED]��结.md", "location": {"line_start": 7, "line_end": 7}, "raw_text": "候选正文", "role": "SUPPORTING", "scope": {"year": "MATCH", "project": "NOT_APPLICABLE"}}]}
+    bundle = {"failure_reason": "EVIDENCE_INSUFFICIENT", "candidate_evidence": [{"evidence_id": "E1", "source_id": "S1", "source_version": "V1", "file_name": "2025年总结.md", "source_path": "[LOCAL_PATH_REDACTED]", "location": {"line_start": 7, "line_end": 7}, "raw_text": "候选正文", "role": "SUPPORTING", "scope": {"year": "MATCH", "project": "NOT_APPLICABLE"}}]}
     assert "候选来源" in _failure_message(bundle)
     candidates = _review_candidates(bundle)
     assert candidates[0]["file_name"] == "2025年总结.md"
@@ -108,7 +108,7 @@ def test_organization_relation_is_verified_from_raw_text_not_search_context_alon
 
 
 def test_generic_project_count_relevance_uses_the_query_plan_not_a_second_regex():
-    candidate = {"text": "2025年度最终4个项目成功打造为设计管理示范项目。", "file_name": "2025年述职.md", "source_path": "[LOCAL_PATH_REDACTED]��.md", "heading_path": "", "scope": {"project": "NOT_APPLICABLE"}}
+    candidate = {"text": "2025年度最终4个项目成功打造为设计管理示范项目。", "file_name": "2025年述职.md", "source_path": "[LOCAL_PATH_REDACTED]", "heading_path": "", "scope": {"project": "NOT_APPLICABLE"}}
     question = "2025年度多少个项目成功打造为设计管理示范项目？"
     assert _answer_relevant(candidate, question, {"project": [], "query_type": "AGGREGATION_QUERY"}) is True
     assert _answer_relevant(candidate, "星谷科创中心项目有哪些信息？", {"project": ["星谷科创中心项目"], "query_type": "SOURCE_LOOKUP"}) is False

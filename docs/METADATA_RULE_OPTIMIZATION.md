@@ -1,9 +1,9 @@
 # Metadata 分类规则优化验证报告
 
-> 任务：TASK-006.5 Metadata 分类规则优化验证  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
-> 抽样日期：2026-08-22  
+> 任务：TASK-006.5 Metadata 分类规则优化验证
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
+> 抽样日期：2026-08-22
 > 状态：规则已优化，未接入正式 indexer
 
 ## 1. 执行边界与统计口径
@@ -13,14 +13,14 @@
 - 未接入正式 `app/indexer.py`；
 - 未写入 Qdrant；
 - 未改变 Document Loader、Chunker 或正式运行链路；
-- 未修改 `[LOCAL_PATH_REDACTED]；
+- 未修改 `[LOCAL_PATH_REDACTED]`；
 - 未生成 Embedding。
 
 ### 1.1 抽样方法
 
 | 项目 | 口径 |
 |---|---|
-| 候选集 | `[LOCAL_PATH_REDACTED]�出的 498 个支持文件 |
+| 候选集 | `[LOCAL_PATH_REDACTED]` 经现有只读扫描器筛出的 498 个支持文件 |
 | 抽样数 | 50 |
 | 随机种子 | 20260822 |
 | 抽样方式 | `random.Random(20260822).sample(..., 50)` |
@@ -190,6 +190,6 @@ headers：0.76
 | 未接入正式 indexer | 是 |
 | 未写入 Qdrant | 是 |
 | 未改变 Document Engine Loader | 是 |
-| 未修改 `[LOCAL_PATH_REDACTED]| 是 |
+| 未修改 `[LOCAL_PATH_REDACTED]` | 是 |
 
 **TASK-006.5：完成。**

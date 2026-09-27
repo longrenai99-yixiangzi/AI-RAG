@@ -49,7 +49,7 @@ def sha256(path: Path) -> str:
 def primary_mode(text: str | bytes) -> str:
     if isinstance(text, bytes):
         text = text.decode("utf-8")
-    match = re.search(r"(?m)^v2_primary_mod[LOCAL_PATH_REDACTED]*['\"]?([^'\"\s#]+)", text)
+    match = re.search(r"(?m)^v2_primary_mode:\s*['\"]?([^'\"\s#]+)", text)
     return match.group(1).upper() if match else V1
 
 

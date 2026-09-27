@@ -29,7 +29,7 @@ def _evidence() -> EvidenceBundle:
                 chunk_id="chunk-2",
                 document_id="doc-2",
                 file_name="指南.md",
-                source_path="[LOCAL_PATH_REDACTED]��南.md",
+                source_path="[LOCAL_PATH_REDACTED]",
                 document_role="管理指南",
                 authority_level="L2",
                 usage_scene="管理指导",

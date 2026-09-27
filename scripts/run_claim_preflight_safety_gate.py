@@ -31,7 +31,7 @@ def case_rows(rows: list[dict[str, Any]], roles: set[str] | None = None) -> list
 
 
 def synthetic_registration(*, outside: bool) -> list[dict[str, Any]]:
-    target = r"[LOCAL_PATH_REDACTED]�公司技术部\2026\未批准资料\source.pdf" if outside else r"[LOCAL_PATH_REDACTED]"
+    target = r"[LOCAL_PATH_REDACTED]" if outside else r"[LOCAL_PATH_REDACTED]"
     return [
         {
             "source_id": "S_REG",

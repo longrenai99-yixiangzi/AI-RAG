@@ -22,7 +22,7 @@ def _gold_chunks(questions: list[dict]) -> list[Chunk]:
             chunk_id=f"gold-{item['id']}",
             document_id=f"doc-{item['id']}",
             ordinal=index,
-            source_path=f"[LOCAL_PATH_REDACTED]'id']}.md",
+            source_path=f"[LOCAL_PATH_REDACTED]",
             file_name=f"{item['id']}.md",
             text=(
                 f"{item['question']}\n"

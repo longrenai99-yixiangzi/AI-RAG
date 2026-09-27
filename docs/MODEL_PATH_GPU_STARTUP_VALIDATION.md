@@ -12,13 +12,13 @@
 
 | 模型 | V1 路径 | 文件数 | 文件总大小 |
 |---|---|---:|---:|
-| BGE-M3 | `[LOCAL_PATH_REDACTED]| 69 | 2,298,353,048 bytes |
-| bge-reranker-v2-m3 | `[LOCAL_PATH_REDACTED]| 12 | 2,293,244,790 bytes |
+| BGE-M3 | `[LOCAL_PATH_REDACTED]` | 69 | 2,298,353,048 bytes |
+| bge-reranker-v2-m3 | `[LOCAL_PATH_REDACTED]` | 12 | 2,293,244,790 bytes |
 
 复制来源为既有本地模型资产：
 
-- `[LOCAL_PATH_REDACTED]
-- `[LOCAL_PATH_REDACTED]
+- `[LOCAL_PATH_REDACTED]`
+- `[LOCAL_PATH_REDACTED]`
 
 `models/` 已加入 `.gitignore`，避免模型权重进入 Git 版本库。
 
@@ -26,8 +26,8 @@
 
 `app/config.py` 的默认配置已改为 V1 本地模型目录：
 
-- `RAG_EMBEDDING_MODEL_PATH`，默认 `[LOCAL_PATH_REDACTED]
-- `RAG_RERANKER_MODEL_PATH`，默认 `[LOCAL_PATH_REDACTED]
+- `RAG_EMBEDDING_MODEL_PATH`，默认 `[LOCAL_PATH_REDACTED]`
+- `RAG_RERANKER_MODEL_PATH`，默认 `[LOCAL_PATH_REDACTED]`
 
 仍可通过环境变量覆盖默认路径。`.env.example` 已补充这两个配置项示例。
 
@@ -35,7 +35,7 @@
 
 | 项目 | 验证结果 |
 |---|---|
-| GPU Python | `[LOCAL_PATH_REDACTED]|
+| GPU Python | `[LOCAL_PATH_REDACTED]` |
 | Python | 3.12.13 |
 | Torch | 2.12.1+cu132 |
 | Torch CUDA | 13.2 |
@@ -166,7 +166,7 @@ HTTP 验证结果：
 
 ## 8. 未完成与限制
 
-1. V1 自有 `.venv` 仍是 CPU Torch，本任务没有替换它；GPU 运行依赖 `[LOCAL_PATH_REDACTED]。
+1. V1 自有 `.venv` 仍是 CPU Torch，本任务没有替换它；GPU 运行依赖 `[LOCAL_PATH_REDACTED]`。
 2. 当前正式 `8000` 服务没有被强行重启，避免与其正在使用的 Qdrant Local 目录发生竞争；同一 V1 FastAPI 代码已通过隔离目录启动验证。
 3. Reranker 在现有 FastAPI `/api/status` 中默认按需加载，真实 Reranker 加载已通过独立 Retrieval Pipeline 调用验证。
 4. 远程 LLM 未作为本次本地 GPU 启动验收条件；本次没有发送问答请求，也没有执行全库 Embedding。

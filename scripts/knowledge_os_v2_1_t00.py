@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "evaluation" / "knowledge_os_v2_1" / "baseline"
 SOURCE_ROOT = Path(r"[LOCAL_PATH_REDACTED]")
-EXTERNAL_ROOT = Path(r"[LOCAL_PATH_REDACTED]�公司技术部")
+EXTERNAL_ROOT = Path(r"[LOCAL_PATH_REDACTED]")
 STATE = ROOT / "data" / "shadow" / "knowledge_os" / "state.json"
 V1_INDEX = ROOT / "data" / "shadow" / "hierarchical_retrieval_v1_stabilization" / "atomic_evidence.jsonl"
 V2_INDEX = ROOT / "data" / "shadow" / "knowledge_v2_staging" / "bm25_v2.json"

@@ -1,8 +1,8 @@
 # Document Engine 集成验证报告
 
-> 任务：TASK-005 Document Engine 集成验证  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
+> 任务：TASK-005 Document Engine 集成验证
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
 > 状态：旁路验证完成，未替换正式 indexer
 
 ## 1. 验证边界
@@ -24,7 +24,7 @@
 - 修改旧 `app/parsers.py`；
 - 写入正式 Qdrant；
 - 生成 Embedding；
-- 修改 `[LOCAL_PATH_REDACTED]；
+- 修改 `[LOCAL_PATH_REDACTED]`；
 - 发布或替换正式索引。
 
 ## 2. 新增 Pipeline
@@ -108,7 +108,7 @@ location_valid_chunks == chunks
 
 ## 6. 五类真实知识源样本验证
 
-执行方式：对 `[LOCAL_PATH_REDACTED]，每种支持格式取 1 个样本，不执行全量索引。
+执行方式：对 `[LOCAL_PATH_REDACTED]` 只读扫描，每种支持格式取 1 个样本，不执行全量索引。
 
 ### 6.1 汇总结果
 
@@ -211,7 +211,7 @@ tests/test_pipeline.py：4 passed
 | 未修改 `app/parsers.py` | 是 |
 | 未写入正式 Qdrant | 是 |
 | 未影响当前可运行系统 | 是 |
-| 未修改 `[LOCAL_PATH_REDACTED]| 是 |
+| 未修改 `[LOCAL_PATH_REDACTED]` | 是 |
 
 **TASK-005：完成。**
 ```

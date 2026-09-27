@@ -88,7 +88,7 @@ def test_candidate_search_reuses_bm25_and_filters_zero_score():
 
 def test_parenthesized_ledger_project_blocks_another_projects_row():
     question = "直属分公司EPC项目设计价值创造统计台账（无锡山姆）中，结构专业共列了多少条创效策划点？"
-    path = "[LOCAL_PATH_REDACTED]��属分公司EPC项目/常熟项目/设计价值创造统计台账.xlsx"
+    path = "[LOCAL_PATH_REDACTED]"
     text = "工作表：常熟项目\n第41行：序号：39 | 专业类别：结构 | 创效策划点：电梯基础"
     row = {"evidence_id": "E1", "document_id": "D1", "source_path": path, "file_name": "常熟设计价值创造统计台账.xlsx", "heading_path": "项目台账", "text": text, "location": {"sheet_name": "项目台账", "row_start": 41, "row_end": 41, "table_id": "T1"}, "rank": 1, "candidate_origin": "FROZEN_V2_5_RRF", "lineage_status": "LINEAGE_CONFIRMED"}
     document = {"document_id": "D1", "source_path": path, "file_name": "常熟设计价值创造统计台账.xlsx", "project": ["常熟药机厂项目"]}
@@ -113,7 +113,7 @@ def test_structured_rows_require_the_candidate_source_version_and_complete_table
 def test_explicit_counted_list_retrieval_requires_a_full_list_chunk():
     question = "二公司设计管理部的主要职责有哪 6 项？"
     plan = plan_query(question).to_dict()
-    base = {"source_path": "[LOCAL_PATH_REDACTED]�公司设计管理部.md", "file_name": "二公司设计管理部.md", "scope": {}}
+    base = {"source_path": "[LOCAL_PATH_REDACTED]", "file_name": "二公司设计管理部.md", "scope": {}}
     summary = {**base, "text": "中建三局第二建设公司设计管理部是公司设计管理工作的核心部门，负责体系建设和EPC项目设计全过程管理。"}
     list_chunk = {**base, "text": "- 设计管理体系建设和维护\n- EPC项目设计支持与策划\n- 设计评审与评估管理\n- 设计资源库建设\n- 设计人才培养与能力建设\n- 设计管理制度文件的编制与更新"}
 
@@ -129,7 +129,7 @@ def test_explicit_counted_list_retrieval_requires_a_full_list_chunk():
 
 def test_task_book_link_chunk_is_context_only_for_count_and_coverage_question():
     question = "设计任务书汇编收录了多少个项目的任务书？覆盖哪些业态？"
-    path = "[LOCAL_PATH_REDACTED]��设计管理流程.md"
+    path = "[LOCAL_PATH_REDACTED]"
     plan = plan_query(question)
     link_labels = (
         "[[raw/设计支持/设计任务书|设计任务书文件夹（26个项目）]]",
@@ -150,7 +150,7 @@ def test_task_book_link_chunk_is_context_only_for_count_and_coverage_question():
 
 def test_registration_pointer_label_cannot_supply_inventory_count():
     question = "设计支持中心资料登记共登记多少份资料？"
-    path = "[LOCAL_PATH_REDACTED]��中心资料登记.md"
+    path = "[LOCAL_PATH_REDACTED]"
     text = "目录入口：[共登记26份资料](raw/设计支持中心资料登记.md)"
     row = {"evidence_id": "E1", "document_id": "D1", "source_path": path, "file_name": "设计支持中心资料登记.md", "heading_path": "资料登记", "text": text, "location": {"line_start": 1}, "rank": 1, "candidate_origin": "FROZEN_V2_5_RRF", "lineage_status": "LINEAGE_CONFIRMED"}
     document = {"document_id": "D1", "source_path": path, "file_name": "设计支持中心资料登记.md", "document_type": "REGISTER_PAGE"}
@@ -165,7 +165,7 @@ def test_registration_pointer_label_cannot_supply_inventory_count():
 
 def test_period_scoped_source_body_supports_quantity_difference_rate():
     question = "2024 年上半年二公司钢筋量差率是多少？"
-    path = "[LOCAL_PATH_REDACTED]��结/2024年半年总结.md"
+    path = "[LOCAL_PATH_REDACTED]"
     text = "2024年上半年开展钢筋管理，钢筋量差率达8.45%，同比提升0.25个百分点。"
     row = {"evidence_id": "E1", "document_id": "D1", "source_path": path, "file_name": "2024年半年总结.md", "heading_path": "2024年半年总结 > 正文", "text": text, "location": {"line_start": 7, "line_end": 7}, "rank": 1, "candidate_origin": "PERIOD_SCOPE_RESCUE", "lineage_status": "LINEAGE_CONFIRMED"}
     document = {"document_id": "D1", "source_path": path, "file_name": "2024年半年总结.md", "document_type": "REVIEW_RECORD"}
@@ -236,7 +236,7 @@ def test_shared_source_role_rescue_prefers_body_evidence_for_dop_dimensions_and_
             "evidence_id": "DOP-BODY",
             "source_id": "V262-dop",
             "file_name": "2025年设计管理总结.md",
-            "source_path": "[LOCAL_PATH_REDACTED]��结.md",
+            "source_path": "[LOCAL_PATH_REDACTED]",
             "heading_path": "正文",
             "text": "DOP设计管理模块适配及应用，共完成41个项目，DOP设计管理平台新开项目上线覆盖率100%。",
         },
@@ -244,7 +244,7 @@ def test_shared_source_role_rescue_prefers_body_evidence_for_dop_dimensions_and_
             "evidence_id": "DIM-BODY",
             "source_id": "V262-dim",
             "file_name": "光谷实验中学项目.md",
-            "source_path": "[LOCAL_PATH_REDACTED]�中学项目.md",
+            "source_path": "[LOCAL_PATH_REDACTED]",
             "heading_path": "光谷实验中学项目 > 设计管理工作中涉及的方面",
             "text": "设计管理工作中涉及的方面：报批报建、方案比选、相关方沟通、设计策划、设计任务书、限额设计。",
         },
@@ -260,7 +260,7 @@ def test_shared_source_role_rescue_prefers_body_evidence_for_dop_dimensions_and_
             "evidence_id": "HUAIBEI-BODY",
             "source_id": "V262-huaibei",
             "file_name": "淮北科创项目含超塔（安徽）.md",
-            "source_path": "[LOCAL_PATH_REDACTED]��科创项目含超塔（安徽）.md",
+            "source_path": "[LOCAL_PATH_REDACTED]",
             "heading_path": "第 3 页/段",
             "text": "总投资额12.2亿元；仍有超概4000万元风险；设计方案优化35项，设计优化率达到3.6%。",
         },
@@ -370,9 +370,9 @@ def test_source_closure_gate_normalizes_quotes_and_rejects_structural_terms(monk
 
 def test_same_file_name_at_a_different_path_does_not_inherit_shadow_approval(tmp_path, monkeypatch):
     register = tmp_path / "source_closure.jsonl"
-    register.write_text('{"correct_source_path":"[LOCAL_PATH_REDACTED]","correct_source_file_name":"manual.pdf","source_status":"VERIFIED_RUNTIME"}\n', encoding="utf-8")
+    register.write_text('{"correct_source_path":"synthetic/approved/manual.pdf","correct_source_file_name":"manual.pdf","source_status":"VERIFIED_RUNTIME"}\n', encoding="utf-8")
     monkeypatch.setattr(v2, "SOURCE_CLOSURE_REGISTER", register)
-    assert v2._declared_source_status("[LOCAL_PATH_REDACTED]") == "SOURCE_IDENTIFIED"
+    assert v2._declared_source_status("synthetic/other/manual.pdf") == "SOURCE_IDENTIFIED"
 
 
 def test_role_fact_candidate_can_promote_complete_role_evidence_beyond_top_five():
@@ -433,19 +433,19 @@ def test_owner_gold_review_closure_rescues_the_exact_duty_list_source():
         "RIGHT": {
             "evidence_id": "RIGHT",
             "file_name": "设计策划评审.md",
-            "source_path": r"[LOCAL_PATH_REDACTED]��\设计策划评审.md",
+            "source_path": r"synthetic\wiki\concepts\设计支持\right.md",
             "text": fact_text,
         },
         "QUERY_PAGE": {
             "evidence_id": "QUERY_PAGE",
             "file_name": "设计策划评审.md",
-            "source_path": r"[LOCAL_PATH_REDACTED]",
+            "source_path": r"synthetic\wiki\queries\query.md",
             "text": fact_text,
         },
         "OTHER": {
             "evidence_id": "OTHER",
             "file_name": "other.md",
-            "source_path": r"[LOCAL_PATH_REDACTED]��\other.md",
+            "source_path": r"synthetic\wiki\concepts\other\other.md",
             "text": fact_text,
         },
     }
@@ -456,11 +456,11 @@ def test_owner_gold_review_closure_rescues_the_exact_duty_list_source():
 
 
 def test_structured_source_origin_uses_the_confirmed_original_path():
-    parsed = {"file_name": "丽水医院项目 .docx", "source_path": r"[LOCAL_PATH_REDACTED]��院项目 .docx"}
+    parsed = {"file_name": "丽水医院项目 .docx", "source_path": r"[LOCAL_PATH_REDACTED]"}
 
     restored = _restore_source_origin(parsed)
 
-    assert restored["source_path"] == r"[LOCAL_PATH_REDACTED]�公司技术部\法人管项目\体系建设\5、检查督导\评价表\丽水医院项目 .docx"
+    assert restored["source_path"] == r"[LOCAL_PATH_REDACTED]"
 
 
 def test_evaluation_table_rescue_is_scoped_to_its_exact_named_table():
@@ -500,14 +500,14 @@ def test_huawei_optimization_rescue_stays_in_the_approved_baicaoyuan_source():
             "evidence_id": "RIGHT",
             "source_id": "V262-BAICAOYUAN",
             "file_name": "百草园超高层产品线观摩材料.md",
-            "source_path": r"[LOCAL_PATH_REDACTED]�优秀管理经验\4-为百草园超高层产品线观摩材料0528(1).pdf",
+            "source_path": r"[LOCAL_PATH_REDACTED]",
             "text": "桩基支护优化22项，主体结构优化38项，累计技术创效2473万元",
         },
         "OTHER": {
             "evidence_id": "OTHER",
             "source_id": "V262-OTHER",
             "file_name": "其他百草园材料.md",
-            "source_path": r"[LOCAL_PATH_REDACTED]��\百草园.md",
+            "source_path": r"[LOCAL_PATH_REDACTED]",
             "text": "桩基支护优化22项，主体结构优化38项，累计技术创效2473万元",
         },
     }

@@ -108,7 +108,7 @@ def test_pdf_value_creation_question_counts_professions_from_summary_page():
             "总图规划\n9\n0\n2\n建筑\n8\n3\n48\n电气\n2\n5\n38\n合计\n88\n72\n578"
         ),
     )
-    evidence.update({"file_name": "设计价值创造点清单20260903.pdf", "source_path": "[LOCAL_PATH_REDACTED]��创造点清单.pdf", "location": {"page": 3}})
+    evidence.update({"file_name": "设计价值创造点清单20260903.pdf", "source_path": "[LOCAL_PATH_REDACTED]", "location": {"page": 3}})
     answer = render(_bundle("VERIFIED", [evidence], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question, query_type="AGGREGATION_QUERY"))
     assert answer["answer_status"] == "ANSWERED"
     assert "3个专业" in answer["answer_text"]
@@ -143,14 +143,14 @@ def test_review_point_question_renders_at_least_five_points_from_approved_xlsx_s
             "3.7配电系统图应标注详细。"
         ),
     )
-    review.update({"evidence_id": "REVIEW-XLSX", "file_name": "全专业施工图审核要点提示汇编（2026年）.xlsx", "source_path": "[LOCAL_PATH_REDACTED]�点.xlsx"})
+    review.update({"evidence_id": "REVIEW-XLSX", "file_name": "全专业施工图审核要点提示汇编（2026年）.xlsx", "source_path": "[LOCAL_PATH_REDACTED]"})
     adjacent = _evidence("DIRECT", text="电气专业有3条风险。")
     adjacent.update({"evidence_id": "RISK-DOCX", "file_name": "能源环保风险清单.docx", "source_path": "[LOCAL_PATH_REDACTED]"})
     bundle = _bundle("VERIFIED", [review, adjacent], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question)
     answer = render(bundle)
     assert "3.1由变电所供电的住宅宜采用TN系统" in answer["answer_text"]
     assert "3.7配电系统图应标注详细" in answer["answer_text"]
-    assert answer["citations"][0]["source_path"] == "[LOCAL_PATH_REDACTED]�点.xlsx"
+    assert answer["citations"][0]["source_path"] == "[LOCAL_PATH_REDACTED]"
 
 
 def test_verified_answer_uses_the_best_repeated_local_anchor():
@@ -862,7 +862,7 @@ def test_owner_source_rescue_renders_the_duty_count_and_deadline_from_the_source
         "source_id": "BASE-STAGING-SOURCE",
         "candidate_origin": "OWNER_ANSWER_GOLD_SOURCE_RESCUE",
         "file_name": "设计策划评审.md",
-        "source_path": r"[LOCAL_PATH_REDACTED]��\设计策划评审.md",
+        "source_path": r"[LOCAL_PATH_REDACTED]",
     })
     plan = plan_query(question)
     coverage = [{"subquestion_id": f"SQ{index}", "coverage_status": "COVERED"} for index in range(1, len(plan.subquestions) + 1)]
@@ -908,7 +908,7 @@ def test_course_chapter_answer_requires_all_five_source_headings():
 
 def test_company_epc_evaluation_dimensions_stay_in_the_named_complete_table():
     question = "《公司EPC项目设计管理评价表》采用多少分制？9个评价维度分别是什么？"
-    source_path = "[LOCAL_PATH_REDACTED]��院项目.docx"
+    source_path = "[LOCAL_PATH_REDACTED]"
     source_version = "sha-source"
     table_id = "target-table"
     labels = (
@@ -938,7 +938,7 @@ def test_company_epc_evaluation_dimensions_stay_in_the_named_complete_table():
             "cells": [{"value": str(index)}, {"value": label}],
         })
     unrelated = _evidence("DIRECT", text="行：15 | 设计创效率 | 常熟项目")
-    unrelated.update({"evidence_id": "OTHER", "source_path": "[LOCAL_PATH_REDACTED]��创造.xlsx", "source_version": "sha-other", "file_name": "常熟台账.xlsx", "heading_path": "直属分公司设计价值创造统计表", "table_id": "other-table"})
+    unrelated.update({"evidence_id": "OTHER", "source_path": "[LOCAL_PATH_REDACTED]", "source_version": "sha-other", "file_name": "常熟台账.xlsx", "heading_path": "直属分公司设计价值创造统计表", "table_id": "other-table"})
     evidence.append(unrelated)
     structured_rows.append({
         "source_path": unrelated["source_path"],
@@ -1010,7 +1010,7 @@ def test_scheme_comparison_claims_use_the_same_source_for_dimensions_and_steps()
         "- **工作流程**：明确比选目标 → 编制比选方案 → 组织评审 → 形成结论"
     )
     evidence = _evidence("DIRECT", text=source_text)
-    evidence.update({"file_name": "方案比选.md", "source_path": "[LOCAL_PATH_REDACTED]��/方案比选.md"})
+    evidence.update({"file_name": "方案比选.md", "source_path": "[LOCAL_PATH_REDACTED]"})
     plan = plan_query(question)
     coverage = [{"subquestion_id": f"SQ{index}", "coverage_status": "COVERED"} for index in range(1, len(plan.subquestions) + 1)]
     bundle = _bundle("VERIFIED", [evidence], coverage, query_type=plan.query_type, question=question)

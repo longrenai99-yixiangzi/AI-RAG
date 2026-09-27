@@ -1,8 +1,8 @@
 # AI设计管理知识库 V1.0 Chunk Strategy + Metadata Schema 设计
 
-> 任务：TASK-004G Chunk Strategy + Metadata Schema 设计  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
+> 任务：TASK-004G Chunk Strategy + Metadata Schema 设计
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
 > 状态：仅完成统一数据模型设计，未接入正式 indexer
 
 ## 1. 设计边界与原则
@@ -25,7 +25,7 @@ Loader / Quality Check
 - 接入正式 `app/indexer.py`；
 - 生成 Embedding；
 - 写入 Qdrant；
-- 修改 `[LOCAL_PATH_REDACTED]。
+- 修改 `[LOCAL_PATH_REDACTED]`。
 
 统一模型必须满足：
 
@@ -367,6 +367,6 @@ V1 设计新增的 `file_type`、`metadata`、`source_block_id`、`chunk_version
 - 未接入正式 `app/indexer.py`；
 - 未生成 Embedding；
 - 未写 Qdrant；
-- 未修改 `[LOCAL_PATH_REDACTED]。
+- 未修改 `[LOCAL_PATH_REDACTED]`。
 
 **TASK-004G：设计完成。**

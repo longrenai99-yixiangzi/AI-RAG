@@ -23,17 +23,17 @@ from app.ingestion.pipeline import PipelineDocument, PipelineResult, run_documen
 from app.retrieval.dense_provider import BGEM3DenseProvider
 
 ROOT_ID = "Root-002"
-ROOT = Path(r"[LOCAL_PATH_REDACTED]�公司技术部")
+ROOT = Path(r"[LOCAL_PATH_REDACTED]")
 SUPPORTED = {".pdf", ".docx", ".xlsx", ".pptx", ".md", ".markdown"}
 FORBIDDEN_PARTS = ("微信", "临时", "temp", "缓存", "cache", "个人", "草稿")
 COLLECTION = "root002_shadow_bge_m3"
 
 APPROVED_DIRS = (
-    ("P0", "设计管理", Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\各类文件\设计管理")),
-    ("P0", "设计服务台账", Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\设计服务台账")),
-    ("P0", "新洲星谷", Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\新洲星谷")),
-    ("P0", "应城智汇港", Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\应城智汇港")),
-    ("P1", "设计复盘", Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\设计复盘")),
+    ("P0", "设计管理", Path(r"[LOCAL_PATH_REDACTED]")),
+    ("P0", "设计服务台账", Path(r"[LOCAL_PATH_REDACTED]")),
+    ("P0", "新洲星谷", Path(r"[LOCAL_PATH_REDACTED]")),
+    ("P0", "应城智汇港", Path(r"[LOCAL_PATH_REDACTED]")),
+    ("P1", "设计复盘", Path(r"[LOCAL_PATH_REDACTED]")),
 )
 
 

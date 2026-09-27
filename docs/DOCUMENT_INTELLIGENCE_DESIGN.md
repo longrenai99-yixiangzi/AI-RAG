@@ -1,8 +1,8 @@
 # AI 设计管理知识库 V1.0 Document Intelligence Layer 设计
 
-> 任务：TASK-014D Document Intelligence Layer 设计  
+> 任务：TASK-014D Document Intelligence Layer 设计
 > 正式目录：[LOCAL_PATH_REDACTED]
-> 知识源：[LOCAL_PATH_REDACTED]（只读）  
+> 知识源：[LOCAL_PATH_REDACTED]
 > 状态：仅完成设计，不执行全量文档摘要，不修改正式 Retriever、8000 服务或 Qdrant
 
 ## 1. 目标与问题定义

@@ -18,51 +18,51 @@ OUTPUT_DIR = PROJECT_ROOT / "evaluation" / "business_gold_v2"
 BA_DIR = PROJECT_ROOT / "evaluation" / "v1_business_acceptance"
 
 BA007_REQUESTED_PATH = Path(
-    r"[LOCAL_PATH_REDACTED]�公司技术部\2026\示范，工程\关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx"
+    r"[LOCAL_PATH_REDACTED]"
 )
 BA007_RESOLVED_PATH = Path(
-    r"[LOCAL_PATH_REDACTED]�公司技术部\2026\示范工程\关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx"
+    r"[LOCAL_PATH_REDACTED]"
 )
 
 OWNER_SOURCES: dict[str, dict[str, Any]] = {
     "BA-001": {
         "source_role": "PRIMARY_GOLD_CANDIDATE",
-        "source_path": r"[LOCAL_PATH_REDACTED]�公司技术部\2026\各类文件\设计管理\《项目设计管理手册》.pdf",
+        "source_path": r"[LOCAL_PATH_REDACTED]",
         "source_mode": "FROZEN_SHADOW_ARTIFACT",
         "governance": "PENDING_APPROVAL",
         "artifact": "evaluation/policy_facet_grounding/BA-001.json",
     },
     "BA-002": {
         "source_role": "PRIMARY_GOLD_CANDIDATE",
-        "source_path": r"[LOCAL_PATH_REDACTED]�公司技术部\2026\各类文件\设计管理\《项目设计管理手册》.pdf",
+        "source_path": r"[LOCAL_PATH_REDACTED]",
         "source_mode": "FROZEN_SHADOW_ARTIFACT",
         "governance": "PENDING_APPROVAL",
         "artifact": "evaluation/ba002_formula_semantic_alignment/BA-002.json",
     },
     "BA-003": {
         "source_role": "PRIMARY_GOLD_CANDIDATE",
-        "source_path": r"[LOCAL_PATH_REDACTED]�公司技术部\2026\知识库\《产品线（医疗、学校、厂房）方案比选案例库》\厂房\中建三局二公司产品线设计方案比选典型案例汇编（厂房）（正文）.docx",
+        "source_path": r"[LOCAL_PATH_REDACTED]",
         "source_mode": "TARGETED_READ_ONLY",
         "governance": "OUT_OF_SCOPE",
         "artifact": "data/shadow/source_discovery/source_records.jsonl",
     },
     "BA-004": {
         "source_role": "PRIMARY_GOLD_CANDIDATE",
-        "source_path": r"[LOCAL_PATH_REDACTED]��\方案比选\方案比选库\设计方案比选提示清单7.23.xlsx",
+        "source_path": r"[LOCAL_PATH_REDACTED]",
         "source_mode": "TARGETED_READ_ONLY",
         "governance": "APPROVED",
         "artifact": "evaluation/ba004_answer_structure_hardening/run_01.json",
     },
     "BA-005": {
         "source_role": "PRIMARY_GOLD_CANDIDATE",
-        "source_path": r"[LOCAL_PATH_REDACTED]�公司技术部\2026\知识库\全专业施工图审核要点提示汇编\全专业施工图审核要点提示汇编（2026年）.xlsx",
+        "source_path": r"[LOCAL_PATH_REDACTED]",
         "source_mode": "TARGETED_READ_ONLY",
         "governance": "PENDING_APPROVAL",
         "artifact": "evaluation/claim_preflight_positive_path/BA-005.json",
     },
     "BA-006": {
         "source_role": "SUPPORTING_SOURCE",
-        "source_path": r"[LOCAL_PATH_REDACTED]�公司技术部\2026\各类文件\设计管理\关于印发中建三局2026年设计与技术工作计划的通知.pdf",
+        "source_path": r"[LOCAL_PATH_REDACTED]",
         "source_mode": "FROZEN_SHADOW_ARTIFACT",
         "governance": "PENDING_APPROVAL",
         "artifact": "evaluation/p0_integrated_shadow_regression/BA-006.json",
@@ -81,25 +81,25 @@ OWNER_SOURCES: dict[str, dict[str, Any]] = {
     },
     "BA-008": {
         "source_role": "PRIMARY_GOLD_CANDIDATE",
-        "source_path": r"[LOCAL_PATH_REDACTED]��结\2025年饶淇述职.md",
+        "source_path": r"[LOCAL_PATH_REDACTED]",
         "source_mode": "TARGETED_READ_ONLY",
         "governance": "APPROVED",
         "artifact": "evaluation/direct_fact_scope_guard_hardening/BA-008.json",
     },
     "BA-009": {
         "source_role": "PRIMARY_GOLD_CANDIDATE",
-        "source_path": r"[LOCAL_PATH_REDACTED]�公司技术部\2026\EPC项目双周推进会\4月\EPC项目设计管理工作监督任务表（2026年4月第一周）.xlsx",
+        "source_path": r"[LOCAL_PATH_REDACTED]",
         "source_mode": "TARGETED_READ_ONLY",
         "governance": "PENDING_APPROVAL",
         "artifact": "evaluation/claim_preflight_positive_path/BA-009.json",
     },
     "BA-010": {
         "source_role": "PRIMARY_GOLD_CANDIDATE",
-        "source_path": r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\新洲星谷\设计管理策划书-星谷科创中心项目.docx",
+        "source_path": r"[LOCAL_PATH_REDACTED]",
         "source_mode": "TARGETED_READ_ONLY",
         "governance": "PENDING_APPROVAL",
         "artifact": "evaluation/claim_preflight_positive_path/BA-010.json",
-        "supporting_structured_source": r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\新洲星谷\星谷科创项目设计管理策划+设计示范项目打造方案\方案比选与价值创造清单方案比选及价值创造.xlsx",
+        "supporting_structured_source": r"[LOCAL_PATH_REDACTED]",
         "supporting_structured_source_note": "沿用既有冻结结构化结果，仅作为 DOCX 表格关系的辅助对账，不直接继承旧统计数字。",
     },
 }

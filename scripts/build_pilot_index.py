@@ -1,4 +1,4 @@
-"""分批试点建库脚本（T11）—— 将 [LOCAL_PATH_REDACTED]�公司技术部 的 2026 + EPC 两个子目录纳入检索索引。
+"""分批试点建库脚本（T11）—— 将 [LOCAL_PATH_REDACTED]。
 
 设计原则：
 1. **完全隔离**：不修改任何现有生产 Shadow 目录。
@@ -40,7 +40,7 @@ from app.parsers import SUPPORTED_EXTENSIONS, iter_source_files  # noqa: E402
 from app.retrieval.dense_provider import BGEM3DenseProvider, _qdrant_point_id  # noqa: E402
 
 # ---- 试点范围 ---------------------------------------------------------------
-SOURCE_ROOT = Path(r"[LOCAL_PATH_REDACTED]�公司技术部")
+SOURCE_ROOT = Path(r"[LOCAL_PATH_REDACTED]")
 SUBS = ["2026", "EPC"]
 
 # ---- 输出目录（全部为新建，不动现有目录）-------------------------------------

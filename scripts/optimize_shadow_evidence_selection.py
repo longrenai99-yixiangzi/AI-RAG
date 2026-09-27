@@ -25,7 +25,7 @@ QUERY_RULES: dict[str, dict[str, Any]] = {
     "BA-001": {
         "intent": "TEMPLATE_QUERY",
         "gold_scope": "GOLD_OUT_OF_SCOPE",
-        "gold_target": "[LOCAL_PATH_REDACTED]��\\设计任务书.md",
+        "gold_target": "[LOCAL_PATH_REDACTED]",
         "target_file_terms": ("设计任务书.md",),
         "entity_terms": ("设计任务书", "任务书"),
         "year_terms": (),
@@ -39,7 +39,7 @@ QUERY_RULES: dict[str, dict[str, Any]] = {
     "BA-002": {
         "intent": "METHOD_QUERY",
         "gold_scope": "GOLD_OUT_OF_SCOPE",
-        "gold_target": "[LOCAL_PATH_REDACTED]�效价值创造问答.md",
+        "gold_target": "[LOCAL_PATH_REDACTED]",
         "target_file_terms": (),
         "entity_terms": ("设计效益", "设计创效", "价值创造"),
         "year_terms": (),
@@ -396,7 +396,7 @@ def select_candidates(candidates: list[Candidate], rule: dict[str, Any]) -> tupl
             selected.append(candidate)
             selected_ids.add(candidate.chunk.chunk_id)
             selected_docs[candidate.chunk.document_id] += 1
-        
+
     for candidate in candidates:
         if candidate.chunk.chunk_id in selected_ids:
             continue

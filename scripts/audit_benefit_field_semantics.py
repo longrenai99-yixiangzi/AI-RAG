@@ -16,12 +16,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 TARGET_WORKBOOK = (
-    Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\新洲星谷")
+    Path(r"[LOCAL_PATH_REDACTED]")
     / "星谷科创项目设计管理策划+设计示范项目打造方案"
     / "方案比选与价值创造清单方案比选及价值创造.xlsx"
 )
-PROJECT_DOCX = Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\新洲星谷\设计管理策划书-星谷科创中心项目.docx")
-REVIEW_XLSX = Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\新洲星谷\设计策划评审意见表(1).xlsx")
+PROJECT_DOCX = Path(r"[LOCAL_PATH_REDACTED]")
+REVIEW_XLSX = Path(r"[LOCAL_PATH_REDACTED]")
 STAGING = PROJECT_ROOT / "data" / "shadow" / "root002_import" / "pipeline_staging.jsonl"
 REPORT = PROJECT_ROOT / "docs" / "BENEFIT_FIELD_SEMANTICS_AUDIT.md"
 

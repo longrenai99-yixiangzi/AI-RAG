@@ -1,8 +1,8 @@
 # DOCX Loader 实现说明
 
-> 任务：TASK-004E DOCX Loader 实现  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
+> 任务：TASK-004E DOCX Loader 实现
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
 > 状态：已实现，未接入正式 indexer
 
 ## 1. 实现范围
@@ -46,7 +46,7 @@ DOCXLoader().load(path, document_id) -> DOCXLoadResult
 | `empty` | DOCX 没有可提取的段落或表格内容 |
 | `read_error` | 文件读取失败、DOCX 损坏、解析异常或扩展名不受支持 |
 
-旧 `.doc` 文件直接返回 `read_error`，错误信息明确说明不自动转换；不会改名、转换或写回 `[LOCAL_PATH_REDACTED]。
+旧 `.doc` 文件直接返回 `read_error`，错误信息明确说明不自动转换；不会改名、转换或写回 `[LOCAL_PATH_REDACTED]`。
 
 ## 4. 已实现功能
 
@@ -152,7 +152,7 @@ app/indexer.py
 - 接管正式索引；
 - 执行 Embedding；
 - 写入 Qdrant；
-- 修改 `[LOCAL_PATH_REDACTED]。
+- 修改 `[LOCAL_PATH_REDACTED]`。
 
 后续迁移应先比较旧 Parser 与新 Loader 的段落数量、章节路径、表格文本和 Citation 定位，再通过适配器接入正式 Document Engine。
 
@@ -207,6 +207,6 @@ DOCX Loader 局部测试：6 passed
 | 不写 Qdrant | 已满足 |
 | 未修改 `app/parsers.py` | 是 |
 | 未接入正式 indexer | 是 |
-| 未修改 `[LOCAL_PATH_REDACTED]| 是 |
+| 未修改 `[LOCAL_PATH_REDACTED]` | 是 |
 
 **TASK-004E：完成。**

@@ -1,7 +1,7 @@
 # Retrieval Pipeline V1 Shadow 实现说明
 
-> 任务：TASK-010 Retrieval Pipeline V1 Shadow 实现  
-> 项目目录：`[LOCAL_PATH_REDACTED]
+> 任务：TASK-010 Retrieval Pipeline V1 Shadow 实现
+> 项目目录：`[LOCAL_PATH_REDACTED]`
 > 状态：Shadow 实现完成，未接入正式问答链路
 
 ## 1. 执行边界

@@ -1,8 +1,8 @@
 # XLSX Loader 实现说明
 
-> 任务：TASK-004F XLSX Loader 实现  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
+> 任务：TASK-004F XLSX Loader 实现
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
 > 状态：已实现，未接入正式 indexer
 
 ## 1. 实现范围
@@ -165,7 +165,7 @@ app/indexer.py
 - 接管正式索引；
 - 执行 Embedding；
 - 写入 Qdrant；
-- 修改 Excel 源文件或 `[LOCAL_PATH_REDACTED]。
+- 修改 Excel 源文件或 `[LOCAL_PATH_REDACTED]`。
 
 后续迁移时应对比旧 Parser 与新 Loader 的 Workbook 数、Sheet 数、有效 Sheet 数、行列范围、表头和 SourceBlock 文本，再通过适配器接入正式 Document Engine。
 
@@ -223,6 +223,6 @@ XLSX Loader 局部测试：6 passed
 | 不写 Qdrant | 已满足 |
 | 未修改 `app/parsers.py` | 是 |
 | 未接入正式 indexer | 是 |
-| 未修改 `[LOCAL_PATH_REDACTED]| 是 |
+| 未修改 `[LOCAL_PATH_REDACTED]` | 是 |
 
 **TASK-004F：完成。**

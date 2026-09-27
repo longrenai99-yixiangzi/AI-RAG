@@ -33,16 +33,16 @@ Source Discovery 结果：
 外部引用主要指向：
 
 ```text
-[LOCAL_PATH_REDACTED]�公司技术部
-[LOCAL_PATH_REDACTED]��中心
+[LOCAL_PATH_REDACTED]
+[LOCAL_PATH_REDACTED]
 ```
 
 Source Discovery 中的路径统计：
 
 | 外部 Root | SourceRecord | 已存在 | NEEDS_REVIEW | LINK_BROKEN |
 |---|---:|---:|---:|---:|
-| `[LOCAL_PATH_REDACTED]�公司技术部` | 314 | 225 | 225 | 89 |
-| `[LOCAL_PATH_REDACTED]��中心` | 58 | 38 | 38 | 20 |
+| `[LOCAL_PATH_REDACTED]` | 314 | 225 | 225 | 89 |
+| `[LOCAL_PATH_REDACTED]` | 58 | 38 | 38 | 20 |
 
 这些路径目前只能被识别为外部候选，不能直接进入正式知识库。
 
@@ -53,7 +53,7 @@ Source Discovery 中的路径统计：
 | 属性 | 值 |
 |---|---|
 | `root_id` | `Root-001` |
-| `path` | `[LOCAL_PATH_REDACTED]|
+| `path` | `[LOCAL_PATH_REDACTED]` |
 | `owner` | 设计管理知识库维护方 |
 | `purpose` | Wiki、概念页、实体页、Query 页、raw 登记页和已纳入知识库的企业资料 |
 | `read_only` | `true` |
@@ -71,7 +71,7 @@ Source Discovery 中的路径统计：
 | 属性 | 值 |
 |---|---|
 | `root_id` | `Root-002` |
-| `path` | `[LOCAL_PATH_REDACTED]�公司技术部` |
+| `path` | `[LOCAL_PATH_REDACTED]` |
 | `owner` | 二公司技术部/设计与技术管理责任部门 |
 | `purpose` | 设计任务书、设计策划、方案比选、工作计划、项目复盘、技术资料和业务台账的原始文件来源 |
 | `read_only` | `true` |
@@ -97,7 +97,7 @@ Source Discovery 中的路径统计：
 | 属性 | 值 |
 |---|---|
 | `root_id` | `Root-003` |
-| `path` | `[LOCAL_PATH_REDACTED]��中心` |
+| `path` | `[LOCAL_PATH_REDACTED]` |
 | `owner` | 设计支持中心/企业设计支持责任部门 |
 | `purpose` | 设计价值创造、产品线案例、方案比选案例、专业设计资料和设计管理支撑资料 |
 | `read_only` | `true` |
@@ -172,7 +172,7 @@ Program Files、ProgramData 等系统或应用目录
 
 - 运行账户只授予读取权限；
 - 不修改、移动、重命名或覆盖外部源文件；
-- 不把外部源文件复制回 `[LOCAL_PATH_REDACTED]；
+- 不把外部源文件复制回 `[LOCAL_PATH_REDACTED]`；
 - Shadow 缓存和索引必须与正式 Qdrant 分离；
 - 日志不得输出 API Key、个人隐私和不必要的文件正文；
 - Root 被暂停或撤销后，不得继续使用旧版本文件自动发布。
@@ -191,7 +191,7 @@ Program Files、ProgramData 等系统或应用目录
 
 ```json
 {
-  "root_path": "[LOCAL_PATH_REDACTED]�公司技术部",
+  "root_path": "[LOCAL_PATH_REDACTED]",
   "root_approval_status": "PENDING_APPROVAL",
   "inside_allowed_root": false,
   "source_status": "NEEDS_REVIEW",

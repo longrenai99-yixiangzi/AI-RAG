@@ -1,8 +1,8 @@
 # PDF Loader + Quality Check 实现说明
 
-> 任务：TASK-004D PDF Loader + Quality Check 实现  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
+> 任务：TASK-004D PDF Loader + Quality Check 实现
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
 > 状态：已实现，未接入正式 indexer，未执行 OCR
 
 ## 1. 实现范围
@@ -144,7 +144,7 @@ Quality Check 只判断，不执行 OCR，不下载 OCR 模型，不改变源文
 | `scanned_feature.pdf` | 两页图像、无文字层，验证 `needs_ocr` 和图片占比 |
 | `broken.pdf` | 非法 PDF 字节，验证 `read_error` |
 
-Fixture 只存放在 `tests/fixtures/pdf`，不属于 `[LOCAL_PATH_REDACTED]，不参与正式索引。
+Fixture 只存放在 `tests/fixtures/pdf`，不属于 `[LOCAL_PATH_REDACTED]`，不参与正式索引。
 
 ## 6. 与现有系统的关系
 
@@ -165,7 +165,7 @@ app/indexer.py
 - 修改 `app/domain.py`；
 - 接管正式索引；
 - 执行 OCR；
-- 修改 `[LOCAL_PATH_REDACTED]。
+- 修改 `[LOCAL_PATH_REDACTED]`。
 
 后续迁移时应先比较旧 Parser 与新 Loader 的文件状态、页数、SourceBlock 数、文本覆盖和页码 Citation，再通过适配器接入正式 Document Engine。
 
@@ -207,6 +207,6 @@ PDF Loader 局部测试：4 passed
 | 不执行 OCR | 已满足 |
 | 未修改 `app/parsers.py` | 是 |
 | 未接入正式 indexer | 是 |
-| 未修改 `[LOCAL_PATH_REDACTED]| 是 |
+| 未修改 `[LOCAL_PATH_REDACTED]` | 是 |
 
 **TASK-004D：完成。**

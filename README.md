@@ -1,20 +1,20 @@
 # AI设计管理知识库 · V1.0 / V2 内部试用
 
-这是一个本地运行、对 `[LOCAL_PATH_REDACTED]。当前唯一开发基线为 Git 分支 `rag-v1-refactor`；V2 仍处于 8010 内部试用，未切换正式 8000 服务。
+这是一个本地运行的设计管理RAG程序。业务知识源保存在仓库外并按只读方式使用；公开仓库不包含原始资料、文本切片、向量、逐题日志或内部路径。当前开发分支为 `rag-v1-refactor`；V2仍处于8010内部试用范围，未切换正式8000服务。
 
 ## 当前状态
 
-- 开发目录：`[LOCAL_PATH_REDACTED]
+- 开发目录：由使用者在本机自行选择，不写入公开仓库
 - Git 基线：`rag-v1-refactor`
-- 知识源：`[LOCAL_PATH_REDACTED]，只读
+- 知识源：仓库外受控目录，只读
 - 正式服务：`127.0.0.1:8000`，保持未切换
 - 内部试用配置：`127.0.0.1:8010`，V2 Verified RAG 已启用；`v2_primary_mode` 当前为 `V1_PRIMARY`
 - Provider 依赖的生成式回答：试用策略关闭；证据展示和确定性事实路径仍可用
 - 生产状态：`PRODUCTION_READY = FALSE`
 
-V2.6.2 候选 `823d3b32b68f84ba397b9035556cc252cf075ea09b2d7df3923e125f1a74b73a` 已获 Owner 版本批准，但尚未部署。33/30 Live Shadow、当前候选 T5 与 T6 报告均已完成；这不表示8000已切换。2026-09-27 00:52（Asia/Shanghai）核验时8000和8010都没有进程监听；8000仍未获启动、写入或切换授权。当前摘要见 [`docs/V2_6_2_GITHUB_SUMMARY.md`](docs/V2_6_2_GITHUB_SUMMARY.md)，详细交接见 [`docs/V2_6_2_HANDOFF_20260920.md`](docs/V2_6_2_HANDOFF_20260920.md)。
+V2.6.2候选 `823d3b32b68f84ba397b9035556cc252cf075ea09b2d7df3923e125f1a74b73a` 已获Owner版本批准，但尚未部署。33/30 Live Shadow以及对应T5、T6验证已经完成；这不表示8000已切换。8000仍未获启动、写入或切换授权。当前公开状态见[发布状态摘要](docs/CURRENT_RELEASE_STATE.md)。
 
-内部试用的冻结点、来源范围和安全边界见 [`docs/V2_INTERNAL_TRIAL_BASELINE.md`](docs/V2_INTERNAL_TRIAL_BASELINE.md)。
+公开仓库的数据边界见[公共仓库数据政策](docs/PUBLIC_REPOSITORY_DATA_POLICY.md)。内部试用的逐题证据、来源范围和运行记录仅保存在受控本机材料中。
 
 当前基础检索闭环为：
 

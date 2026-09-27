@@ -20,9 +20,9 @@ MANIFEST = V26 / "remediation_candidate_v2_6_2.json"
 OUT = V26 / "v2_6_2_remaining_governance_proposal.json"
 REPORT = ROOT / "docs" / "V2_6_2_REMAINING_GOVERNANCE_PROPOSAL.md"
 SOURCE_ROOTS = (
-    Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2025"),
-    Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026"),
-    Path(r"[LOCAL_PATH_REDACTED]��中心"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
 )
 SUPPORTED = {".md", ".markdown", ".pdf", ".docx", ".doc", ".xlsx", ".pptx", ".txt"}
 SIGNAL_FILES = (

@@ -29,10 +29,10 @@ def test_batch_case_requires_source_location_and_terms():
 
 def test_batch_cases_are_scoped_to_current_sources():
     cases = [
-        {"expected_source_path": "[LOCAL_PATH_REDACTED]", "case_id": "current"},
-        {"expected_source_path": "[LOCAL_PATH_REDACTED]", "case_id": "history"},
+        {"expected_source_path": "synthetic/current/source.md", "case_id": "current"},
+        {"expected_source_path": "synthetic/history/source.md", "case_id": "history"},
     ]
-    assert [case["case_id"] for case in batch._filter_cases(cases, ["[LOCAL_PATH_REDACTED]"])] == ["current"]
+    assert [case["case_id"] for case in batch._filter_cases(cases, ["synthetic/current/source.md"])] == ["current"]
 
 
 def test_pdf_generates_summary_acceptance_case(monkeypatch):

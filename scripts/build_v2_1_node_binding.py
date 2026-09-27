@@ -21,23 +21,23 @@ def node_definitions() -> list[dict]:
     nodes = [
         ("design-management", "设计管理", None, 0, "[LOCAL_PATH_REDACTED]"),
         ("design-management/design-management-system", "设计管理体系", "design-management", 1, "[LOCAL_PATH_REDACTED]"),
-        ("design-management/design-support", "设计支持", "design-management", 1, "[LOCAL_PATH_REDACTED]��.md"),
-        ("design-management/epc-design-process", "EPC项目设计管理流程", "design-management", 1, "[LOCAL_PATH_REDACTED]��设计管理流程.md"),
-        ("design-management/design-management-output", "设计管理成果总结", "design-management", 1, "[LOCAL_PATH_REDACTED]��结.md"),
+        ("design-management/design-support", "设计支持", "design-management", 1, "[LOCAL_PATH_REDACTED]"),
+        ("design-management/epc-design-process", "EPC项目设计管理流程", "design-management", 1, "[LOCAL_PATH_REDACTED]"),
+        ("design-management/design-management-output", "设计管理成果总结", "design-management", 1, "[LOCAL_PATH_REDACTED]"),
     ]
     support = ("报批报建", "方案比选", "相关方沟通机制", "设计价值创造", "设计任务书", "设计策划", "设计计划", "设计评估", "设计质量", "设计风险", "限额设计", "设计招采")
     system = ("制度性文件", "工作计划", "管理指南")
     output = ("管理工具书", "管理经验交流", "设计复盘")
     for name in support:
-        nodes.append((f"design-management/design-support/{name}", name, "design-management/design-support", 2, "[LOCAL_PATH_REDACTED]��.md"))
+        nodes.append((f"design-management/design-support/{name}", name, "design-management/design-support", 2, "[LOCAL_PATH_REDACTED]"))
     nodes.extend([
-        ("design-management/design-support/深化设计", "深化设计", "design-management/design-support", 2, "[LOCAL_PATH_REDACTED]��设计管理流程.md"),
-        ("design-management/design-support/接口与提资", "接口与提资", "design-management/design-support", 2, "[LOCAL_PATH_REDACTED]��设计管理流程.md"),
+        ("design-management/design-support/深化设计", "深化设计", "design-management/design-support", 2, "[LOCAL_PATH_REDACTED]"),
+        ("design-management/design-support/接口与提资", "接口与提资", "design-management/design-support", 2, "[LOCAL_PATH_REDACTED]"),
     ])
     for name in (*system, "培训与能力建设"):
         nodes.append((f"design-management/design-management-system/{name}", name, "design-management/design-management-system", 2, "[LOCAL_PATH_REDACTED]"))
     for name in output:
-        nodes.append((f"design-management/design-management-output/{name}", name, "design-management/design-management-output", 2, "[LOCAL_PATH_REDACTED]��结.md"))
+        nodes.append((f"design-management/design-management-output/{name}", name, "design-management/design-management-output", 2, "[LOCAL_PATH_REDACTED]"))
     return [{"schema_version": "knowledge_os_v2_1.node", "node_id": node_id, "title": title, "parent_node_id": parent, "level": level, "knowledge_domain": "设计管理", "framework_status": "EXISTING_FRAMEWORK", "source": source} for node_id, title, parent, level, source in nodes]
 
 

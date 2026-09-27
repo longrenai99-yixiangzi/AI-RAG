@@ -35,7 +35,7 @@ def main() -> int:
     output: list[str] = []
     changed = 0
     for line in text.splitlines(keepends=True):
-        match = re.search(r"- \{i[LOCAL_PATH_REDACTED]*([^,]+),", line)
+        match = re.search(r"- \{id:\s*([^,]+),", line)
         if not match:
             output.append(line)
             continue

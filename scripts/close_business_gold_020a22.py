@@ -22,16 +22,16 @@ from scripts.close_business_gold_locations import (
 
 OUTPUT_DIR = PROJECT_ROOT / "evaluation" / "business_gold_v2"
 BA006_RESPONSIBILITY_PATH = Path(
-    r"[LOCAL_PATH_REDACTED]�公司技术部\2026\责任状\局\3.二公司：2026年设计与技术专项责任书 .docx"
+    r"[LOCAL_PATH_REDACTED]"
 )
 BA006_WORK_PLAN_PATH = Path(
-    r"[LOCAL_PATH_REDACTED]�公司技术部\2026\各类文件\设计管理\关于印发中建三局2026年设计与技术工作计划的通知.pdf"
+    r"[LOCAL_PATH_REDACTED]"
 )
 BA010_DOCX_PATH = Path(
-    r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\新洲星谷\设计管理策划书-星谷科创中心项目.docx"
+    r"[LOCAL_PATH_REDACTED]"
 )
 BA010_XLSX_PATH = Path(
-    r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\新洲星谷\星谷科创项目设计管理策划+设计示范项目打造方案\方案比选与价值创造清单方案比选及价值创造.xlsx"
+    r"[LOCAL_PATH_REDACTED]"
 )
 
 

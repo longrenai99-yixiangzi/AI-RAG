@@ -1,8 +1,8 @@
 # AI设计管理知识库 V1.0 Staging → Index Pipeline 设计
 
-> 任务：TASK-007 Staging → Index Pipeline 设计  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 知识源：`[LOCAL_PATH_REDACTED]（只读）  
+> 任务：TASK-007 Staging → Index Pipeline 设计
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 知识源：`[LOCAL_PATH_REDACTED]`（只读）
 > 状态：完成设计和纯转换骨架，未执行正式发布
 
 ## 1. 执行边界
@@ -14,7 +14,7 @@
 - 不清空 Qdrant；
 - 不生成全量 Embedding；
 - 不写入正式 Qdrant、SQLite 或 BM25 文件；
-- 不修改 `[LOCAL_PATH_REDACTED]。
+- 不修改 `[LOCAL_PATH_REDACTED]`。
 
 新增发布骨架：
 

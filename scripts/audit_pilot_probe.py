@@ -25,7 +25,7 @@ import pymupdf  # noqa: E402
 
 from app.parsers import SUPPORTED_EXTENSIONS, iter_source_files  # noqa: E402
 
-BASE = Path(r"[LOCAL_PATH_REDACTED]�公司技术部")
+BASE = Path(r"[LOCAL_PATH_REDACTED]")
 SUBS = ["2026", "EPC"]
 OUT_DIR = ROOT / "evaluation" / "knowledge_os_system_audit" / "t11_pilot"
 PDF_SAMPLE = 80

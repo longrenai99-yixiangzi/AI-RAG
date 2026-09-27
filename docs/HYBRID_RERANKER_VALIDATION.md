@@ -1,8 +1,8 @@
 # Dense Retrieval + Reranker Shadow 验证报告
 
-> 任务：TASK-011 Dense Retrieval + Reranker Shadow 验证  
-> 项目目录：`[LOCAL_PATH_REDACTED]
-> 验证日期：2026-08-22  
+> 任务：TASK-011 Dense Retrieval + Reranker Shadow 验证
+> 项目目录：`[LOCAL_PATH_REDACTED]`
+> 验证日期：2026-08-22
 > 状态：Shadow 验证完成，未接入生产问答链路
 
 ## 1. 执行边界

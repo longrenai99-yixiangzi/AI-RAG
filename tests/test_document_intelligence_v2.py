@@ -89,10 +89,10 @@ def test_registration_query_role_and_metadata_conflict(tmp_path: Path):
     assert builder._build_profile
     from app.document_intelligence.v2 import _document_type
 
-    assert _document_type(Path(r"[LOCAL_PATH_REDACTED]"), "", {}) == "REGISTER_PAGE"
-    assert _document_type(Path(r"[LOCAL_PATH_REDACTED]"), "", {}) == "QUERY_PAGE"
+    assert _document_type(Path(r"synthetic\wiki\sources\登记页.md"), "", {}) == "REGISTER_PAGE"
+    assert _document_type(Path(r"synthetic\wiki\queries\query.md"), "", {}) == "QUERY_PAGE"
     document = {"document_id": "d", "document_profile": {}}
-    conflicts = builder._detect_conflicts(document, Path(r"[LOCAL_PATH_REDACTED]"), "正文记载2026年要求")
+    conflicts = builder._detect_conflicts(document, Path(r"synthetic\wiki\queries\2025-summary.md"), "正文记载2026年要求")
     assert conflicts[0]["status"] == "METADATA_CONFLICT"
 
 

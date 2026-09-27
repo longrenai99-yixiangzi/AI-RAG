@@ -156,7 +156,7 @@ export function BatchWorkbench() {
         <span className="eyebrow">01 · SOURCE INTAKE</span><h2>批量资料入库</h2>
         <p>可填写服务器本机路径，也可选择本机文件夹上传。浏览器上传完成后会自动批准进入 Shadow、生成验收题并批量回归；服务器路径仍需点击一次批准。</p>
         <div className="batch-upload"><label>选择文件夹<input ref={folderInput} type="file" multiple onChange={(event) => setSelectedFiles(Array.from(event.target.files || []))} /></label><button className="outline-button" onClick={() => void uploadFolder()} disabled={busy || selectedFiles.length === 0}>上传并预览 ({selectedFiles.length})</button></div>
-        <textarea value={sourceInput} onChange={(event) => setSourceInput(event.target.value)} placeholder={'[LOCAL_PATH_REDACTED]�公司技术部\\2026\\知识库\\高频设计风险清单\n[LOCAL_PATH_REDACTED]�公司技术部\\2026\\概算及策划评审'} />
+        <textarea value={sourceInput} onChange={(event) => setSourceInput(event.target.value)} placeholder={'[LOCAL_PATH_REDACTED]'} />
         <div className="batch-actions"><button className="outline-button" onClick={() => void previewSources()} disabled={busy || paths.length === 0}>只读预览</button><button className="primary-button" onClick={() => void approveSources()} disabled={busy || preview.length === 0}>批准进入 Shadow</button></div>
         {preview.length > 0 && <div className="batch-file-list">{preview.map((file) => <div key={file.source_path}><b>{file.file_name}</b><small>{file.parse_probe} · {(file.size / 1024 / 1024).toFixed(2)} MB</small></div>)}</div>}
       </article>

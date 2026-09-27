@@ -88,11 +88,17 @@ def test_feedback_regression_uses_current_candidate_identity(tmp_path, monkeypat
     monkeypatch.setattr(v2, "KNOWLEDGE_STORE", store)
     monkeypatch.setattr(v2, "_primary_mode", lambda: v2.V262_CANDIDATE_MODE)
     monkeypatch.setattr(v2, "_runtime_evidence_records", lambda: [{"source_id": source["source_id"], "source_path": str(path), "source_version": source["current_hash"]}])
-    monkeypatch.setattr(v2, "_candidate_primary_answer", lambda _question: {"answer_status": "ANSWERED", "answer": "2026 项目事实", "citations": [{"source_id": source["source_id"], "source_version": source["current_hash"]}], "debug": {"runtime_pointer": {"mode": v2.V262_CANDIDATE_MODE, "candidate_hash": "frozen-hash"}}})
+    citation = {"source_id": "V262-frozen-source", "source_path": str(path), "source_version": source["current_hash"]}
+    monkeypatch.setattr(v2, "_candidate_primary_answer", lambda _question: {"answer_status": "ANSWERED", "answer": "2026 项目事实", "citations": [citation], "debug": {"runtime_pointer": {"mode": v2.V262_CANDIDATE_MODE, "candidate_hash": "frozen-hash"}}})
     monkeypatch.setattr(v2, "_engine_instance", lambda: (_ for _ in ()).throw(AssertionError("V1 must not answer")))
     run = v2.run_feedback_workflow_regression(feedback["feedback_id"], v2.ReviewedFeedbackRequest(decision="APPROVE"))["regression"]
     assert run["regression_status"] == "PASSED"
     assert run["runtime_pointer"]["candidate_hash"] == "frozen-hash"
+    assert run["citation_source_id"] == "V262-frozen-source"
+    citation["source_version"] = "other-version"
+    assert v2.run_feedback_workflow_regression(feedback["feedback_id"], v2.ReviewedFeedbackRequest())["regression"]["regression_status"] == "FAILED"
+    citation.update({"source_version": source["current_hash"], "source_path": str(tmp_path / "2025-project.md")})
+    assert v2.run_feedback_workflow_regression(feedback["feedback_id"], v2.ReviewedFeedbackRequest())["regression"]["regression_status"] == "FAILED"
 
 
 def test_batch_regression_uses_same_candidate_answer_entry(monkeypatch):

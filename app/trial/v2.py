@@ -1558,12 +1558,12 @@ def run_feedback_workflow_regression(feedback_id: str, request: ReviewedFeedback
     if not source or source.get("index_status") != "INDEXED" or not _runtime_has_source(str(source.get("source_path") or ""), str(source.get("current_hash") or "")):
         return {"feedback_id": feedback_id, "regression_status": "NOT_READY", "reason": "来源当前版本尚未进入主答运行范围。", "runtime_mode": _primary_mode(), "automatic_knowledge_publish": 0}
     result = _answer_current_runtime(str(feedback.get("question") or ""))
-    citation = next((item for item in result.get("citations", []) if item.get("source_id") == source_id), None)
+    citation = next((item for item in result.get("citations", []) if _same_source_path(source["source_path"], item.get("source_path")) and str(item.get("source_version") or "") == str(source.get("current_hash") or "")), None)
     location = str(feedback.get("source_location") or "").strip()
     location_hit = not location or (citation is not None and location in str(citation.get("display_location") or ""))
     missing = [term for term in feedback.get("required_terms", []) if term not in str(result.get("answer") or "")]
     passed = result.get("answer_status") == "ANSWERED" and citation is not None and location_hit and not missing
-    regression = {"run_id": "RW_" + uuid.uuid4().hex, "run_at": _now(), "answer_status": result.get("answer_status"), "runtime_pointer": (result.get("debug") or {}).get("runtime_pointer"), "citation_source_hit": citation is not None, "citation_location_hit": location_hit, "missing_required_terms": missing, "regression_status": "PASSED" if passed else "FAILED", "answer_excerpt": str(result.get("answer") or "")[:900]}
+    regression = {"run_id": "RW_" + uuid.uuid4().hex, "run_at": _now(), "answer_status": result.get("answer_status"), "runtime_pointer": (result.get("debug") or {}).get("runtime_pointer"), "citation_source_id": citation.get("source_id") if citation else None, "citation_source_version": citation.get("source_version") if citation else None, "citation_source_hit": citation is not None, "citation_location_hit": location_hit, "missing_required_terms": missing, "regression_status": "PASSED" if passed else "FAILED", "answer_excerpt": str(result.get("answer") or "")[:900]}
     KNOWLEDGE_STORE.record_regression(feedback_id, regression)
     return {"feedback_id": feedback_id, "regression": regression, "automatic_knowledge_publish": 0}
 

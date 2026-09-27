@@ -5,7 +5,7 @@ type Citation = { citation_id: string; evidence_id?: string; source_id?: string;
 type Claim = { claim_id: string; rendered_claim_text: string; claim_type: string }
 type ReviewCandidate = Citation & { role?: string; scope?: Record<string, string> }
 type V2Result = { query_id: string; query_run_id: string; question: string; resolved_question?: string; answer: string; answer_status: string; status_label: string; citations: Citation[]; claims: Claim[]; growth_candidate_ids: string[]; latency: { total_ms: number }; failure_reason?: string; failure_message?: string; review_candidates?: ReviewCandidate[]; debug: unknown }
-type ChatMessage = { id: string; role: 'user' | 'assistant'; text: string; result?: V2Result }
+type ChatMessage = { id: string; role: 'user' | 'assistant'; text: string; result?: V2Result; request_id?: string; retry_of?: string; status?: 'pending' | 'unknown' | 'stopped' | 'failed'; question?: string }
 type FeedbackDraft = {
   feedback_type: string
   comment: string
@@ -76,7 +76,7 @@ function feedbackDraftKey(queryRunId: string): string {
 }
 
 function compactMessage(message: ChatMessage): ChatMessage {
-  if (message.role === 'user' || !message.result) return { id: message.id, role: message.role, text: message.text }
+  if (message.role === 'user' || !message.result) return { id: message.id, role: message.role, text: message.text, request_id: message.request_id, retry_of: message.retry_of, status: message.status, question: message.question }
   const result = message.result
   return {
     id: message.id,
@@ -101,16 +101,18 @@ function compactMessage(message: ChatMessage): ChatMessage {
   }
 }
 
-function persistMessages(messages: ChatMessage[]) {
+function persistMessages(messages: ChatMessage[]): 'full' | 'partial' | 'failed' {
   const compact = messages.slice(-PERSISTED_MESSAGE_LIMIT).map(compactMessage)
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(compact))
+    return 'full'
   } catch {
     try {
       localStorage.removeItem(STORAGE_KEY)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(compact.filter((item) => item.role === 'user').slice(-8)))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(compact.filter((item) => item.role === 'user' || item.status).slice(-8)))
+      return 'partial'
     } catch {
-      // Quota errors must never take down the Q&A page.
+      return 'failed'
     }
   }
 }
@@ -134,13 +136,31 @@ export function AIChat() {
   const [notice, setNotice] = useState('')
   const [workflow, setWorkflow] = useState<Workflow[]>([])
   const controller = useRef<AbortController | null>(null)
+  const messagesRef = useRef(messages)
+  const conversationRef = useRef(conversationId)
+  const questionRef = useRef(question)
   const history = useMemo(() => messages.filter((item) => item.role === 'user'), [messages])
   const currentRunId = [...messages].reverse().find((item) => item.result)?.result?.query_run_id
 
-  useEffect(() => { persistMessages(messages) }, [messages])
-  useEffect(() => { localStorage.setItem(CONVERSATION_KEY, conversationId) }, [conversationId])
-  useEffect(() => { question ? localStorage.setItem(QUESTION_DRAFT_KEY, question) : localStorage.removeItem(QUESTION_DRAFT_KEY) }, [question])
+  useEffect(() => { try { localStorage.setItem(CONVERSATION_KEY, conversationId) } catch { setNotice('本机存储不可用，刷新后会话可能丢失。') } }, [conversationId])
+  useEffect(() => { persistMessages(messagesRef.current) }, [])
   useEffect(() => { void refreshWorkflow() }, [])
+
+  function commitMessages(next: ChatMessage[]) {
+    messagesRef.current = next
+    setMessages(next)
+    const saved = persistMessages(next)
+    if (saved !== 'full') setNotice(saved === 'partial' ? '本机空间不足，只保存了问题和待处理状态；刷新后部分答案可能丢失。' : '本机存储不可用，刷新后可能无法恢复本次记录。')
+  }
+
+  function updateQuestion(next: string) {
+    questionRef.current = next
+    setQuestion(next)
+    try {
+      if (next) localStorage.setItem(QUESTION_DRAFT_KEY, next)
+      else localStorage.removeItem(QUESTION_DRAFT_KEY)
+    } catch { setNotice('本机存储不可用，刷新后草稿可能丢失。') }
+  }
 
   async function refreshWorkflow() {
     try {
@@ -150,27 +170,37 @@ export function AIChat() {
     } catch { setNotice('反馈记录暂时无法读取。') }
   }
 
-  async function send(value = question) {
+  async function send(value = question, retryOf = '') {
     const text = value.trim()
-    if (!text || loading) return
-    setMessages((items) => [...items, { id: crypto.randomUUID(), role: 'user', text }])
-    setQuestion('')
+    if (!text || controller.current) return
+    const requestId = crypto.randomUUID()
+    const answerId = `answer:${requestId}`
+    const currentConversation = conversationRef.current
+    const activeController = new AbortController()
+    controller.current = activeController
     setNotice('')
+    commitMessages([...messagesRef.current, { id: requestId, role: 'user', text, request_id: requestId, retry_of: retryOf || undefined }, { id: answerId, role: 'assistant', text: '正在等待本页的问答结果…', request_id: requestId, retry_of: retryOf || undefined, status: 'pending', question: text }])
+    updateQuestion('')
     setLoading(true)
-    controller.current = new AbortController()
     try {
-      const response = await fetch('/api/v2/query', { method: 'POST', signal: controller.current.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, trial_user: 'reviewer-001', conversation_id: conversationId, node_id: nodeId }) })
-      const result = await response.json() as V2Result
-      if (!response.ok) throw new Error(result.answer || '问答服务暂时不可用')
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: 'assistant', text: result.answer, result }])
+      const response = await fetch('/api/v2/query', { method: 'POST', signal: activeController.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, trial_user: 'reviewer-001', conversation_id: currentConversation, node_id: nodeId }) })
+      const result = await response.json().catch(() => null) as (V2Result & { detail?: string }) | null
+      if (!response.ok) throw new Error(typeof result?.detail === 'string' ? result.detail : `HTTP ${response.status}`)
+      if (!result || typeof result.answer !== 'string' || !result.query_run_id) throw new Error('服务响应缺少答案或运行编号')
+      if (conversationRef.current !== currentConversation || controller.current !== activeController) return
+      commitMessages(messagesRef.current.map((item) => item.id === answerId ? { id: answerId, role: 'assistant', text: result.answer, result, request_id: requestId, retry_of: retryOf || undefined } : item))
       setSelected(Array.isArray(result.citations) ? result.citations[0] || null : null)
     } catch (error) {
-      const failure = error instanceof DOMException && error.name === 'AbortError' ? '本次问答已停止。' : '问答服务暂时不可用，请稍后重试。'
-      setMessages((items) => [...items, { id: crypto.randomUUID(), role: 'assistant', text: failure }])
-      setQuestion(text)
+      if (conversationRef.current !== currentConversation || controller.current !== activeController) return
+      const stopped = error instanceof DOMException && error.name === 'AbortError'
+      const failure = stopped ? '本页已停止等待；服务端是否完成尚不确定。可以重试。' : `未收到可用答案：${error instanceof Error ? error.message : '网络连接失败'}。请检查连接后重试。`
+      commitMessages(messagesRef.current.map((item) => item.id === answerId ? { ...item, text: failure, status: stopped ? 'stopped' : 'failed' } : item))
+      if (!questionRef.current) updateQuestion(text)
     } finally {
-      setLoading(false)
-      controller.current = null
+      if (controller.current === activeController) {
+        controller.current = null
+        setLoading(false)
+      }
     }
   }
 
@@ -210,14 +240,17 @@ export function AIChat() {
   }
 
   function newConversation() {
+    controller.current?.abort()
+    controller.current = null
     const id = crypto.randomUUID()
+    conversationRef.current = id
     setConversationId(id)
-    setMessages([])
-    setSelected(null)
     setNotice('')
-    localStorage.removeItem(STORAGE_KEY)
-    localStorage.removeItem(QUESTION_DRAFT_KEY)
-    setQuestion('')
+    try { localStorage.setItem(CONVERSATION_KEY, id) } catch { setNotice('本机存储不可用，刷新后会话可能丢失。') }
+    commitMessages([])
+    setSelected(null)
+    updateQuestion('')
+    setLoading(false)
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -233,8 +266,8 @@ export function AIChat() {
     </aside>
     <main className="chat-main panel">
       <header className="chat-hero"><span className="eyebrow">AI KNOWLEDGE Q&A</span><h1>AI知识问答</h1><p>{nodeId ? `当前从知识节点 ${nodeId} 发起；答案仍需可核查来源。` : '基于当前 8010 试用知识范围的可验证问答'}</p></header>
-      <div className="chat-flow">{messages.length === 0 && <div className="chat-empty"><h2>先查证，再回答</h2><p>回答中的制度、数字和项目事实都应能回到原文位置。</p><div>{EXAMPLES.map((item) => <button key={item} onClick={() => void send(item)}>{item}</button>)}</div></div>}{messages.map((message) => message.role === 'user' ? <div className="user-message" key={message.id}>{message.text}</div> : <AnswerCard key={message.id} message={message} onCitation={setSelected} onFeedback={submitFeedback} />)}{loading && <div className="answer-card loading-answer"><b>正在检索知识库…</b><span>正在查找相关文档、核验证据并生成回答。</span></div>}</div>
-      <footer className="chat-composer"><textarea value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={onKeyDown} placeholder="输入设计管理问题，Enter发送，Shift+Enter换行" /><div><span>V2 Verified · 8010内部试用</span><button className="text-button" onClick={() => controller.current?.abort()} disabled={!loading}>停止</button><button className="text-button" onClick={() => setMessages([])}>清空当前会话</button><button className="primary-button" onClick={() => void send()} disabled={loading}>发送</button></div></footer>
+      <div className="chat-flow">{messages.length === 0 && <div className="chat-empty"><h2>先查证，再回答</h2><p>回答中的制度、数字和项目事实都应能回到原文位置。</p><div>{EXAMPLES.map((item) => <button key={item} onClick={() => void send(item)}>{item}</button>)}</div></div>}{messages.map((message) => message.role === 'user' ? <div className="user-message" key={message.id}>{message.text}</div> : <AnswerCard key={message.id} message={message} onCitation={setSelected} onFeedback={submitFeedback} onRetry={(item) => void send(item.question || '', item.request_id)} />)}</div>
+      <footer className="chat-composer"><textarea value={question} onChange={(event) => updateQuestion(event.target.value)} onKeyDown={onKeyDown} placeholder="输入设计管理问题，Enter发送，Shift+Enter换行" /><div><span>V2 Verified · 8010内部试用</span><button className="text-button" onClick={() => controller.current?.abort()} disabled={!loading}>停止</button><button className="text-button" onClick={newConversation}>清空并新建会话</button><button className="primary-button" onClick={() => void send()} disabled={loading}>发送</button></div></footer>
     </main>
     <aside className="source-detail panel">
       <div className="source-detail-head"><span className="eyebrow">CITATION & CORRECTION</span><h2>来源与更正</h2></div>
@@ -245,11 +278,11 @@ export function AIChat() {
   </section>
 }
 
-function AnswerCard({ message, onCitation, onFeedback }: { message: ChatMessage; onCitation: (citation: Citation) => void; onFeedback: (result: V2Result, draft: FeedbackDraft) => Promise<boolean> }) {
+function AnswerCard({ message, onCitation, onFeedback, onRetry }: { message: ChatMessage; onCitation: (citation: Citation) => void; onFeedback: (result: V2Result, draft: FeedbackDraft) => Promise<boolean>; onRetry: (message: ChatMessage) => void }) {
   const result = message.result
   const [draft, setDraft] = useState<FeedbackDraft>(() => result ? loadFeedbackDraft(result) : emptyFeedback())
   const [submitting, setSubmitting] = useState(false)
-  if (!result) return <article className="answer-card"><p>{message.text}</p></article>
+  if (!result) return <article className={`answer-card ${message.status || ''}`}><p>{message.text}</p>{message.status && <small>{message.status === 'pending' ? '正在本页等待响应；刷新后无法确认服务端是否完成。' : '重试会重新发送该问题，原请求可能已被服务端处理。'}</small>}{message.status && message.status !== 'pending' && <button className="text-button" onClick={() => onRetry(message)}>重试此问题</button>}</article>
   const answerResult = result
   const claims = Array.isArray(answerResult.claims) ? answerResult.claims : []
   const citations = Array.isArray(answerResult.citations) ? answerResult.citations : []
@@ -275,8 +308,8 @@ function AnswerCard({ message, onCitation, onFeedback }: { message: ChatMessage;
 
   return <article className={`answer-card ${partial ? 'partial' : ''} ${conflict ? 'conflict' : ''}`}>
     <header><span className={`answer-status ${status.toLowerCase()}`}>{result.status_label || status}</span><small>{latencyMs.toFixed(0)} ms</small></header>
+    <div className="answer-body">{message.text}</div>
     {partial && <div className="partial-grid"><div><b>已确认内容</b>{confirmed.map((item) => <p key={item.claim_id}>{item.rendered_claim_text}</p>)}</div><div><b>证据不足内容</b>{limitations.map((item) => <p key={item.claim_id}>{item.rendered_claim_text}</p>)}</div></div>}
-    {!partial && <div className="answer-body">{message.text}</div>}
     {result.failure_message && <p className="runtime-error">{result.failure_message}</p>}
     {result.resolved_question && result.resolved_question !== result.question && <small className="resolved-question">本轮检索问题：{result.resolved_question}</small>}
     <section className="answer-citations"><b>引用来源</b>{citations.length ? citations.map((citation, index) => <button key={citation.citation_id || `${index}`} onClick={() => onCitation(citation)}>[{index + 1}] {citation.file_name} · {citation.display_location}</button>) : <span>本次没有形成可定位引用。</span>}</section>
@@ -352,6 +385,6 @@ function SourceDetail({ citation }: { citation: Citation }) {
 function loadMessages(): ChatMessage[] {
   try {
     const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-    return Array.isArray(value) ? value.filter((item) => item && (item.role === 'user' || item.role === 'assistant') && typeof item.text === 'string') : []
+    return Array.isArray(value) ? value.filter((item) => item && (item.role === 'user' || item.role === 'assistant') && typeof item.text === 'string').map((item) => item.status === 'pending' ? { ...item, status: 'unknown', text: '刷新后无法确认上次请求是否完成。可以重试。' } : item) : []
   } catch { return [] }
 }

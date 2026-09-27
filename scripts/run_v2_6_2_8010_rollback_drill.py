@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import re
 import subprocess
-import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,6 +44,29 @@ def now() -> str:
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load_execution_authorization(path: Path, candidate_hash: str, action: str) -> dict[str, str]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    permission = {
+        "8010_cutover": "port_8010_persistent_primary_switch_authorized",
+        "8010_rollback_drill": "port_8010_rollback_drill_authorized",
+    }[action]
+    if str(payload.get("candidate_hash") or "") != candidate_hash:
+        raise RuntimeError("AUTHORIZATION_CANDIDATE_HASH_MISMATCH")
+    if payload.get(permission) is not True:
+        raise RuntimeError(f"AUTHORIZATION_SCOPE_MISSING:{permission}")
+    decision_id = str(payload.get("decision_id") or payload.get("authorization_id") or "")
+    if not decision_id:
+        raise RuntimeError("AUTHORIZATION_ID_MISSING")
+    return {
+        "decision_id": decision_id,
+        "action": action,
+        "permission": permission,
+        "candidate_hash": candidate_hash,
+        "authorization_file": path.name,
+        "authorization_sha256": sha256(path),
+    }
 
 
 def primary_mode(text: str | bytes) -> str:
@@ -216,25 +239,63 @@ def restart(mode: str) -> dict:
     return verify_runtime(mode)
 
 
+def restore_runtime(before_config: bytes, service_was_running: bool) -> dict[str, Any]:
+    CONFIG.write_bytes(before_config)
+    running_now = _port_open(8010)
+    if running_now:
+        run_script(STOP)
+        _wait_for_port_release(8010)
+    if service_was_running:
+        start_service()
+    running_after = _port_open(8010)
+    restored = CONFIG.read_bytes() == before_config and running_after == service_was_running
+    return {
+        "status": "PASS" if restored else "FAIL",
+        "config_restored_byte_for_byte": CONFIG.read_bytes() == before_config,
+        "service_running_before": service_was_running,
+        "service_running_after": running_after,
+        "primary_mode": primary_mode(CONFIG.read_bytes()),
+    }
+
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Run the scoped 8010 V1→candidate→V1 rollback drill.")
+    parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--expected-candidate-hash")
+    parser.add_argument("--authorization-file", type=Path)
+    parser.add_argument("--target-port", type=int, default=8010)
+    return parser.parse_args(argv)
+
+
 def main() -> int:
-    if "--execute" not in sys.argv:
-        raise SystemExit("Refusing to alter 8010 without --execute.")
+    args = parse_args()
+    if not args.execute:
+        print(json.dumps({"status": "PRECHECK_ONLY_NO_CHANGES", "execute_required": True, "target_port": 8010}))
+        return 0
+    if args.target_port != 8010:
+        raise SystemExit("Rollback drill is restricted to target port 8010.")
+    if not args.expected_candidate_hash or args.authorization_file is None:
+        raise SystemExit("--execute requires --expected-candidate-hash and --authorization-file.")
     before_config = CONFIG.read_bytes()
+    service_was_running = _port_open(8010)
     if primary_mode(before_config) != V1:
         raise SystemExit("Rollback drill requires V1_PRIMARY as the starting pointer.")
+    if _port_open(8000):
+        raise SystemExit("Rollback drill blocked because port 8000 has a listener.")
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
     candidate_hash = str(manifest.get("candidate_hash") or "")
-    if not candidate_hash:
-        raise SystemExit("Rollback drill requires a candidate manifest hash.")
+    if not candidate_hash or candidate_hash != args.expected_candidate_hash:
+        raise SystemExit("Rollback drill candidate does not match --expected-candidate-hash.")
+    authorization = load_execution_authorization(args.authorization_file, candidate_hash, "8010_rollback_drill")
     if REPORT.exists():
         archive = REPORT.with_name(f"{REPORT.stem}_pre_{datetime.now().strftime('%Y%m%dT%H%M%S%f')}{REPORT.suffix}")
         archive.write_bytes(REPORT.read_bytes())
     report = {
         "schema_version": "knowledge_os_v2_6_2.8010_rollback_drill",
         "started_at": now(),
-        "authorization": "OWNER_CONFIRMED_8010_ONLY_V1_TO_V262_TO_V1",
+        "authorization": authorization,
         "candidate_hash": candidate_hash,
-        "snapshot": {"config_sha256": sha256(CONFIG), "primary_mode": V1, "port_8000_listener": _port_open(8000)},
+        "snapshot": {"config_sha256": sha256(CONFIG), "primary_mode": V1, "port_8000_listener": False, "service_running": service_was_running},
         "steps": [],
         "status": "RUNNING",
         "formal_8000_touched": False,
@@ -243,7 +304,8 @@ def main() -> int:
     }
     restored = False
     try:
-        report["steps"].append({"step": "V1_BASELINE", "runtime": verify_runtime(V1)})
+        baseline = verify_runtime(V1) if service_was_running else {"configured_primary_mode": V1, "service_running": False, "port_8000_listener": False}
+        report["steps"].append({"step": "V1_BASELINE", "runtime": baseline})
         report["steps"].append({"step": "SWITCH_TO_V262", "runtime": restart(CANDIDATE)})
         candidate_smoke = [ask(*case, CANDIDATE, candidate_hash) for case in SMOKE]
         report["steps"].append({"step": "V262_SMOKE", "results": candidate_smoke})
@@ -261,31 +323,25 @@ def main() -> int:
         report["steps"].append({"step": "ROLLBACK_TO_V1", "runtime": restart(V1)})
         v1_smoke = [ask(*case, V1) for case in SMOKE]
         report["steps"].append({"step": "V1_RESTORATION_SMOKE", "results": v1_smoke})
-        if CONFIG.read_bytes() != before_config:
-            raise RuntimeError("V1 configuration snapshot was not restored byte-for-byte")
-        if _port_open(8000):
-            raise RuntimeError("8000 listener detected after rollback")
-        report["final_config_sha256"] = sha256(CONFIG)
-        restored = True
+        report["pre_execution_state_restore"] = restore_runtime(before_config, service_was_running)
+        restored = report["pre_execution_state_restore"]["status"] == "PASS"
+        if not restored:
+            raise RuntimeError("PRE_EXECUTION_STATE_RESTORE_FAILED")
         report["status"] = "PASS"
     except Exception as error:
         report["status"] = "FAIL"
         report["error"] = f"{type(error).__name__}: {error}"
         try:
-            if primary_mode(CONFIG.read_bytes()) != V1 or not _port_open(8010):
-                restart(V1)
-            if CONFIG.read_bytes() != before_config:
-                CONFIG.write_bytes(before_config)
-                run_script(STOP)
-                start_service()
-            runtime = verify_runtime(V1)
-            restored = CONFIG.read_bytes() == before_config and runtime["health"] == "ok" and not _port_open(8000)
+            report["pre_execution_state_restore"] = restore_runtime(before_config, service_was_running)
+            restored = report["pre_execution_state_restore"]["status"] == "PASS"
         except Exception as rollback_error:
             report["rollback_error"] = f"{type(rollback_error).__name__}: {rollback_error}"
     finally:
-        report["restored_to_v1"] = restored
+        report["restored_to_v1"] = restored and primary_mode(CONFIG.read_bytes()) == V1
+        report["restored_to_pre_execution_state"] = restored
         report["final_config_sha256"] = sha256(CONFIG)
         report["completed_at"] = now()
+        REPORT.parent.mkdir(parents=True, exist_ok=True)
         REPORT.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"status": report["status"], "restored_to_v1": restored, "candidate_hash": report["candidate_hash"], "report": str(REPORT)}, ensure_ascii=False))
     return 0 if report["status"] == "PASS" and restored else 1

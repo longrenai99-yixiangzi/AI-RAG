@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import argparse
 import json
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.request import Request, urlopen
+from urllib.request import urlopen
 
 try:
-    from scripts.run_v2_6_2_8010_rollback_drill import CANDIDATE, CONFIG, MANIFEST, V1, ask, get_json as base_get_json, primary_mode, restart
+    from scripts.run_v2_6_2_8010_rollback_drill import CANDIDATE, CONFIG, MANIFEST, V1, ask, load_execution_authorization, primary_mode, restart, restore_runtime, sha256
 except ModuleNotFoundError:
-    from run_v2_6_2_8010_rollback_drill import CANDIDATE, CONFIG, MANIFEST, V1, ask, get_json as base_get_json, primary_mode, restart
+    from run_v2_6_2_8010_rollback_drill import CANDIDATE, CONFIG, MANIFEST, V1, ask, load_execution_authorization, primary_mode, restart, restore_runtime, sha256
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -61,27 +62,65 @@ def smoke_diagnostics() -> dict:
     return {"overview_keys": sorted(overview.keys()), "question_keys": sorted(questions.keys())}
 
 
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Precheck or explicitly execute the scoped 8010 candidate cutover.")
+    parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--expected-candidate-hash")
+    parser.add_argument("--authorization-file", type=Path)
+    parser.add_argument("--target-port", type=int, default=8010)
+    return parser.parse_args(argv)
+
+
 def main() -> int:
+    args = parse_args()
+    if not args.execute:
+        print(json.dumps({
+            "status": "PRECHECK_ONLY_NO_CHANGES",
+            "execute_required": True,
+            "target_port": 8010,
+            "required_arguments": ["--execute", "--expected-candidate-hash", "--authorization-file"],
+        }))
+        return 0
+    if args.target_port != 8010:
+        raise SystemExit("Cutover is restricted to target port 8010.")
+    if not args.expected_candidate_hash or args.authorization_file is None:
+        raise SystemExit("--execute requires --expected-candidate-hash and --authorization-file.")
     before = CONFIG.read_text(encoding="utf-8")
+    before_bytes = CONFIG.read_bytes()
+    service_was_running = port_open(8010)
+    if primary_mode(before) != V1:
+        raise SystemExit("Cutover requires V1_PRIMARY as the starting pointer.")
+    if port_open(8000):
+        raise SystemExit("Cutover blocked because port 8000 has a listener.")
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    candidate_hash = str(manifest.get("candidate_hash") or "")
+    if not candidate_hash or candidate_hash != args.expected_candidate_hash:
+        raise SystemExit("Cutover candidate does not match --expected-candidate-hash.")
+    authorization = load_execution_authorization(args.authorization_file, candidate_hash, "8010_cutover")
+    if REPORT.exists():
+        archive = REPORT.with_name(f"{REPORT.stem}_pre_{datetime.now().strftime('%Y%m%dT%H%M%S%f')}{REPORT.suffix}")
+        archive.write_bytes(REPORT.read_bytes())
     report: dict = {
         "schema_version": "knowledge_os_v2_6_2.8010_cutover",
         "started_at": now(),
-        "authorization": "OWNER_CONFIRMED_8010_FORMAL_CUTOVER_AND_CANARY",
-        "candidate_hash": manifest.get("candidate_hash"),
+        "authorization": authorization,
+        "candidate_hash": candidate_hash,
         "formal_8000_touched": False,
         "formal_qdrant_write": False,
         "formal_sqlite_write": False,
-        "previous_primary_mode": primary_mode(before),
+        "snapshot": {
+            "config_sha256": sha256(CONFIG),
+            "previous_primary_mode": V1,
+            "service_running": service_was_running,
+            "port_8000_listener": False,
+        },
         "steps": [],
         "status": "RUNNING",
     }
+    mutated = False
     try:
-        if primary_mode(before) != V1:
-            raise RuntimeError("CUTOVER_REQUIRES_V1_PRIMARY_START")
-        if port_open(8000):
-            raise RuntimeError("CUTOVER_BLOCKED_8000_LISTENER_PRESENT")
-        report["steps"].append({"step": "BASELINE", "primary_mode": V1, "port_8000_listener": False})
+        report["steps"].append({"step": "BASELINE", "primary_mode": V1, "port_8000_listener": False, "service_running": service_was_running})
+        mutated = True
         report["steps"].append({"step": "CUTOVER_TO_V262", "runtime": restart(CANDIDATE)})
         health = get_json("/api/health")
         enabled = get_json("/api/v2/enabled")
@@ -100,16 +139,22 @@ def main() -> int:
         report["status"] = "PASS_ACTIVE_V262"
         report["active_primary_mode"] = CANDIDATE
     except Exception as error:
-        report["status"] = "FAIL_ROLLED_BACK_TO_V1"
         report["error"] = f"{type(error).__name__}: {error}"
-        try:
-            restart(V1)
-            report["rollback"] = {"status": "PASS", "primary_mode": primary_mode(CONFIG.read_text(encoding="utf-8")), "port_8000_listener": port_open(8000)}
-        except Exception as rollback_error:
-            report["rollback"] = {"status": "FAIL", "error": f"{type(rollback_error).__name__}: {rollback_error}"}
+        if mutated:
+            try:
+                report["recovery"] = restore_runtime(before_bytes, service_was_running)
+                report["status"] = "FAIL_RESTORED_PRE_EXECUTION_STATE" if report["recovery"]["status"] == "PASS" else "FAIL_RECOVERY_FAILED"
+            except Exception as recovery_error:
+                report["status"] = "FAIL_RECOVERY_FAILED"
+                report["recovery"] = {"status": "FAIL", "error": f"{type(recovery_error).__name__}: {recovery_error}"}
+        else:
+            report["status"] = "FAIL_NO_MUTATION"
     finally:
         report["completed_at"] = now()
         report["config_primary_mode_at_close"] = primary_mode(CONFIG.read_text(encoding="utf-8"))
+        report["config_restored_byte_for_byte"] = CONFIG.read_bytes() == before_bytes
+        report["service_running_at_close"] = port_open(8010)
+        REPORT.parent.mkdir(parents=True, exist_ok=True)
         REPORT.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps({"status": report["status"], "active_primary_mode": report.get("active_primary_mode") or report.get("config_primary_mode_at_close"), "candidate_hash": report["candidate_hash"], "report": str(REPORT)}, ensure_ascii=False))
     return 0 if report["status"] == "PASS_ACTIVE_V262" else 1

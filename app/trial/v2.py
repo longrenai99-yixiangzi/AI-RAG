@@ -1032,6 +1032,10 @@ def _candidate_primary_answer(question: str) -> dict[str, Any]:
     embedding_ms = (time.perf_counter() - embedding_started) * 1000
     shadow = candidate.run(question, {"answer_status": "NOT_RUN", "citations": []}, query_vector=query_vector, include_trace=True)
     citations = list(shadow.get("v2_citations") or [])
+    for citation in citations:
+        record = candidate.atomic.get(str(citation.get("evidence_id") or ""), {})
+        if record and not citation.get("source_version"):
+            citation["source_version"] = record.get("source_version")
     trace_context = shadow.get("trace_context") or {}
     status = str(shadow.get("v2_status") or "INSUFFICIENT_EVIDENCE")
     return {
@@ -1325,7 +1329,7 @@ def knowledge_source(source_id: str) -> dict[str, Any]:
 
 
 @router.get("/knowledge/sources/{source_id}/evidence")
-def knowledge_source_evidence(source_id: str, limit: int = 10) -> dict[str, Any]:
+def knowledge_source_evidence(source_id: str, limit: int = 10, evidence_id: str = "") -> dict[str, Any]:
     source = next((row for row in _source_catalog(include_withdrawn=True) if row.get("source_id") == source_id), None)
     if source is None:
         raise HTTPException(status_code=404, detail="SOURCE_NOT_FOUND")
@@ -1345,6 +1349,7 @@ def knowledge_source_evidence(source_id: str, limit: int = 10) -> dict[str, Any]
         for record in _runtime_evidence_records()
         if str(record.get("source_id") or source_id_for_path(str(record.get("source_path") or ""))) == source_id
         and str(record.get("source_version") or "") == str(source.get("runtime_source_version") or "")
+        and (not evidence_id or str(record.get("evidence_id") or "") == evidence_id)
     ][:max(1, min(limit, 50))]
     return {"source": source, "items": records}
 

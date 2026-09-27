@@ -46,6 +46,7 @@ def test_candidate_primary_trace_keeps_candidate_hash_claims_and_real_evidence(m
 
     class FakeCandidate:
         candidate_hash = "candidate-sha"
+        atomic = {"E1": {"source_version": "source-sha"}}
 
         def run(self, _question, _primary, *, query_vector, include_trace):
             assert query_vector == [0.0]
@@ -64,6 +65,7 @@ def test_candidate_primary_trace_keeps_candidate_hash_claims_and_real_evidence(m
     assert trace["failure"]["failure_code"] == "NO_FAILURE"
     assert result["latency"]["query_embedding_ms"] >= 0
     assert result["latency"]["candidate_pipeline_ms"] == 12.0
+    assert result["citations"][0]["source_version"] == "source-sha"
 
 
 def test_candidate_search_reuses_bm25_and_filters_zero_score():

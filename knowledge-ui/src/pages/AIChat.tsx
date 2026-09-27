@@ -345,7 +345,8 @@ function WorkflowItem({ item, onRefresh }: { item: Workflow; onRefresh: () => Pr
 
 function SourceDetail({ citation }: { citation: Citation }) {
   const ext = citation.file_name?.split('.').pop()?.toUpperCase() || '文件'
-  return <div className="source-card"><b>{citation.file_name}</b><span>{ext} · {citation.display_location}</span><p>{citation.source_path}</p><small>{citation.source_id || '来源ID待补'} · 版本 {(citation.source_version || '待核实').slice(0, 12)}</small><h3>原文证据</h3><div className="evidence-text">{citation.excerpt || '当前引用未提供可展开的原文。'}</div></div>
+  const sourceLink = citation.source_id && citation.evidence_id ? `/sources?source_id=${encodeURIComponent(citation.source_id)}&evidence_id=${encodeURIComponent(citation.evidence_id)}` : ''
+  return <div className="source-card"><b>{citation.file_name}</b><span>{ext} · {citation.display_location}</span><p>{citation.source_path}</p><small>{citation.source_id || '来源ID待补'} · 版本 {(citation.source_version || '待核实').slice(0, 12)}</small>{sourceLink && <a href={sourceLink}>查看当前主答中的这条来源证据</a>}<h3>原文证据</h3><div className="evidence-text">{citation.excerpt || '当前引用未提供可展开的原文。'}</div></div>
 }
 
 function loadMessages(): ChatMessage[] {

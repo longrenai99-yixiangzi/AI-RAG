@@ -25,6 +25,18 @@ def test_candidate_source_preview_search_and_answer_share_frozen_runtime(tmp_pat
     assert v2._runtime_has_source(str(tmp_path / "2025-project.md")) is False
 
 
+def test_cited_evidence_can_be_previewed_after_first_fifty_chunks(tmp_path, monkeypatch):
+    path = str(tmp_path / "many-chunks.md")
+    source_id = source_id_for_path(path)
+    records = {f"E{index}": {"evidence_id": f"E{index}", "source_id": source_id, "source_path": path, "source_version": "source-sha", "raw_text": f"chunk {index}"} for index in range(60)}
+    monkeypatch.setattr(v2, "_primary_mode", lambda: v2.V262_CANDIDATE_MODE)
+    monkeypatch.setattr(v2, "_candidate_primary_runtime", lambda: (SimpleNamespace(atomic=records), None))
+    monkeypatch.setattr(v2, "KNOWLEDGE_STORE", TrialKnowledgeStore(tmp_path / "state.json"))
+    assert "E55" not in {item["evidence_id"] for item in v2.knowledge_source_evidence(source_id, limit=50)["items"]}
+    exact = v2.knowledge_source_evidence(source_id, evidence_id="E55")["items"]
+    assert [(item["evidence_id"], item["source_version"]) for item in exact] == [("E55", "source-sha")]
+
+
 def test_pending_candidate_is_not_active_and_invalidates_on_source_change(tmp_path):
     path = tmp_path / "source.md"
     path.write_text("第一版", encoding="utf-8")

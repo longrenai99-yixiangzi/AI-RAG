@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 type Source = {
   source_id: string
@@ -24,6 +25,9 @@ const statusText: Record<string, string> = { INDEXED: '正文已入库', PENDING
 const runtimeText: Record<string, string> = { ACTIVE_FROZEN_CANDIDATE: '当前冻结候选已收录', ACTIVE_CURRENT_RUNTIME: '当前主答已收录', PENDING_CANDIDATE_INCLUSION: '待纳入候选', NOT_IN_CURRENT_RUNTIME: '当前主答未收录' }
 
 export function KnowledgeSources() {
+  const [params] = useSearchParams()
+  const linkedSourceId = params.get('source_id') || ''
+  const linkedEvidenceId = params.get('evidence_id') || ''
   const [sources, setSources] = useState<Source[]>([])
   const [format, setFormat] = useState('全部')
   const [query, setQuery] = useState('')
@@ -44,10 +48,19 @@ export function KnowledgeSources() {
   }
   useEffect(() => { const timer = window.setTimeout(() => void loadSources(), 200); return () => window.clearTimeout(timer) }, [query, format, page])
 
-  async function inspect(source: Source) {
+  useEffect(() => {
+    if (!linkedSourceId) return
+    fetch(`/api/v2/knowledge/sources/${encodeURIComponent(linkedSourceId)}`, { cache: 'no-store' })
+      .then(async (response) => { if (!response.ok) throw new Error(String(response.status)); return response.json() })
+      .then((payload) => void inspect(payload.source, linkedEvidenceId))
+      .catch(() => setError('引用来源无法定位，请检查当前主答版本。'))
+  }, [linkedSourceId, linkedEvidenceId])
+
+  async function inspect(source: Source, evidenceId = '') {
     setSelected(source)
     setEvidence([])
-    const response = await fetch(`/api/v2/knowledge/sources/${source.source_id}/evidence?limit=12`, { cache: 'no-store' })
+    const suffix = evidenceId ? `?evidence_id=${encodeURIComponent(evidenceId)}` : '?limit=12'
+    const response = await fetch(`/api/v2/knowledge/sources/${encodeURIComponent(source.source_id)}/evidence${suffix}`, { cache: 'no-store' })
     const payload = await response.json()
     if (response.ok) setEvidence(payload.items || [])
   }

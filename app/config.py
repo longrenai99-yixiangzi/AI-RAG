@@ -12,11 +12,11 @@ except ImportError:  # pragma: no cover - keeps local tests portable.
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SUPPLEMENTAL_ROOTS = (
-    Path(r"[LOCAL_PATH_REDACTED]寔涓績\灞�鍒跺害鏂囦欢"),
-    Path(r"[LOCAL_PATH_REDACTED]屽叕鍙告妧鏈儴\2026\鐭ヨ瘑搴揬浠峰�煎垱閫犵偣娓呭崟"),
-    Path(r"[LOCAL_PATH_REDACTED]屽叕鍙告妧鏈儴\2026\璁捐澶嶇洏"),
-    Path(r"[LOCAL_PATH_REDACTED]屽叕鍙告妧鏈儴\2026\姒傜畻鍙婄瓥鍒掕瘎瀹钁涘簵鏂板崕涓"),
-    Path(r"[LOCAL_PATH_REDACTED]屽叕鍙告妧鏈儴\2026\绀鸿寖宸ョ▼"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
+    Path(r"[LOCAL_PATH_REDACTED]"),
     PROJECT_ROOT / "data" / "supplemental",
 )
 

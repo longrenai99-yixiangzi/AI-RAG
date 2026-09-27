@@ -8,31 +8,31 @@ from app.config import Settings
 
 SOURCES = [
     {
-        "path": Path(r"[LOCAL_PATH_REDACTED]��中心\局制度文件\《项目设计管理手册》.pdf"),
+        "path": Path(r"[LOCAL_PATH_REDACTED]"),
     },
     {
-        "path": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\知识库\价值创造点清单\设计价值创造点清单0819.xlsx"),
+        "path": Path(r"[LOCAL_PATH_REDACTED]"),
     },
     {
-        "path": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\设计复盘\EPC设计管理经验总结(葛店新华中学项目).docx"),
+        "path": Path(r"[LOCAL_PATH_REDACTED]"),
     },
     {
-        "path": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\概算及策划评审\葛店新华中学\葛店新华中学-设计管理策划.docx"),
+        "path": Path(r"[LOCAL_PATH_REDACTED]"),
     },
     {
         # The original legacy .doc is kept untouched in [LOCAL_PATH_REDACTED]
         # .docx is a read-only conversion used only because the parser handles .docx.
-        "path": Path(r"[LOCAL_PATH_REDACTED]�店新华中学EPC设计管理示范项目打造实施方案1.0.docx"),
-        "source_path": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\示范工程\实施方案\华中公司葛店新华中学EPC设计管理示范项目打造实施方案1.0.doc"),
+        "path": Path(r"[LOCAL_PATH_REDACTED]"),
+        "source_path": Path(r"[LOCAL_PATH_REDACTED]"),
     },
     {
-        "path": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\示范工程\2026年公司示范工程计划1.docx"),
+        "path": Path(r"[LOCAL_PATH_REDACTED]"),
     },
     {
-        "path": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\示范工程\关于发布2026年公司设计示范、深化设计示范、BIM示范工程（第一批）计划的通知.docx"),
+        "path": Path(r"[LOCAL_PATH_REDACTED]"),
     },
     {
-        "path": Path(r"[LOCAL_PATH_REDACTED]�公司技术部\2026\示范工程\2026年上半年公司EPC项目及设计示范项目检查情况通报.docx"),
+        "path": Path(r"[LOCAL_PATH_REDACTED]"),
     },
 ]
 

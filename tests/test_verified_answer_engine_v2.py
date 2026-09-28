@@ -125,6 +125,27 @@ def test_scoring_question_uses_the_exact_subject_row_and_score_criterion():
     assert answer["claims"][0]["evidence_ids"] == ["RIGHT"]
 
 
+def test_scoring_question_binds_multiline_excel_rule_to_the_named_item():
+    question = "《样例案例集》未发布扣几分？"
+    text = (
+        "表头：序号 | 指标 | 指标 | 考核内容 | 分值 | 评分规则 | 其他指标 | 分值 | 评分规则\n"
+        "行：1 | 管理 | 创效 | 3月发布《样例案例集》并宣贯 | 20 | "
+        "检查方式：查看样例案例集。\n评分标准：未发布示范项目清单扣5分，未完成样例案例集编制扣15分。 | "
+        "其他成果 | 25 | 未发布其他成果扣3分。"
+    )
+    evidence = _evidence("DIRECT", text=text, location={"sheet_name": "Sheet1", "row_start": 13, "row_end": 13})
+    bundle = _bundle("VERIFIED", [evidence], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question)
+    bundle["query_plan"] = plan_query(question).to_dict()
+
+    answer = render(bundle)
+
+    assert answer["answer_status"] == "ANSWERED"
+    assert "未发布示范项目清单扣5分" in answer["answer_text"]
+    assert "未完成样例案例集编制扣15分" in answer["answer_text"]
+    assert "未发布其他成果扣3分" not in answer["answer_text"]
+    assert "该项分值为20分" in answer["answer_text"]
+
+
 def test_verified_answer_uses_source_local_window_not_chunk_prefix():
     text = "\u524d\u7f6e\u76ee\u5f55\u548c\u8bf4\u660e\u3002\n\u8bbe\u8ba1\u4efb\u52a1\u4e66\u5e94\u5305\u542b\u8bbe\u8ba1\u8303\u56f4\u3001\u6210\u679c\u8981\u6c42\u548c\u8ba1\u5212\u8282\u70b9\u3002\n\u540e\u7eed\u8bf4\u660e\u3002"
     question = "\u8bbe\u8ba1\u4efb\u52a1\u4e66\u9700\u8981\u5305\u542b\u54ea\u4e9b\u5185\u5bb9\uff1f"

@@ -1025,21 +1025,29 @@ def _scoring_standard_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
         if compact_target not in compact_text:
             continue
         lines = raw_source_text.splitlines() or source_text.splitlines()
-        row_line = next((line for line in lines if compact_target in re.sub(r"\s+", "", line).casefold() and scoring.search(line)), "")
+        row_markers = list(re.finditer(r"(?m)^\s*行[：:]", raw_source_text))
+        row_line = ""
+        if len(row_markers) == 1:
+            row_line = raw_source_text[row_markers[0].end():].strip()
+        if not row_line:
+            row_line = next((line for line in lines if compact_target in re.sub(r"\s+", "", line).casefold() and scoring.search(line)), "")
         if not row_line:
             continue
-        header_line = next((line for line in lines if line.lstrip().startswith(("表头：", "表头:")) and "评分标准" in line), "")
+        header_line = next((line for line in lines if line.lstrip().startswith(("表头：", "表头:")) and any(label in line for label in ("评分标准", "评分规则"))), "")
         criterion = ""
         points = ""
         if header_line:
             headers = [value.strip() for value in re.split(r"\|", re.sub(r"^\s*表头[：:]", "", header_line))]
             values = [value.strip() for value in re.split(r"\|", re.sub(r"^\s*行[：:]", "", row_line))]
             if len(headers) == len(values):
-                score_index = next((index for index, value in enumerate(headers) if value == "评分标准"), None)
-                points_index = next((index for index, value in enumerate(headers) if value == "分值"), None)
+                target_index = next((index for index, value in enumerate(values) if compact_target in re.sub(r"\s+", "", value).casefold()), None)
+                score_indices = [index for index, value in enumerate(headers) if value in {"评分标准", "评分规则"} and scoring.search(values[index])]
+                score_index = next((index for index in score_indices if target_index is None or index > target_index), None)
                 if score_index is not None:
                     criterion = values[score_index]
-                if points_index is not None and re.fullmatch(r"\d+(?:\.\d+)?", values[points_index]):
+                points_indices = [index for index, value in enumerate(headers) if value == "分值" and (target_index is None or index > target_index) and (score_index is None or index < score_index) and re.fullmatch(r"\d+(?:\.\d+)?", values[index])]
+                points_index = points_indices[-1] if points_indices else None
+                if points_index is not None:
                     points = values[points_index]
         if not criterion:
             criterion = next((part.strip() for part in re.split(r"[|]", row_line) if scoring.search(part)), row_line.strip())

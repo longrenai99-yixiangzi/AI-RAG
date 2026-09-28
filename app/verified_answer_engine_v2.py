@@ -138,6 +138,11 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
         if any(claim.get("claim_type") != "DIRECT" for claim in claims):
             return _partial_answer(bundle, claims)
         return _answered(bundle, claims) if status == "VERIFIED" else _partial_answer(bundle, claims)
+    grade_item_claims = _structured_grade_item_claims(bundle, bundle.get("structured_rows") or [])
+    if grade_item_claims:
+        if any(claim.get("claim_type") != "DIRECT" for claim in grade_item_claims):
+            return _partial_answer(bundle, grade_item_claims)
+        return _answered(bundle, grade_item_claims) if status == "VERIFIED" else _partial_answer(bundle, grade_item_claims)
     approved_gold_claims = _approved_gold_claims(bundle)
     if approved_gold_claims:
         return _answered(bundle, approved_gold_claims)
@@ -1812,7 +1817,101 @@ def _xlsx_field_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
     )
 
 
+def _structured_grade_item_claims(bundle: dict[str, Any], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    question = re.sub(r"\s+", "", str(bundle.get("question") or ""))
+    grade_match = re.search(r"[ABC]级", question)
+    if not rows or not grade_match:
+        return []
+    grade = grade_match.group(0)
+    asks_brand = any(term in question for term in ("品牌", "供应商"))
+    asks_method = any(term in question for term in ("做法", "标准"))
+    if not (asks_brand or asks_method):
+        return []
+
+    if asks_brand:
+        focus_match = re.search(r"([^，,；;?？]+?)的[ABC]级", question)
+        focus = re.split(r"[，,]", focus_match.group(1))[-1].strip() if focus_match else ""
+    else:
+        focus_match = re.search(r"的([^，,；;?？]+?)(?:做法|标准)", question)
+        focus = focus_match.group(1).strip() if focus_match else ""
+    area_match = re.search(r"([^，,；;?？、]{1,16})、([^，,；;?？、]{1,12})的", question)
+    areas = [area_match.group(1), area_match.group(2)] if area_match else []
+    if not focus:
+        return []
+
+    matches: list[tuple[dict[str, Any], str]] = []
+    for row in rows:
+        cells = row.get("cells") or []
+        values = list(row.get("values") or [])
+        if not values:
+            values = [
+                next((str(cell.get(key)).strip() for key in ("value", "normalized_value", "raw_value", "cell_value") if cell.get(key) not in (None, "")), "")
+                for cell in cells
+            ]
+        row_text = "".join(str(value) for value in values) + "".join(
+            str(cell.get("header") or cell.get("column_name") or "") + str(cell.get("value") or cell.get("normalized_value") or "")
+            for cell in cells
+        )
+        if grade not in row_text or focus not in row_text or any(area not in row_text for area in areas):
+            continue
+
+        grade_index = next((index for index, value in enumerate(values) if grade in str(value)), None)
+        if grade_index is None:
+            continue
+        if asks_brand:
+            answer_values = [
+                str(value).strip()
+                for value in values[grade_index + 1:]
+                if str(value).strip()
+                and str(value).strip() not in {"备注", "-", "/"}
+                and not re.fullmatch(r"\d+(?:\.\d+)?", str(value).strip())
+            ]
+            answer_value = "、".join(answer_values)
+        else:
+            answer_value = ""
+            for value in values[grade_index:]:
+                text = str(value).strip()
+                if not text:
+                    continue
+                found = re.search(rf"{re.escape(grade)}\s*[:：]?\s*([^。；;]+)", text)
+                if found and found.group(1).strip():
+                    answer_value = found.group(1).strip().rstrip("。；; ")
+                    break
+            if not answer_value:
+                answer_value = next((str(value).strip() for value in values[grade_index + 1:] if str(value).strip()), "")
+        if answer_value:
+            matches.append((row, answer_value))
+
+    if not matches:
+        return []
+    answers = list(dict.fromkeys(value for _, value in matches))
+    evidence_ids = list(dict.fromkeys(str(row.get("bundle_evidence_id") or "") for row, _ in matches if row.get("bundle_evidence_id")))
+    row_numbers = [int(row.get("row_number") or 0) for row, _ in matches]
+    row_ids = [str(row.get("row_id") or row.get("table_row_id") or row.get("row_number") or "") for row, _ in matches]
+    if len(answers) > 1:
+        return [_claim(
+            "C1", "LIMITATION", "SQ1",
+            "同一对象和等级在适用来源中对应的做法或品牌不一致，需先确认业态及适用手册。",
+            evidence_ids, raw_evidence_text=f"匹配来源行：{','.join(map(str, row_numbers))}",
+            source_rows=row_numbers, source_row_ids=row_ids,
+        )]
+
+    if asks_brand:
+        text = f"{focus}{grade}品牌/供应商：{answers[0]}。"
+    else:
+        subject = "、".join([*areas, focus]) if areas else focus
+        text = f"{subject}{grade}做法：{answers[0]}。"
+    source_text = "\n".join(
+        f"第{row.get('row_number')}行：{' | '.join(str(value) for value in row.get('values') or [])}"
+        for row, _ in matches
+    )
+    return [_claim("C1", "DIRECT", "SQ1", text, evidence_ids, raw_evidence_text=source_text, source_rows=row_numbers, source_row_ids=row_ids)]
+
+
 def _structured_claims(bundle: dict[str, Any], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grade_item_claims = _structured_grade_item_claims(bundle, rows)
+    if grade_item_claims:
+        return grade_item_claims
     if bundle["query_plan"].get("query_type") not in {"AGGREGATION_QUERY", "STRUCTURED_QUERY"}:
         return []
     question = str(bundle.get("question") or "")
@@ -1944,9 +2043,16 @@ def _structured_extreme_claims(bundle: dict[str, Any], rows: list[dict[str, Any]
     if len(table_keys) != 1 or not evidence_ids:
         return [_claim("C1", "LIMITATION", "SQ1", "当前命中了多个表格或缺少表格级证据链接，不能跨表合并计算极值。", evidence_ids, raw_evidence_text=f"matched_table_groups={len(table_keys)}")] if evidence_ids else []
 
+    module_claims = _structured_module_breakdown_claim(bundle, rows)
+    if module_claims is not None:
+        return module_claims
+
     cells = list(rows[0].get("cells") or [])
     prefix = question[:marker_position]
     metric_cells = sorted((cell for cell in cells if stem(cell) and stem(cell) in prefix), key=lambda cell: len(stem(cell)), reverse=True)
+    if not metric_cells:
+        suffix = question[marker_position:]
+        metric_cells = sorted((cell for cell in cells if stem(cell) and stem(cell) in suffix), key=lambda cell: len(stem(cell)), reverse=True)
     metric_cell = None
     for cell in metric_cells:
         for row in rows:
@@ -2011,6 +2117,57 @@ def _structured_extreme_claims(bundle: dict[str, Any], rows: list[dict[str, Any]
     if missing:
         claims.append(_claim("C2", "LIMITATION", "SQ1", f"胜出记录未提供可核验的{'、'.join(missing)}字段，相关部分暂不能确认。", [evidence_ids[0]], raw_evidence_text=f"winner_row_ids={','.join(winner_ids)}", source_rows=winner_rows, source_row_ids=winner_ids))
     return claims
+
+
+def _structured_module_breakdown_claim(bundle: dict[str, Any], rows: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+    question = re.sub(r"\s+", "", str(bundle.get("question") or ""))
+    if not any(term in question for term in ("模块构成", "模块组成")) or "数量" not in question or "重量" not in question:
+        return None
+
+    def header(cell: dict[str, Any]) -> str:
+        return str(cell.get("normalized_column_name") or cell.get("header") or cell.get("column_name") or "").strip()
+
+    def value(cell: dict[str, Any]) -> str:
+        return next((str(cell.get(key)).strip() for key in ("normalized_value", "value", "raw_value", "cell_value") if cell.get(key) not in (None, "")), "")
+
+    cells = list(rows[0].get("cells") or [])
+    name_cell = next((cell for cell in cells if any(term in header(cell) for term in ("模块名称", "模块类别"))), None)
+    count_cell = next((cell for cell in cells if "数量" in header(cell)), None)
+    weight_cell = next((cell for cell in cells if "重量" in header(cell)), None)
+    if not name_cell or not count_cell or not weight_cell:
+        return None
+
+    records: list[tuple[str, str, str, dict[str, Any]]] = []
+    total_count = ""
+    for row in rows:
+        row_cells = row.get("cells") or []
+        module = value(next((cell for cell in row_cells if header(cell) == header(name_cell)), {}))
+        count = value(next((cell for cell in row_cells if header(cell) == header(count_cell)), {}))
+        weight = value(next((cell for cell in row_cells if header(cell) == header(weight_cell)), {}))
+        if module in {"合计", "总计"}:
+            total_count = count
+            continue
+        if not module or not count or not weight:
+            return [_claim("C1", "LIMITATION", "SQ1", "模块表格存在缺少名称、数量或重量的行，暂不据此判断完整构成及最大重量。", [str(rows[0].get("bundle_evidence_id") or "")], raw_evidence_text=f"checked_rows={len(rows)}")]
+        numeric = re.search(r"-?\d[\d,]*(?:\.\d+)?", weight.replace(",", ""))
+        if not numeric:
+            return [_claim("C1", "LIMITATION", "SQ1", "模块表格中的重量列包含无法核对的非数值行，暂不判断最大重量。", [str(rows[0].get("bundle_evidence_id") or "")], raw_evidence_text=f"weight={weight}")]
+        records.append((module, count, weight, row))
+    if not records:
+        return None
+
+    maximum = max(Decimal(re.search(r"-?\d[\d,]*(?:\.\d+)?", weight.replace(",", "")).group(0)) for _, _, weight, _ in records)
+    winners = [(module, weight, row) for module, _, weight, row in records if Decimal(re.search(r"-?\d[\d,]*(?:\.\d+)?", weight.replace(",", "")).group(0)) == maximum]
+    parts = [f"{module}{count}个" for module, count, _, _ in records]
+    if total_count:
+        parts.append(f"合计{total_count}个")
+    max_text = "、".join(f"{module}{weight}" for module, weight, _ in winners)
+    all_rows = [int(row["row_number"]) for row in rows if row.get("row_number") is not None]
+    all_row_ids = [str(row.get("row_id") or row.get("table_row_id") or "") for row in rows]
+    evidence_id = str(rows[0].get("bundle_evidence_id") or "")
+    source_text = "\n".join(f"第{row.get('row_number')}行：{' | '.join(str(item) for item in row.get('values') or [])}" for row in rows)
+    claim_text = f"模块组成与数量：{'、'.join(parts)}；最大重量：{max_text}。"
+    return [_claim("C1", "DIRECT", "SQ1", claim_text, [evidence_id], raw_evidence_text=source_text, source_rows=all_rows, source_row_ids=all_row_ids)]
 
 
 def _table_counts(text: str) -> dict[str, int]:

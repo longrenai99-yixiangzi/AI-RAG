@@ -27,6 +27,78 @@ def test_parallel_fact_split_preserves_named_project_entities():
     counted_course = plan_query("《EPC项目设计管理方法与实务》课程分为哪5个章节？")
     assert counted_course.subquestions == ["《EPC项目设计管理方法与实务》课程分为哪5个章节？"]
 
+    factory_floor = plan_query("工业厂房项目中，生产区域、仓储区域的地面做法中，A级做法是什么")
+    assert factory_floor.project == []
+    assert "工业厂房项目" not in factory_floor.entities
+    assert factory_floor.query_type == "STRUCTURED_QUERY"
+    assert factory_floor.subquestions == []
+
+    fan_coil = plan_query("工业厂房项目中，空调末端设备的B级品牌或供应商有哪些")
+    assert fan_coil.project == []
+    assert "工业厂房项目" not in fan_coil.entities
+
+
+def test_structured_grade_lookup_uses_the_matching_item_row():
+    cases = (
+        (
+            "工业厂房项目中，生产区域、仓储区域的地面做法中，A级做法是什么",
+            "表头：部位 | 生产区域、仓储区域 | 备注\n行：地面 | A级：耐磨面层。 B级：混凝土面层。 | ",
+            {"row_id": "R-FLOOR", "table_id": "T-FLOOR", "row_number": 2, "bundle_evidence_id": "E1", "values": ["地面", "A级：耐磨面层。 B级：混凝土面层。", ""], "cells": [{"header": "部位", "value": "地面"}, {"header": "生产区域、仓储区域", "value": "A级：耐磨面层。 B级：混凝土面层。"}]},
+            "耐磨面层",
+        ),
+        (
+            "工业厂房项目中，空调末端设备的B级品牌或供应商有哪些",
+            "表头：暖通材料设备品牌参考\n行：5 | 空调末端设备 | 空调末端设备 | 规格 | B级 | 品牌甲、品牌乙 | ",
+            {"row_id": "R-FCU", "table_id": "T-FCU", "row_number": 31, "bundle_evidence_id": "E1", "values": ["5", "空调末端设备", "空调末端设备", "规格", "B级", "品牌甲、品牌乙", ""], "cells": [{"header": "暖通材料设备品牌参考", "value": "空调末端设备"}, {"header": "暖通材料设备品牌参考", "value": "B级"}, {"header": "暖通材料设备品牌参考", "value": "品牌甲、品牌乙"}]},
+            "品牌甲、品牌乙",
+        ),
+    )
+    for question, source_text, row, expected in cases:
+        plan = plan_query(question)
+        evidence = _evidence("DIRECT", text=source_text, location={"table_id": row["table_id"], "table": 1})
+        evidence.update({"table_id": row["table_id"], "source_version": "sha-current"})
+        bundle = _bundle("VERIFIED", [evidence], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], query_type=plan.query_type, question=question)
+        bundle.update({"query_plan": plan.to_dict(), "structured_rows": [row], "structured_evidence_complete": "风机盘管" not in question})
+
+        answer = render(bundle)
+
+        assert answer["answer_status"] == "ANSWERED"
+        assert expected in answer["answer_text"]
+        assert answer["claims"][0]["evidence_ids"] == ["E1"]
+
+
+def test_module_breakdown_answers_all_rows_and_the_maximum_weight():
+    question = "模块化数据中心的模块构成、数量与最大重量是多少？"
+    plan = plan_query(question)
+    headers = ["模块名称", "数量", "最大重量", "高度"]
+    values = [
+        ["模块A", "10", "12.5吨", "3000"],
+        ["模块B", "20", "18.2吨", "3500"],
+        ["屋面撬块C", "5", "6吨", "/"],
+        ["设备单元D", "2", "4吨", "1000"],
+        ["合计", "37", "", ""],
+    ]
+    rows = [
+        {
+            "row_id": f"R{index}", "row_number": index, "table_id": "T-MODULES",
+            "bundle_evidence_id": "E1", "source_path": "[LOCAL_PATH_REDACTED]",
+            "source_version": "sha-module-source", "values": row_values,
+            "cells": [{"header": header, "value": value} for header, value in zip(headers, row_values)],
+        }
+        for index, row_values in enumerate(values, start=1)
+    ]
+    evidence = _evidence("DIRECT", text="模块组成表：模块A 10 12.5吨；模块B 20 18.2吨；屋面撬块C 5 6吨；设备单元D 2 4吨；合计37。", location={"table_id": "T-MODULES", "table": 1})
+    evidence.update({"table_id": "T-MODULES", "source_version": "sha-module-source"})
+    bundle = _bundle("VERIFIED", [evidence], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], query_type=plan.query_type, question=question)
+    bundle.update({"query_plan": plan.to_dict(), "structured_rows": rows, "structured_evidence_complete": True})
+
+    answer = render(bundle)
+
+    assert answer["answer_status"] == "ANSWERED"
+    assert "模块A10个" in answer["answer_text"]
+    assert "合计37个" in answer["answer_text"]
+    assert "模块B18.2吨" in answer["answer_text"]
+
 
 def test_verified_answer_has_direct_claim_and_citation():
     answer = render(_bundle("VERIFIED", [_evidence("DIRECT")], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}]))

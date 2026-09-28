@@ -360,13 +360,23 @@ def _attach_structured_rows(candidates: list[dict[str, Any]], structured_rows: l
     matched = _matched_structured_rows(candidates, structured_rows)
     if not matched:
         return
-    source_path, sheet = matched[0]["source_path"], matched[0].get("sheet_name")
-    parent = next(candidate for candidate in candidates if _same_structured_source(candidate, matched[0]))
-    candidates.append({
-        **parent, "evidence_id": matched[0]["bundle_evidence_id"], "role": "DIRECT", "candidate_rank": parent.get("candidate_rank"),
-        "text": "Structured Fact Bundle", "location": {"sheet_name": sheet, "table": (matched[0].get("source_location") or {}).get("table"), "structured_table_id": matched[0]["table_id"], "row_start": min(row["row_number"] for row in matched), "row_end": max(row["row_number"] for row in matched), "source_row_numbers": [row["row_number"] for row in matched]},
-        "lineage_status": "LINEAGE_PARTIAL", "why_direct": "Same-source frozen structured row/cell evidence.", "structured_row_ids": [row["row_id"] for row in matched],
-    })
+    groups: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for row in matched:
+        key = (str(row.get("source_path") or ""), str(row.get("table_id") or ""), str(row.get("source_version") or ""))
+        groups.setdefault(key, []).append(row)
+    for group_rows in groups.values():
+        first = group_rows[0]
+        parent = next(candidate for candidate in candidates if _same_structured_source(candidate, first))
+        location = first.get("source_location") or {}
+        row_numbers = [int(row["row_number"]) for row in group_rows if row.get("row_number") is not None]
+        if not row_numbers or not first.get("bundle_evidence_id"):
+            continue
+        row_ids = [str(row.get("row_id") or row.get("table_row_id") or "") for row in group_rows]
+        candidates.append({
+            **parent, "evidence_id": first["bundle_evidence_id"], "role": "DIRECT", "candidate_rank": parent.get("candidate_rank"),
+            "text": "Structured Fact Bundle", "location": {"page": location.get("page"), "sheet_name": first.get("sheet_name"), "table": location.get("table"), "structured_table_id": first["table_id"], "row_start": min(row_numbers), "row_end": max(row_numbers), "source_row_numbers": row_numbers, "source_row_ids": row_ids},
+            "lineage_status": "LINEAGE_PARTIAL", "why_direct": "Same-source frozen structured row/cell evidence.", "structured_row_ids": row_ids,
+        })
 
 
 def _same_structured_source(candidate: dict[str, Any], row: dict[str, Any]) -> bool:

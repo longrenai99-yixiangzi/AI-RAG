@@ -353,8 +353,6 @@ def _keyword_body_rescue(question: str, plan: Any, atomic: dict[str, dict[str, A
 def _project_scope_source_rescue(question: str, plan: Any, atomic: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     """Recover relevant body blocks from the same named project source/document."""
     projects = [str(value) for value in getattr(plan, "project", []) if str(value).strip()]
-    if not projects:
-        projects = [match.group(1) for match in re.finditer(r"([\u3400-\u9fffA-Za-z0-9（）()·+\-]{2,48}项目)", question)]
     keywords = [term for term in query_terms(question) if len(term) >= 2 and term not in {"项目", "阶段", "多少", "分别", "各", "共计", "如何", "情况", "内容", "是什么"}]
     if not projects or len(keywords) < 2:
         return []

@@ -26,7 +26,7 @@ PROJECT_PHRASE_MARKERS = ("的", "作为", "管项目", "层面", "及以上", "
 GENERIC_PROJECT_STEMS = {
     "数据", "数据中心", "级数据", "海外", "项目", "项目及",
     "中建三局", "中建三局第二建设公司", "公司层面重点管控",
-    "直属分公司EPC",
+    "直属分公司EPC", "厂房", "工业厂房", "电子厂房", "标准厂房",
 }
 
 
@@ -174,7 +174,16 @@ def _is_named_project(value: str) -> bool:
 
 
 def _is_generic_project_phrase(value: str) -> bool:
-    return bool(re.match(r"^度(?:设计|多少|有|成功|最终)", value)) or any(marker in value for marker in GENERIC_PROJECT_MARKERS)
+    stem = value
+    for suffix in ("项目", "工程"):
+        if stem.endswith(suffix):
+            stem = stem[: -len(suffix)]
+            break
+    return (
+        bool(re.match(r"^度(?:设计|多少|有|成功|最终)", value))
+        or any(marker in value for marker in GENERIC_PROJECT_MARKERS)
+        or stem.strip("（）() ") in GENERIC_PROJECT_STEMS
+    )
 
 
 def _organizations(question: str) -> list[str]:
@@ -216,6 +225,8 @@ def _comparison_plan(question: str) -> list[str]:
 def _query_type(question: str, aggregation: list[str], comparison: list[str]) -> str:
     if comparison and not any(item in aggregation for item in ("GROUP_BY", "COUNT", "FILTER", "SUM", "MAX", "MIN")):
         return "COMPARISON_QUERY" if "比较" in question or "区别" in question else "OPTION_QUERY"
+    if re.search(r"[ABC]级", question) and any(term in question for term in ("做法", "品牌", "供应商")):
+        return "STRUCTURED_QUERY"
     if aggregation:
         return "AGGREGATION_QUERY" if any(item in aggregation for item in ("GROUP_BY", "COUNT", "SUM", "FILTER", "MAX", "MIN")) else "STRUCTURED_QUERY"
     if comparison:
@@ -296,6 +307,10 @@ def _subquestions(question: str, aggregation: list[str], entities: list[str]) ->
 
 def _parallel_fact_subquestions(question: str) -> list[str]:
     """Split a shared-predicate question when it explicitly asks about joined targets."""
+    # A list of work areas before a shared "的 ... 做法/标准" phrase is query scope,
+    # not a set of independently requested facts.
+    if "分别" not in question and re.search(r"[^，,；;、]{1,16}、[^，,；;、]{1,12}的[^？?]*?(?:做法|标准|要求|指标)", question):
+        return []
     match = re.search(
         r"((?:分别|各)?(?:是多少|是什么|什么|如何[^？?]*|哪些[^？?]*|哪[^？?]*|多少[^？?]*|各指[^？?]*|分别指[^？?]*))\s*[？?]?\s*$",
         question,

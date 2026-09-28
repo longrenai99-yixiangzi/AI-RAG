@@ -9,9 +9,9 @@ from app.retrieval.retrieval_trace import build_trace
 from app.trial.knowledge_store import TrialKnowledgeStore
 from scripts.build_verified_evidence_bundle_v1 import _direct_candidate, _scope
 from app.trial.v2 import _closure_status, _core_phrases, _display_location, _evaluate_feedback_regression, _feedback_profile, _friendly_status, _should_emit_live_shadow, _with_exact_atomic_rescue
-from app.trial.live_shadow_v25 import _approved_gold_source_rescue, _owner_answer_gold_source_rescue, _restore_source_origin
+from app.trial.live_shadow_v25 import _approved_gold_source_rescue, _owner_answer_gold_source_rescue, _project_scope_source_rescue, _restore_source_origin
 from app.retrieval.query_planner_v1 import plan_query
-from scripts.run_verified_answer_engine_v2 import _answer_relevant, _runtime_bundle, _same_structured_source, _structured_rows_complete
+from scripts.run_verified_answer_engine_v2 import _answer_relevant, _attach_structured_rows, _runtime_bundle, _same_structured_source, _structured_rows_complete
 from scripts.run_v2_6_2_answer_gold_replay import _current_manual_review, _run_fingerprints
 from scripts.run_v2_6_2_compatibility_replay import _batch_size
 from scripts.replay_v2_6_live_shadow_manual_review import _ensure_no_manual_decisions_to_overwrite
@@ -21,6 +21,23 @@ from app.verified_answer_engine_v2 import render
 def test_v2_status_is_user_friendly():
     assert _friendly_status("CONFLICTING_ANSWER") == "资料存在冲突"
     assert _friendly_status("SOURCE_SCOPE_MISSING") == "当前知识范围暂无可靠来源"
+
+
+def test_factory_product_category_does_not_trigger_named_project_rescue():
+    question = "工业厂房项目中，空调末端设备的B级品牌或供应商有哪些"
+    plan = plan_query(question)
+    evidence = {
+        "evidence_id": "E1",
+        "source_id": "SRC_FACTORY_STANDARD",
+        "document_id": "DOC_FACTORY_STANDARD",
+        "file_name": "工业厂房建设标准样例.docx",
+        "source_path": "D:/vault/raw/factory-standard-sample.docx",
+        "text": "空调末端设备 | B级 | 品牌甲、品牌乙",
+        "location": {"table_id": "T1"},
+    }
+
+    assert plan.project == []
+    assert _project_scope_source_rescue(question, plan, {"E1": evidence}) == []
 
 
 def test_candidate_primary_shadows_when_primary_hash_differs_from_current_candidate():
@@ -110,6 +127,21 @@ def test_structured_rows_require_the_candidate_source_version_and_complete_table
     assert _structured_rows_complete(current_rows) is True
     assert _structured_rows_complete(current_rows[:1]) is False
     assert _structured_rows_complete(current_rows + current_rows[:1]) is False
+
+
+def test_structured_rows_emit_one_citation_bundle_per_source_table():
+    candidates = [
+        {"evidence_id": "E1", "role": "DIRECT", "source_path": "source-a.pdf", "source_version": "sha-a", "table_id": "T1", "location": {"table_id": "T1"}},
+        {"evidence_id": "E2", "role": "DIRECT", "source_path": "source-b.pdf", "source_version": "sha-b", "table_id": "T2", "location": {"table_id": "T2"}},
+    ]
+    rows = [
+        {"row_id": "R1", "row_number": 1, "bundle_evidence_id": "BUNDLE-T1", "table_id": "T1", "source_path": "source-a.pdf", "source_version": "sha-a", "source_location": {"table": 1}},
+        {"row_id": "R2", "row_number": 2, "bundle_evidence_id": "BUNDLE-T2", "table_id": "T2", "source_path": "source-b.pdf", "source_version": "sha-b", "source_location": {"table": 1}},
+    ]
+
+    _attach_structured_rows(candidates, rows)
+
+    assert {row["evidence_id"] for row in candidates[2:]} == {"BUNDLE-T1", "BUNDLE-T2"}
 
 
 def test_explicit_counted_list_retrieval_requires_a_full_list_chunk():

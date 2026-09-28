@@ -84,10 +84,51 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
         return _refusal(bundle, "SOURCE_SCOPE_MISSING", "当前已纳入的知识范围中没有足够来源支持该问题。")
     if status == "CONFLICTING_EVIDENCE":
         return _conflict_answer(bundle)
+    assembly_rate_claims = _assembly_rate_pdf_claims(bundle)
+    if assembly_rate_claims:
+        return _partial_answer(bundle, assembly_rate_claims)
+    allocation_claims = _budget_allocation_claims(bundle)
+    if allocation_claims:
+        return _answered(bundle, allocation_claims) if status == "VERIFIED" else _partial_answer(bundle, allocation_claims)
     aggregation = (bundle.get("query_plan") or {}).get("aggregation_plan") or []
     if any(operation in aggregation for operation in ("MAX", "MIN")):
         if bundle.get("structured_evidence_complete") is not True:
             limitation = _structured_incomplete_claim(bundle)
+            subquestions = list(bundle.get("subquestions") or (bundle.get("query_plan") or {}).get("subquestions") or [])
+            extreme_markers = ("最大", "最多", "最高", "最小", "最少", "最低", "极值")
+            extreme_ids = {
+                f"SQ{index}"
+                for index, subquestion in enumerate(subquestions, start=1)
+                if any(marker in str(subquestion) for marker in extreme_markers)
+            }
+            if extreme_ids:
+                covered_ids = {
+                    str(item.get("subquestion_id"))
+                    for item in bundle.get("coverage_map", [])
+                    if item.get("coverage_status") == "COVERED"
+                    and str(item.get("subquestion_id")) not in extreme_ids
+                }
+                known_claims = [
+                    claim
+                    for claim in _claims(bundle)
+                    if claim.get("claim_type") == "DIRECT"
+                    and str(claim.get("subquestion_id")) in covered_ids
+                    and not any(marker in str(claim.get("claim_text") or "") for marker in extreme_markers)
+                ]
+                if known_claims:
+                    limiting_evidence = next((claim.get("evidence_ids") for claim in known_claims if claim.get("evidence_ids")), [])
+                    limitation_claims = [
+                        _claim(
+                            f"C{len(known_claims) + index}",
+                            "LIMITATION",
+                            question_id,
+                            f"现有证据没有提供用于完整比较的同范围数据，暂不能确认“{subquestions[int(question_id[2:]) - 1]}”。",
+                            list(limiting_evidence[:1]),
+                            raw_evidence_text="The requested extreme requires a complete comparable source set.",
+                        )
+                        for index, question_id in enumerate(sorted(extreme_ids), start=1)
+                    ]
+                    return _partial_answer(bundle, [*known_claims, *limitation_claims])
             if limitation:
                 return _partial_answer(bundle, limitation)
             return _refusal(bundle, "INSUFFICIENT_EVIDENCE", "没有取得同一来源表格的完整行级明细，不能据单条命中判断最大值或最小值。")
@@ -143,6 +184,14 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
         return _answered(bundle, [narrative_count_claim]) if status == "VERIFIED" else _partial_answer(bundle, [narrative_count_claim])
     single_fact_claim = _single_fact_claim(bundle)
     if single_fact_claim is not None:
+        review_count_claim = _review_count_claim(bundle)
+        if review_count_claim is not None:
+            review_count_claim["claim_id"] = "C1"
+            single_fact_claim["claim_id"] = "C2"
+            claims = [review_count_claim, single_fact_claim]
+            if status == "VERIFIED" and all(claim.get("claim_type") == "DIRECT" for claim in claims):
+                return _answered(bundle, claims)
+            return _partial_answer(bundle, claims)
         return _answered(bundle, [single_fact_claim]) if status == "VERIFIED" else _partial_answer(bundle, [single_fact_claim])
     planning_metrics_claim = _planning_metrics_claim(bundle)
     if planning_metrics_claim is not None:
@@ -155,18 +204,30 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
         return _answered(bundle, [design_optimization_claim]) if status == "VERIFIED" else _partial_answer(bundle, [design_optimization_claim])
     if "SUM" in aggregation:
         evidence = next((item for item in bundle.get("verified_evidence", []) if item.get("role") == "DIRECT"), None)
+        if evidence is None:
+            return _refusal(bundle, "INSUFFICIENT_EVIDENCE", "当前没有可核对的同源数值证据，不能确认合计值。")
+        subquestions = list(bundle.get("subquestions") or (bundle.get("query_plan") or {}).get("subquestions") or [])
+        count_id = next((f"SQ{index}" for index, subquestion in enumerate(subquestions, start=1) if any(marker in str(subquestion) for marker in ("几项", "多少项", "多少条", "几条", "数量"))), None)
+        sum_id = next((f"SQ{index}" for index, subquestion in enumerate(subquestions, start=1) if any(marker in str(subquestion) for marker in ("金额", "合计", "总额"))), "SQ1")
+        direct_text = "\n".join(str(item.get("text") or item.get("raw_text") or "") for item in bundle.get("verified_evidence") or [])
+        has_count = bundle.get("structured_evidence_complete") is True or bool(re.search(r"(?:共计|共|合计|总计)\D{0,8}\d+\s*(?:项|条|个|份)", direct_text))
+        limitations = []
+        if count_id and count_id != sum_id and not has_count:
+            limitations.append(_claim("C1", "LIMITATION", count_id, "当前证据未保留同源完整条目，暂不能确认问题要求的总项数。", [evidence["evidence_id"]], raw_evidence_text="A complete same-source item count is not present in the current evidence."))
         limitation = _claim(
-            "C1",
+            f"C{len(limitations) + 1}",
             "LIMITATION",
-            "SQ1",
+            sum_id,
             "问题要求对表内数值求和，但当前没有可确认的同源完整数值列和单位口径；本次不以分组条数或单行命中代替总额。",
-            [evidence["evidence_id"]] if evidence else [],
+            [evidence["evidence_id"]],
             raw_evidence_text="SUM requires a source-complete field and a confirmed unit definition.",
         )
-        return _partial_answer(bundle, [limitation])
+        return _partial_answer(bundle, [*limitations, limitation])
     review_count_claim = _review_count_claim(bundle)
     if review_count_claim is not None:
-        return _answered(bundle, [review_count_claim]) if status == "VERIFIED" else _partial_answer(bundle, [review_count_claim])
+        if review_count_claim.get("claim_type") in {"LIMITATION", "INSUFFICIENT"} or status != "VERIFIED":
+            return _partial_answer(bundle, [review_count_claim])
+        return _answered(bundle, [review_count_claim])
     keyword_body_claim = _keyword_body_claim(bundle)
     if keyword_body_claim is not None:
         return _answered(bundle, [keyword_body_claim]) if status == "VERIFIED" else _partial_answer(bundle, [keyword_body_claim])
@@ -382,11 +443,41 @@ def _claims(bundle: dict[str, Any]) -> list[dict[str, Any]]:
             exact_sentence = _exact_phrase_sentence(evidence["text"], evidence.get("exact_core_phrase_matches") or [])
             source_text = exact_sentence or (evidence["text"] if explicit_counted_list or _asks_for_structure(bundle["question"]) and _evidence_headings(evidence["text"]) else text)
             for index, statement in enumerate(_render_direct_claims(source_text, bundle["question"]), start=1):
-                claims.append(_claim(f"C{index}", "DIRECT", "SQ1", statement, [evidence["evidence_id"]], raw_evidence_text=text))
+                claims.append(_claim(f"C{index}", "DIRECT", _direct_subquestion_id(bundle, statement), statement, [evidence["evidence_id"]], raw_evidence_text=text))
     if "效益增量" in bundle["question"] and any("设计创效" in item["text"] for item in bundle["verified_evidence"]):
         evidence = bundle["verified_evidence"][0]
         claims.append(_claim(f"C{len(claims)+1}", "LIMITATION", "SQ1", "现有正式资料给出的是“设计创效”计算口径，未明确证明其与“设计效益增量”完全等同。", [evidence["evidence_id"]], raw_evidence_text="术语映射边界：设计创效与设计效益增量未被正式资料明确等同。"))
     return claims
+
+
+def _direct_subquestion_id(bundle: dict[str, Any], text: str) -> str:
+    subquestions = list(bundle.get("subquestions") or (bundle.get("query_plan") or {}).get("subquestions") or [])
+    if len(subquestions) < 2:
+        return "SQ1"
+    explicit_count = bool(re.search(r"\d+\+?\s*(?:项|条|个|份)", text))
+    explicit_amount = bool(re.search(r"\d[\d,.]*\s*(?:万元|亿元|元)", text)) or "金额" in text
+    if explicit_count:
+        count_pattern = r"(?:哪|哪些)\s*(?:\d+|[一二三四五六七八九十]+)\s*(?:个|项|条|步|环节|章节|维度|方面)|几项|多少项|多少条|几条|几个|多少个|数量是多少"
+        count_id = next((f"SQ{index}" for index, question in enumerate(subquestions, start=1) if re.search(count_pattern, str(question))), None)
+        if count_id:
+            return count_id
+    if explicit_amount:
+        amount_id = next((f"SQ{index}" for index, question in enumerate(subquestions, start=1) if any(marker in str(question) for marker in ("金额", "合计", "总额", "费用"))), None)
+        if amount_id:
+            return amount_id
+    coverage = {str(item.get("subquestion_id")): item.get("coverage_status") for item in bundle.get("coverage_map", [])}
+    compact = re.sub(r"\s+", "", text).casefold()
+    stop = {"多少", "几个", "哪些", "哪", "哪个", "如何", "什么", "是否", "个", "项", "条", "的", "与", "和", "及"}
+    scored = []
+    for index, subquestion in enumerate(subquestions, start=1):
+        question_id = f"SQ{index}"
+        if coverage and coverage.get(question_id) != "COVERED":
+            continue
+        terms = [str(term).casefold() for term in query_terms(str(subquestion)) if len(str(term)) >= 2 and str(term) not in stop]
+        hits = sum(term in compact for term in terms)
+        if hits:
+            scored.append((hits, -index, question_id))
+    return max(scored)[2] if scored else "SQ1"
 
 
 def _digital_construction_solution_claims(bundle: dict[str, Any]) -> list[dict[str, Any]]:
@@ -988,7 +1079,8 @@ def _single_fact_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
                 continue
             value = " ".join(part for part in match.groups() if part)
             label = "总工期" if key == "工期" else key
-            return _claim("C1", "DIRECT", "SQ1", f"{label}为 {value}。", [evidence["evidence_id"]], raw_evidence_text=match.group(0))
+            statement = f"{label}为 {value}。"
+            return _claim("C1", "DIRECT", _direct_subquestion_id(bundle, statement), statement, [evidence["evidence_id"]], raw_evidence_text=match.group(0))
     return None
 
 
@@ -1331,8 +1423,90 @@ def _budget_review_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def _assembly_rate_pdf_claims(bundle: dict[str, Any]) -> list[dict[str, Any]]:
+    question = str(bundle.get("question") or "")
+    if "装配率策划" not in question or not any(marker in question for marker in ("金额", "节省")):
+        return []
+    project_terms = [re.sub(r"项目$", "", str(value)).strip().casefold() for value in (bundle.get("query_plan") or {}).get("project", [])]
+    for evidence in bundle.get("verified_evidence") or []:
+        file_name = str(evidence.get("file_name") or "")
+        if not file_name.lower().endswith(".pdf") or project_terms and not any(term in file_name.casefold() for term in project_terms):
+            continue
+        raw = str(evidence.get("text") or evidence.get("raw_text") or "")
+        lines = [line.strip() for line in raw.splitlines() if line.strip()]
+        starts = [index for index, line in enumerate(lines) if re.fullmatch(r"\d+", line)]
+        for offset, start in enumerate(starts):
+            end = starts[offset + 1] if offset + 1 < len(starts) else len(lines)
+            row_lines = lines[start + 1 : end]
+            if not any("装配率策划" in line for line in row_lines[:2]):
+                continue
+            row_text = " ".join(row_lines)
+            amount = re.search(r"(\d+(?:\.\d+)?)\s*万元", row_text)
+            retained = re.search(r"仅保留.{0,80}?要求", row_text)
+            other = re.search(r"其(?:他|它)楼栋.{0,60}?要求", row_text)
+            if not (amount and retained):
+                continue
+            scope = f"保留范围：{retained.group(0)}。"
+            if other:
+                scope += f"{other.group(0)}。"
+            subquestions = list(bundle.get("subquestions") or (bundle.get("query_plan") or {}).get("subquestions") or [])
+            scope_id = next((f"SQ{index}" for index, value in enumerate(subquestions, start=1) if "保留" in str(value) or "范围" in str(value)), "SQ1")
+            amount_id = next((f"SQ{index}" for index, value in enumerate(subquestions, start=1) if "金额" in str(value) or "节省" in str(value)), "SQ2")
+            if "创效金额" in raw and "节省金额" in question:
+                amount_claim = _claim("C2", "LIMITATION", amount_id, f"原文在“创效金额”列记载 {amount.group(1)} 万元；资料没有单独将此数标为节省金额。", [evidence["evidence_id"]], raw_evidence_text=row_text)
+            else:
+                amount_claim = _claim("C2", "DIRECT", amount_id, f"金额为 {amount.group(1)} 万元。", [evidence["evidence_id"]], raw_evidence_text=row_text)
+            return [
+                _claim("C1", "DIRECT", scope_id, scope, [evidence["evidence_id"]], raw_evidence_text=row_text),
+                amount_claim,
+            ]
+    return []
+
+
+def _budget_allocation_claims(bundle: dict[str, Any]) -> list[dict[str, Any]]:
+    question = str(bundle.get("question") or "")
+    if "概算" not in question or "预留" not in question or "倾斜" not in question:
+        return []
+    for evidence in bundle.get("verified_evidence") or []:
+        text = _clean_display(str(evidence.get("text") or evidence.get("raw_text") or ""))
+        reserve = re.search(r"下浮\s*(\d+(?:\.\d+)?)\s*%\s*作为限额设计标准[^。；;\n]{0,40}预留后期调整空间", text)
+        low = re.search(r"([^。；;\n]{2,80}?)等专业概算指标过低", text)
+        surplus = re.search(r"([^。；;\n]{2,120}?)(?:等专业)?概算富余", text)
+        surplus_prefix = text.split("概算富余", 1)[0] if "概算富余" in text else ""
+        surplus_names = re.split(r"[，,；;]", surplus_prefix)[-1].strip()
+        if not (reserve and low and surplus and surplus_names):
+            continue
+        return [
+            _claim("C1", "DIRECT", "SQ1", f"限额按复核后各专业概算下浮{reserve.group(1)}%执行，并预留后期调整空间。", [evidence["evidence_id"]], raw_evidence_text=text),
+            _claim("C2", "DIRECT", "SQ2", f"概算指标偏低的专业包括{low.group(1)}；概算富余的专业包括{surplus_names}，富余概算向指标偏低专业调整。", [evidence["evidence_id"]], raw_evidence_text=text),
+        ]
+    return []
+
+
 def _review_count_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
     question = str(bundle.get("question") or "")
+    count_question = "意见" in question and any(marker in question for marker in ("多少条", "几条", "共提出"))
+    if count_question:
+        subquestions = list(bundle.get("subquestions") or (bundle.get("query_plan") or {}).get("subquestions") or [])
+        count_id = next(
+            (f"SQ{index}" for index, subquestion in enumerate(subquestions, start=1) if "意见" in str(subquestion) or any(marker in str(subquestion) for marker in ("多少条", "几条"))),
+            "SQ1",
+        )
+        for evidence in bundle.get("verified_evidence") or []:
+            raw = str(evidence.get("text") or evidence.get("raw_text") or "")
+            total = re.search(r"(?:合计|共计|总计|共提出|共)[^\d]{0,12}(\d+)\s*条", raw)
+            if total:
+                return _claim("C1", "DIRECT", count_id, f"图纸审查意见共{total.group(1)}条。", [evidence["evidence_id"]], raw_evidence_text=total.group(0))
+            parts = [
+                (label.strip(), value)
+                for label, value in re.findall(r"([^，,；;。\n]{2,60}?)(\d+)\s*条", raw)
+                if any(marker in label for marker in ("图纸审查", "图审单位", "外部专家"))
+            ]
+            if len(parts) > 1:
+                breakdown = "；".join(f"{label}{value}条" for label, value in parts)
+                text = f"原文分别列出：{breakdown}。原文未明示合计意见数，暂不能确认总数。"
+                return _claim("C1", "LIMITATION", count_id, text, [evidence["evidence_id"]], raw_evidence_text=raw)
+        return None
     if "意见" not in question or "落实" not in question:
         return None
     for item in bundle.get("verified_evidence") or []:
@@ -1348,46 +1522,61 @@ def _design_optimization_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
     question = str(bundle.get("question") or "")
     if "设计优化" not in question or "创效" not in question or not any(marker in question for marker in ("合计", "共几项", "多少项")):
         return None
-    if "大冶" in question:
-        pool = [item for item in bundle.get("candidate_evidence") or [] if "大冶" in str(item.get("file_name") or "") and "设计优化" in str(item.get("text") or "")]
+    project_terms = [re.sub(r"项目$", "", str(value)).strip().casefold() for value in (bundle.get("query_plan") or {}).get("project", [])]
+    if project_terms:
+        pool = [
+            item for item in bundle.get("candidate_evidence") or []
+            if any(term in str(item.get("file_name") or "").casefold() for term in project_terms)
+            and "设计优化" in str(item.get("text") or "")
+        ]
         combined = "\n".join(str(item.get("text") or "") for item in pool)
         total = re.search(r"合计[^\d]{0,30}(\d+(?:\.\d+)?)\s*万元", combined)
         if total:
-            count_values = {int(value) for value in re.findall(r"(?:^|\n)\s*(\d+)\s+", combined) if int(value) < 100}
-            if not count_values:
-                table_ids = {item.get("table_id") for item in pool if item.get("role") == "DIRECT" and item.get("table_id")}
-                rows = [row for row in bundle.get("structured_rows") or [] if not table_ids or row.get("table_id") in table_ids]
-                count_values = {int(row.get("row_number")) for row in rows if row.get("row_number") is not None and str((row.get("cells") or [{}])[0].get("value") or "").strip().isdigit()}
-            file_rows = [row for row in bundle.get("structured_rows") or [] if "大冶" in str(row.get("file_name") or "") and str((row.get("cells") or [{}])[0].get("value") or "").strip().isdigit() and any("设计优化" in str(cell.get("value") or "") or "设计优化" in str(cell.get("header") or "") for cell in row.get("cells") or [])]
-            if len(file_rows) > len(count_values):
-                count_values = {(str(row.get("table_id") or ""), int(row.get("row_number"))) for row in file_rows if row.get("row_number") is not None}
-            if len(count_values) < 8:
-                inline_numbers = set()
-                for block in re.split(r"设计优化(?:创效)?", combined)[1:]:
-                    inline_numbers.update(int(value) for value in re.findall(r"(?:^|\s)([1-9]|1[0-9])\s+(?=[\u4e00-\u9fff])", block))
-                if len(inline_numbers) > len(count_values):
-                    count_values = inline_numbers
+            stated_count = re.search(r"设计优化[^。；;\n]{0,30}?(?:共计|共)\s*(\d+)\s*项", combined)
+            count_values = set()
+            if bundle.get("structured_evidence_complete") is True:
+                rows = [
+                    row for row in bundle.get("structured_rows") or []
+                    if any(term in str(row.get("file_name") or "").casefold() for term in project_terms)
+                    and not row.get("is_header") and not row.get("is_summary")
+                ]
+                count_values = {
+                    row.get("source_row_id") or row.get("row_id") or row.get("row_number")
+                    for row in rows
+                    if row.get("source_row_id") or row.get("row_id") or row.get("row_number") is not None
+                }
             citation = next((item for item in pool if item.get("role") == "DIRECT"), None)
             if citation:
-                return _claim("C1", "DIRECT", "SQ1", f"设计优化创效共 {len(count_values)} 项，合计 {total.group(1)} 万元。" if count_values else f"设计优化创效合计 {total.group(1)} 万元。", [citation["evidence_id"]], raw_evidence_text=combined)
+                count = int(stated_count.group(1)) if stated_count else len(count_values)
+                text = f"设计优化创效共 {count} 项，合计 {total.group(1)} 万元。" if count else f"设计优化创效合计 {total.group(1)} 万元。"
+                return _claim("C1", "DIRECT", _direct_subquestion_id(bundle, text), text, [citation["evidence_id"]], raw_evidence_text=combined)
     for item in bundle.get("verified_evidence") or []:
         raw = str(item.get("text") or item.get("raw_text") or "")
         if "设计优化创效" not in raw and "设计优化" not in raw:
             continue
         total = re.search(r"合计[^\d]{0,30}(\d+(?:\.\d+)?)\s*万元", raw)
         if total:
-            count_values = {int(value) for value in re.findall(r"行：\s*(\d+)", raw)}
-            if not count_values:
-                count_values = {int(value) for value in re.findall(r"(?:^|\n)\s*(\d+)\s+", raw)}
-            count = len(count_values)
-            if "大冶" in question and count:
-                return _claim("C1", "DIRECT", "SQ1", f"设计优化创效共 {count} 项，合计 {total.group(1)} 万元。", [item["evidence_id"]], raw_evidence_text=raw)
+            stated_count = re.search(r"设计优化[^。；;\n]{0,30}?(?:共计|共)\s*(\d+)\s*项", raw)
+            count_values = set()
+            if bundle.get("structured_evidence_complete") is True:
+                count_values = {int(value) for value in re.findall(r"行：\s*(\d+)", raw)}
+                if not count_values:
+                    count_values = {int(value) for value in re.findall(r"(?:^|\n)\s*(\d+)\s+", raw)}
+            count = int(stated_count.group(1)) if stated_count else len(count_values)
+            if stated_count:
+                text = f"设计优化创效共 {count} 项，合计 {total.group(1)} 万元。"
+                return _claim("C1", "DIRECT", _direct_subquestion_id(bundle, text), text, [item["evidence_id"]], raw_evidence_text=raw)
+            if count:
+                text = f"设计优化创效共 {count} 项，合计 {total.group(1)} 万元。"
+                return _claim("C1", "DIRECT", _direct_subquestion_id(bundle, text), text, [item["evidence_id"]], raw_evidence_text=raw)
             if "计量院" in question and "最大" in question:
                 amounts = [(float(value), label.strip()) for label, value in re.findall(r"([^\n]{0,80}?)(\d+(?:\.\d+)?)\s*万元", raw) if float(value) > 0 and "合计" not in label]
                 largest = max(amounts, default=(0.0, ""), key=lambda pair: pair[0])
                 suffix = f"金额最大的一项为：{largest[1]}{largest[0]:g}万元。" if largest[0] else ""
-                return _claim("C1", "DIRECT", "SQ1", f"计量院项目设计优化创效合计 {total.group(1)} 万元。{suffix}", [item["evidence_id"]], raw_evidence_text=raw)
-            return _claim("C1", "DIRECT", "SQ1", f"设计优化创效合计 {total.group(1)} 万元。", [item["evidence_id"]], raw_evidence_text=raw)
+                text = f"计量院项目设计优化创效合计 {total.group(1)} 万元。{suffix}"
+                return _claim("C1", "DIRECT", _direct_subquestion_id(bundle, text), text, [item["evidence_id"]], raw_evidence_text=raw)
+            text = f"设计优化创效合计 {total.group(1)} 万元。"
+            return _claim("C1", "DIRECT", _direct_subquestion_id(bundle, text), text, [item["evidence_id"]], raw_evidence_text=raw)
     return None
 
 
@@ -1955,7 +2144,7 @@ def _refusal(bundle: dict[str, Any], status: str, message: str) -> dict[str, Any
 
 
 def _answer(bundle: dict[str, Any], status: str, claims: list[dict[str, Any]], limitations: list[str]) -> dict[str, Any]:
-    missing_subquestions = _uncovered_answer_subquestions(bundle, claims) if status == "ANSWERED" else []
+    missing_subquestions = _uncovered_answer_subquestions(bundle, claims) if status in {"ANSWERED", "PARTIAL_ANSWER"} else []
     if missing_subquestions:
         evidence_ids = next((claim.get("evidence_ids") for claim in claims if claim.get("evidence_ids")), [])
         subquestions = list(bundle.get("subquestions") or (bundle.get("query_plan") or {}).get("subquestions") or [])
@@ -1993,8 +2182,14 @@ def _answer(bundle: dict[str, Any], status: str, claims: list[dict[str, Any]], l
     if not answer_text:
         answer_text = "结论：本次检索未形成可直接支持结论的证据，请以所列可核查原文为准。"
     missing_ids = [question_id for question_id, _ in missing_subquestions]
-    missing_id_set = set(missing_ids)
-    answer = {"answer_id": str(uuid.uuid4()), "query_id": bundle["query_id"], "answer_status": status, "answer_text": answer_text, "claims": claims, "claim_evidence_map": [{"claim_id": claim["claim_id"], "evidence_ids": claim["evidence_ids"], "citation_ids": claim["citation_ids"]} for claim in claims], "citations": citations, "covered_subquestions": [item["subquestion_id"] for item in bundle["coverage_map"] if item["coverage_status"] == "COVERED" and item["subquestion_id"] not in missing_id_set], "uncovered_subquestions": list(dict.fromkeys([*[item["subquestion_id"] for item in bundle["coverage_map"] if item["coverage_status"] in {"NOT_COVERED", "EVIDENCE_INSUFFICIENT"}], *missing_ids])), "conflicts": bundle["conflicting_evidence"], "limitations": limitations, "source_scope_status": bundle["bundle_status"] == "SOURCE_SCOPE_MISSING", "lineage_status": bundle["bundle_status"] == "LINEAGE_BLOCKED", "generation_mode": "DETERMINISTIC_VERIFIED", "validation_status": "PENDING", "answer_trace": {"bundle_status": bundle["bundle_status"], "gold_runtime_injection": 0}}
+    limitation_ids = [str(claim.get("subquestion_id")) for claim in claims if claim.get("claim_type") in {"LIMITATION", "INSUFFICIENT"}]
+    missing_id_set = set(missing_ids) | set(limitation_ids)
+    uncovered_ids = list(dict.fromkeys([
+        *[item["subquestion_id"] for item in bundle["coverage_map"] if item["coverage_status"] in {"NOT_COVERED", "EVIDENCE_INSUFFICIENT"}],
+        *missing_ids,
+        *limitation_ids,
+    ]))
+    answer = {"answer_id": str(uuid.uuid4()), "query_id": bundle["query_id"], "answer_status": status, "answer_text": answer_text, "claims": claims, "claim_evidence_map": [{"claim_id": claim["claim_id"], "evidence_ids": claim["evidence_ids"], "citation_ids": claim["citation_ids"]} for claim in claims], "citations": citations, "covered_subquestions": [item["subquestion_id"] for item in bundle["coverage_map"] if item["coverage_status"] == "COVERED" and item["subquestion_id"] not in missing_id_set], "uncovered_subquestions": uncovered_ids, "conflicts": bundle["conflicting_evidence"], "limitations": limitations, "source_scope_status": bundle["bundle_status"] == "SOURCE_SCOPE_MISSING", "lineage_status": bundle["bundle_status"] == "LINEAGE_BLOCKED", "generation_mode": "DETERMINISTIC_VERIFIED", "validation_status": "PENDING", "answer_trace": {"bundle_status": bundle["bundle_status"], "gold_runtime_injection": 0}}
     validation = validate(answer, bundle)
     answer["validation_status"] = "VALID" if validation["valid"] else "ANSWER_VALIDATION_FAILED"
     answer["answer_trace"]["validation_errors"] = validation["validation_errors"]
@@ -2012,6 +2207,7 @@ def _uncovered_answer_subquestions(bundle: dict[str, Any], claims: list[dict[str
     if len(subquestions) < 2 and not any(re.search(r"(?:哪|哪些)\s*[0-9一二三四五六七八九十]+\s*(?:个|项|条|步|维度|方面)", value) for value in subquestions):
         return []
     direct_claims = [claim for claim in claims if claim.get("claim_type") == "DIRECT"]
+    limited_ids = {str(claim.get("subquestion_id")) for claim in claims if claim.get("claim_type") in {"LIMITATION", "INSUFFICIENT"}}
     direct_text = "\n".join(str(claim.get("rendered_claim_text") or claim.get("claim_text") or "") for claim in direct_claims)
     answer = re.sub(r"\s+", "", direct_text).casefold()
     stop = {"多少", "几个", "哪些", "哪", "哪个", "如何", "什么", "是否", "分为", "方面", "内容", "项目", "任务书", "个", "的", "与", "和", "及"}
@@ -2019,10 +2215,14 @@ def _uncovered_answer_subquestions(bundle: dict[str, Any], claims: list[dict[str
         "包含": ("包含", "包括", "含"),
         "规模": ("规模", "总建筑面积", "建筑面积", "占地面积"),
         "节点": ("节点", "开工日期", "交付日期", "竣工日期"),
+        "金额": ("金额", "万元", "亿元", "总额"),
+        "合计金额": ("合计金额", "合计", "万元", "亿元", "总额"),
     }
     missing = []
     for index, subquestion in enumerate(subquestions, start=1):
         question_id = f"SQ{index}"
+        if question_id in limited_ids:
+            continue
         mapped_claims = [claim for claim in direct_claims if claim.get("subquestion_id") == question_id]
         terms = [str(term).casefold() for term in query_terms(str(subquestion)) if len(str(term)) >= 2 and str(term) not in stop]
         term_hits = sum(any(alias in answer for alias in coverage_aliases.get(term, (term,))) for term in terms)
@@ -2040,6 +2240,11 @@ def _uncovered_answer_subquestions(bundle: dict[str, Any], claims: list[dict[str
             if sum(bool(re.search(pattern, answer)) for pattern in metric_patterns) >= 2:
                 continue
         if "绿色低碳指标" in str(subquestion) and "绿色低碳指标" not in answer and not re.search(r"(?:能耗|节能|碳排放)[^\d]{0,12}\d", answer):
+            missing.append((question_id, str(subquestion)))
+            continue
+        if any(marker in str(subquestion) for marker in ("几项", "多少项", "多少条", "几条", "几个", "多少个", "数量是多少")):
+            if re.search(r"\d+\+?\s*(?:项|条|个|份)", direct_text):
+                continue
             missing.append((question_id, str(subquestion)))
             continue
         if (
@@ -2079,6 +2284,9 @@ def _explicit_list_item_count(text: str, claims: list[dict[str, Any]] | None = N
     claims = claims or []
     bullets = [line for line in text.splitlines() if re.match(r"\s*(?:[-*•]|[0-9]+[、.)]|[一二三四五六七八九十]+[、.])", line)]
     enumerated = re.findall(r"(?:^|[；;\n])(?:第)?[一二三四五六七八九十0-9]+[、.）)]", text)
+    numbered_steps = [int(value) for value in re.findall(r"(?:^|[：:；;\n])\s*(\d{1,2})\s+(?=[\u4e00-\u9fff])", text)]
+    if numbered_steps and numbered_steps == list(range(1, len(numbered_steps) + 1)) and any(marker in question for marker in ("流程", "步骤", "环节", "阶段")):
+        return len(numbered_steps)
     row_markers = re.findall(r"(?:^|[；;\n])\s*(?:行[：:]|第\d+行)", text)
     source_rows = {row for claim in claims for row in claim.get("source_rows", [])}
     source_row_ids = {row for claim in claims for row in claim.get("source_row_ids", [])}
@@ -2196,7 +2404,7 @@ def _render_direct_claims(raw: str, question: str) -> list[str]:
         formula = re.search(r"(项目设计创效经济效益额)\s*=\s*(.+?)(?=(?:\d+[）)]\s*设计创效率|设计创效率|附则|$))", text)
         if formula:
             return [f"结论：{formula.group(1)} = {formula.group(2).strip(' 。')}。"]
-    list_summary = _explicit_list_summary(text, question)
+    list_summary = _explicit_list_summary(raw, question)
     if list_summary:
         return [f"结论：{list_summary}"]
     task_book = re.search(r"设计任务书(?:编制)?[^。；]{0,100}?(?:包含|包括)(.+?)(?:等内容|。)", text)
@@ -2211,8 +2419,24 @@ def _render_direct_claims(raw: str, question: str) -> list[str]:
 
 
 def _explicit_list_summary(text: str, question: str) -> str | None:
+    raw_text = text
+    text = _clean_display(text)
     if not any(marker in question for marker in ("哪些", "包括", "包含", "方面", "清单", "职责")):
         return None
+    expected = re.search(r"(?:哪|哪些)\s*([0-9]+|[一二三四五六七八九十]+)\s*(?:个|项|条|步|环节|章节|维度|方面)", question)
+    if expected and any(marker in question for marker in ("流程", "步骤", "环节", "章节")):
+        number = expected.group(1)
+        required = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}.get(number, int(number) if number.isdigit() else 0)
+        item_pattern = r"(?:^|[：:；;\n])[ \t]*(?:[#>*•-][ \t]*)*(\d{1,2})(?:[、.．)）][ \t]+|[ \t]+)([^。；;\n]+)"
+        items = [
+            (int(match.group(1)), re.sub(r"\*+", "", match.group(2)).strip())
+            for match in re.finditer(item_pattern, raw_text)
+        ]
+        items = [(index, label) for index, label in items if label and len(label) <= 60]
+        if required and len(items) >= required and [index for index, _ in items[:required]] == list(range(1, required + 1)):
+            unit = next((marker for marker in ("环节", "步骤", "章节") if marker in question), "项")
+            subject = re.split(r"(?:包含|包括|分为)", question, maxsplit=1)[0].strip("，,：: ") or "流程"
+            return f"{subject}包括{required}个{unit}：" + "；".join(f"{index} {label}" for index, label in items[:required])
     if "职责" in question:
         expected = re.search(r"(?:哪|哪些)\s*([0-9]+|[一二三四五六七八九十]+)\s*项", question)
         required = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9, "十": 10}.get(expected.group(1), int(expected.group(1)) if expected and expected.group(1).isdigit() else 0) if expected else 0

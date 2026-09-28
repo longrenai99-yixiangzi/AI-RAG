@@ -124,7 +124,16 @@ def _scope(plan: dict[str, Any], document: dict[str, Any], source: dict[str, Any
             result[field] = "NOT_APPLICABLE"
         elif any(str(value).casefold() in json.dumps(candidate_values, ensure_ascii=False).casefold() for value in values):
             result[field] = "MATCH"
-        elif field in {"project", "year"} and any(str(value).casefold() in identity or _scope_alias(value).casefold() in identity or str(value).casefold() in evidence_text for value in values):
+        elif field == "year":
+            source_name = str(row.get("file_name") or source.get("file_name") or "")
+            source_years = set(re.findall(r"(?<!\d)20\d{2}(?!\d)", Path(source_name).stem))
+            if source_years:
+                result[field] = "MATCH" if any(str(value) in source_years for value in values) else "MISMATCH"
+            elif any(str(value).casefold() in evidence_text for value in values):
+                result[field] = "MATCH"
+            else:
+                result[field] = "MISMATCH" if candidate_values else "UNKNOWN"
+        elif field == "project" and any(str(value).casefold() in identity or _scope_alias(value).casefold() in identity or str(value).casefold() in evidence_text for value in values):
             result[field] = "MATCH"
         elif field == "organization" and any(_organization_in_text(str(value), f"{identity} {evidence_text}") for value in values):
             result[field] = "MATCH"

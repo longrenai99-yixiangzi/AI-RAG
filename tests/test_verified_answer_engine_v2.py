@@ -446,6 +446,196 @@ def test_structured_max_refuses_to_rank_a_partial_row_set():
     assert "40.2" not in answer["answer_text"]
 
 
+def test_incomplete_max_clause_keeps_a_separately_covered_fact_clause():
+    question = "演示流程包含哪 4 个步骤？哪个步骤数量最多？"
+    evidence = _evidence(
+        "DIRECT",
+        text="流程包括：1 阶段甲；2 阶段乙；3 阶段丙；4 阶段丁。",
+    )
+    subquestions = [
+        "演示流程包含哪 4 个步骤",
+        "哪个步骤数量最多",
+    ]
+    bundle = _bundle(
+        "VERIFIED_PARTIAL",
+        [evidence],
+        [
+            {"subquestion_id": "SQ1", "subquestion": subquestions[0], "coverage_status": "COVERED"},
+            {"subquestion_id": "SQ2", "subquestion": subquestions[1], "coverage_status": "EVIDENCE_INSUFFICIENT"},
+        ],
+        query_type="AGGREGATION_QUERY",
+        question=question,
+    )
+    bundle["query_plan"].update({"aggregation_plan": ["MAX"], "subquestions": subquestions})
+    bundle["subquestions"] = subquestions
+    bundle["structured_evidence_complete"] = False
+
+    answer = render(bundle)
+
+    assert answer["answer_status"] == "PARTIAL_ANSWER"
+    assert all(term in answer["answer_text"] for term in ("阶段甲", "阶段乙", "阶段丙", "阶段丁"))
+    assert "步骤数量最多" in answer["answer_text"]
+    assert "SQ1" in answer["covered_subquestions"]
+    assert "SQ2" in answer["uncovered_subquestions"]
+    assert answer["citations"]
+
+
+def test_answered_count_and_total_are_not_rendered_as_a_missing_total():
+    question = "示例项目设计优化创效共几项、合计金额多少？"
+    plan = plan_query(question)
+    evidence = _evidence("DIRECT", text="示例项目设计优化创效共 3 项，合计 12.5 万元。")
+    coverage = [
+        {"subquestion_id": f"SQ{index}", "subquestion": subquestion, "coverage_status": "COVERED"}
+        for index, subquestion in enumerate(plan.subquestions or [question], start=1)
+    ]
+    bundle = _bundle("VERIFIED", [evidence], coverage, query_type=plan.query_type, question=question)
+    bundle["query_plan"] = plan.to_dict()
+    bundle["subquestions"] = plan.subquestions
+
+    answer = render(bundle)
+
+    assert answer["answer_status"] == "ANSWERED"
+    assert "3 项" in answer["answer_text"] and "12.5 万元" in answer["answer_text"]
+    assert "未在本次回答中完整回应" not in answer["answer_text"]
+    assert validate(answer, bundle)["valid"] is True
+
+
+def test_partial_optimization_table_slice_does_not_become_the_total_item_count():
+    question = "示例项目设计优化创效共几项、合计金额多少？"
+    plan = plan_query(question).to_dict()
+    plan["project"] = ["示例项目"]
+    evidence = _evidence("DIRECT", text="设计优化序号5：案例甲；序号8：案例乙；合计12.5万元。")
+    evidence["file_name"] = "示例项目.pptx"
+    coverage = [
+        {"subquestion_id": f"SQ{index}", "subquestion": subquestion, "coverage_status": "COVERED"}
+        for index, subquestion in enumerate(plan["subquestions"], start=1)
+    ]
+    bundle = _bundle("VERIFIED", [evidence], coverage, query_type=plan["query_type"], question=question)
+    bundle["query_plan"] = plan
+    bundle["subquestions"] = plan["subquestions"]
+    bundle["structured_evidence_complete"] = False
+
+    answer = render(bundle)
+
+    assert answer["answer_status"] == "PARTIAL_ANSWER"
+    assert "12.5 万元" in answer["answer_text"]
+    assert "共 2 项" not in answer["answer_text"] and "共 4 项" not in answer["answer_text"]
+    assert "SQ1" in answer["uncovered_subquestions"] and "SQ2" in answer["covered_subquestions"]
+
+
+def test_complete_structured_optimization_rows_support_the_item_count():
+    question = "示例项目设计优化创效共几项、合计金额多少？"
+    plan = plan_query(question).to_dict()
+    plan["project"] = ["示例项目"]
+    evidence = _evidence("DIRECT", text="设计优化合计金额12.5万元。")
+    evidence["file_name"] = "示例项目复盘.pptx"
+    coverage = [
+        {"subquestion_id": f"SQ{index}", "subquestion": subquestion, "coverage_status": "COVERED"}
+        for index, subquestion in enumerate(plan["subquestions"], start=1)
+    ]
+    bundle = _bundle("VERIFIED", [evidence], coverage, query_type=plan["query_type"], question=question)
+    bundle["query_plan"] = plan
+    bundle["subquestions"] = plan["subquestions"]
+    bundle["structured_evidence_complete"] = True
+    bundle["structured_rows"] = [
+        {"row_id": f"R{index}", "row_number": index, "file_name": evidence["file_name"], "cells": [{"header": "优化事项", "value": f"项目{index}"}]}
+        for index in range(1, 4)
+    ]
+
+    answer = render(bundle)
+
+    assert answer["answer_status"] == "ANSWERED"
+    assert "共 3 项" in answer["answer_text"] and "12.5 万元" in answer["answer_text"]
+    assert validate(answer, bundle)["valid"] is True
+
+
+def test_partial_multi_fact_answer_marks_the_missing_count_clause():
+    question = "示例项目图纸审查共提出多少条意见？化解风险金额多少？"
+    plan = plan_query(question)
+    evidence = _evidence("DIRECT", text="项目图纸审查12条，图审单位复核5条，外部专家意见3条。金额为 7 万元。")
+    coverage = [
+        {"subquestion_id": f"SQ{index}", "subquestion": subquestion, "coverage_status": "COVERED"}
+        for index, subquestion in enumerate(plan.subquestions, start=1)
+    ]
+    bundle = _bundle("VERIFIED", [evidence], coverage, query_type=plan.query_type, question=question)
+    bundle["query_plan"] = plan.to_dict()
+    bundle["subquestions"] = plan.subquestions
+
+    answer = render(bundle)
+
+    assert answer["answer_status"] == "PARTIAL_ANSWER"
+    assert "7 万元" in answer["answer_text"]
+    assert all(value in answer["answer_text"] for value in ("12条", "5条", "3条"))
+    assert "原文未明示合计意见数" in answer["answer_text"]
+    assert "未在本次回答中完整回应“化解风险金额多少”" not in answer["answer_text"]
+    assert "SQ1" in answer["uncovered_subquestions"] and "SQ2" in answer["covered_subquestions"]
+
+
+def test_budget_allocation_answers_reserve_and_professional_direction_separately():
+    question = "示例项目概算首次分配时需预留多少？资金向哪些专业倾斜？"
+    plan = plan_query(question)
+    evidence = _evidence(
+        "DIRECT",
+        text="专业A及专业B等专业概算指标过低，专业C及专业D概算富余。限额根据复核后各专业概算下浮5%作为限额设计标准，预留后期调整空间。",
+    )
+    coverage = [
+        {"subquestion_id": f"SQ{index}", "subquestion": subquestion, "coverage_status": "COVERED"}
+        for index, subquestion in enumerate(plan.subquestions, start=1)
+    ]
+    bundle = _bundle("VERIFIED", [evidence], coverage, query_type=plan.query_type, question=question)
+    bundle["query_plan"] = plan.to_dict()
+    bundle["subquestions"] = plan.subquestions
+
+    answer = render(bundle)
+
+    assert answer["answer_status"] == "ANSWERED"
+    assert "下浮5%" in answer["answer_text"]
+    assert all(term in answer["answer_text"] for term in ("专业A及专业B", "专业C及专业D"))
+    assert {claim["subquestion_id"] for claim in answer["claims"]} == {"SQ1", "SQ2"}
+
+
+def test_pdf_amount_is_taken_from_the_matching_named_row():
+    question = "演示项目装配率策划保留范围和节省金额是多少？"
+    plan = plan_query(question).to_dict()
+    plan["project"] = ["演示项目"]
+    evidence = _evidence(
+        "DIRECT",
+        text="""表头：序号 | 策划项目 | 创效金额
+5
+设备优化
+降低预算。
+2.4万元
+6
+装配率策划
+仅保留区域甲和区域乙装配率要求，其它区域满足替代指标要求。
+7.6万元
+7
+空调优化
+3.0万元""",
+    )
+    evidence["file_name"] = "演示项目策划复盘.pdf"
+    bundle = _bundle(
+        "VERIFIED",
+        [evidence],
+        [
+            {"subquestion_id": "SQ1", "subquestion": "演示项目装配率策划保留范围", "coverage_status": "COVERED"},
+            {"subquestion_id": "SQ2", "subquestion": "节省金额是多少", "coverage_status": "COVERED"},
+        ],
+        query_type=plan["query_type"],
+        question=question,
+    )
+    bundle["query_plan"] = plan
+    bundle["subquestions"] = plan["subquestions"] or ["演示项目装配率策划保留范围", "节省金额是多少"]
+
+    answer = render(bundle)
+
+    assert answer["answer_status"] == "PARTIAL_ANSWER"
+    assert "仅保留区域甲和区域乙装配率要求" in answer["answer_text"]
+    assert "7.6 万元" in answer["answer_text"]
+    assert "2.4万元" not in answer["answer_text"]
+    assert "创效金额" in answer["answer_text"]
+
+
 def test_unimplemented_table_sum_does_not_fall_back_to_group_counts():
     question = "项目清单各专业合计金额是多少？"
     evidence = _evidence("DIRECT", text="结构专业 10 万元；建筑专业 20 万元。", location={"table_id": "T1"})

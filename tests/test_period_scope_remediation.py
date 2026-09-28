@@ -45,3 +45,20 @@ def test_period_unspecified_query_keeps_conflict_guard() -> None:
     second = _candidate("second", {"organization": "MATCH", "year": "MATCH", "metric": "MATCH", "period": "NOT_APPLICABLE"}, "\u603b\u4f53\u521b\u6548\u73873.33%")
     assert plan["period"] == ""
     assert set(_same_scope_conflicts([first, second], plan)) == {"first", "second"}
+
+
+def test_source_filename_year_overrides_a_different_year_in_body_dates() -> None:
+    plan = plan_query("2025年度项目支持数量是多少？").to_dict()
+    old_register = _scope_for(
+        plan,
+        "项目统计台账-2024年7月.xlsx",
+        "项目计划于2025-12-30完成；当前台账为2024年7月。",
+    )
+    current_summary = _scope_for(
+        plan,
+        "2025年度总结.md",
+        "2025年度项目支持数量为12个。",
+    )
+
+    assert old_register["year"] == "MISMATCH"
+    assert current_summary["year"] == "MATCH"

@@ -23,6 +23,7 @@ from app.domain import SourceBlock
 from app.knowledge_growth_v1 import candidate_for_trace
 from app.config import Settings
 from app.ingestion.atomic_search import search_atomic_evidence
+from app.ingestion.atomic_evidence import build_atomic_evidence
 from app.ingestion.pipeline import run_document_pipeline
 from app.ingestion.loaders.pdf_loader import extract_value_creation_rows, extract_value_creation_summary
 from app.retrieval.dense_provider import BGEM3DenseProvider
@@ -724,12 +725,14 @@ def _sync_trial_sources() -> None:
 def _source_catalog(*, include_withdrawn: bool = False) -> list[dict[str, Any]]:
     central = {row["source_id"]: row for row in KNOWLEDGE_STORE.list_sources(include_withdrawn=include_withdrawn)}
     runtime_source_ids: set[str] = set()
+    runtime_by_version: dict[tuple[str, str], dict[str, Any]] = {}
     for evidence in _runtime_evidence_records():
         source_path = str(evidence.get("source_path") or "")
         if not source_path:
             continue
         source_id = str(evidence.get("source_id") or source_id_for_path(source_path))
         runtime_source_ids.add(source_id)
+        runtime_by_version[(_normalize_source_path(source_path).casefold(), str(evidence.get("source_version") or ""))] = evidence
         row = central.setdefault(source_id, {
             "source_id": source_id, "source_path": source_path,
             "file_name": evidence.get("file_name") or Path(source_path).name,
@@ -742,7 +745,13 @@ def _source_catalog(*, include_withdrawn: bool = False) -> list[dict[str, Any]]:
         row["runtime_source_version"] = evidence.get("source_version") or row.get("current_hash")
     candidate_mode = _primary_mode() == V262_CANDIDATE_MODE
     for source_id, row in central.items():
-        included = source_id in runtime_source_ids
+        matching = runtime_by_version.get((_normalize_source_path(row.get("source_path") or "").casefold(), str(row.get("current_hash") or "")))
+        included = source_id in runtime_source_ids or matching is not None
+        if matching:
+            row["runtime_source_id"] = matching.get("source_id") or source_id
+            row["runtime_source_version"] = matching.get("source_version")
+        elif source_id in runtime_source_ids:
+            row["runtime_source_id"] = source_id
         row["runtime_included"] = included
         row["runtime_status"] = "ACTIVE_FROZEN_CANDIDATE" if included and candidate_mode else "ACTIVE_CURRENT_RUNTIME" if included else "PENDING_CANDIDATE_INCLUSION" if candidate_mode else "NOT_IN_CURRENT_RUNTIME"
     return sorted(central.values(), key=lambda row: (str(row.get("knowledge_root_id") or ""), str(row.get("file_name") or "").casefold()))
@@ -1032,11 +1041,41 @@ def _candidate_primary_answer(question: str) -> dict[str, Any]:
     embedding_ms = (time.perf_counter() - embedding_started) * 1000
     shadow = candidate.run(question, {"answer_status": "NOT_RUN", "citations": []}, query_vector=query_vector, include_trace=True)
     citations = list(shadow.get("v2_citations") or [])
+    evidence_replacements: dict[str, str] = {}
     for citation in citations:
         record = candidate.atomic.get(str(citation.get("evidence_id") or ""), {})
+        if not record and hasattr(candidate, "cited_evidence_record"):
+            record = candidate.cited_evidence_record(citation) or {}
+            if record:
+                evidence_replacements[str(citation["evidence_id"])] = record["evidence_id"]
+                citation["evidence_id"] = record["evidence_id"]
+                citation["parent_evidence_id"] = record.get("parent_evidence_id")
+                citation["location"] = record.get("location") or citation.get("location")
         if record and not citation.get("source_version"):
             citation["source_version"] = record.get("source_version")
+        if record:
+            for key in ("source_id", "source_path", "file_name", "location"):
+                if not citation.get(key):
+                    citation[key] = record.get(key)
+            if not citation.get("excerpt"):
+                citation["excerpt"] = str(record.get("raw_text") or record.get("text") or "")[:900]
+            if not citation.get("display_location") or citation["display_location"] == "位置未定位":
+                citation["display_location"] = _display_location(citation.get("location") or {})
     trace_context = shadow.get("trace_context") or {}
+    if evidence_replacements:
+        def replace_ids(value: Any) -> None:
+            if isinstance(value, dict):
+                for key, child in list(value.items()):
+                    if key == "evidence_id" and isinstance(child, str):
+                        value[key] = evidence_replacements.get(child, child)
+                    elif key == "evidence_ids" and isinstance(child, list):
+                        value[key] = [evidence_replacements.get(item, item) for item in child]
+                    else:
+                        replace_ids(child)
+            elif isinstance(value, list):
+                for child in value:
+                    replace_ids(child)
+        replace_ids(trace_context)
     status = str(shadow.get("v2_status") or "INSUFFICIENT_EVIDENCE")
     return {
         "query_id": "Q_" + uuid.uuid4().hex,
@@ -1299,7 +1338,7 @@ def knowledge_overview() -> dict[str, Any]:
     overview.update({
         "sources": len(sources),
         "indexed_sources": sum(bool(row.get("runtime_included")) for row in sources),
-        "active_knowledge": 0 if _primary_mode() == V262_CANDIDATE_MODE else overview["active_knowledge"],
+        "active_knowledge": len(_candidate_knowledge_items()) if _primary_mode() == V262_CANDIDATE_MODE else overview["active_knowledge"],
         "runtime_mode": _primary_mode(),
     })
     return overview
@@ -1329,25 +1368,33 @@ def knowledge_source(source_id: str) -> dict[str, Any]:
 
 
 @router.get("/knowledge/sources/{source_id}/evidence")
-def knowledge_source_evidence(source_id: str, limit: int = 10, evidence_id: str = "") -> dict[str, Any]:
+def knowledge_source_evidence(source_id: str, limit: int = 10, evidence_id: str = "", source_version: str = "") -> dict[str, Any]:
     source = next((row for row in _source_catalog(include_withdrawn=True) if row.get("source_id") == source_id), None)
     if source is None:
         raise HTTPException(status_code=404, detail="SOURCE_NOT_FOUND")
+    if source_version and source_version != str(source.get("runtime_source_version") or ""):
+        return {"source": source, "items": [], "message": "该引用版本未收录在当前运行范围。", "requested_source_version": source_version}
+    if evidence_id and _primary_mode() == V262_CANDIDATE_MODE:
+        candidate = _candidate_primary_runtime()[0]
+        if hasattr(candidate, "evidence_record"):
+            candidate.evidence_record(evidence_id)
     records = [
         {
             "evidence_id": record["evidence_id"],
-            "source_id": source_id,
+            "source_id": record.get("source_id") or source_id,
             "source_version": record.get("source_version"),
             "parent_evidence_id": record.get("parent_evidence_id"),
             "file_name": record.get("file_name"),
             "location": record.get("location") or {},
             "heading_path": record.get("heading_path") or "",
-            "raw_text": str(record.get("raw_text") or record.get("text") or "")[:1600],
+            "raw_text": str(record.get("raw_text") or record.get("text") or "")[:64000 if evidence_id else 1600],
+            "raw_text_truncated": len(str(record.get("raw_text") or record.get("text") or "")) > (64000 if evidence_id else 1600),
+            "projection_scope": record.get("projection_scope") or "EXACT_EVIDENCE",
             "search_context": str(record.get("search_context") or ""),
             "excerpt": str(record.get("raw_text") or record.get("text") or "")[:900],
         }
         for record in _runtime_evidence_records()
-        if str(record.get("source_id") or source_id_for_path(str(record.get("source_path") or ""))) == source_id
+        if str(record.get("source_id") or source_id_for_path(str(record.get("source_path") or ""))) == str(source.get("runtime_source_id") or source_id)
         and str(record.get("source_version") or "") == str(source.get("runtime_source_version") or "")
         and (not evidence_id or str(record.get("evidence_id") or "") == evidence_id)
     ][:max(1, min(limit, 50))]
@@ -1363,9 +1410,8 @@ def refresh_knowledge_source(source_id: str, request: WithdrawKnowledgeRequest) 
     path = Path(str(source["source_path"]))
     if not path.is_file():
         raise HTTPException(status_code=422, detail="SOURCE_FILE_NOT_FOUND")
-    KNOWLEDGE_STORE.register_source(path, reactivate=True)
-    reset_trial_engine()
-    _engine_instance()
+    source = KNOWLEDGE_STORE.register_source(path, reactivate=True)
+    _prepare_reviewed_source(path, source)
     return {"source": next(row for row in _source_catalog(include_withdrawn=True) if row["source_id"] == source_id), "formal_knowledge_publish": 0}
 
 
@@ -1375,7 +1421,8 @@ def withdraw_knowledge_source(source_id: str, request: WithdrawKnowledgeRequest)
     source = KNOWLEDGE_STORE.withdraw_source(source_id, reviewer=request.trial_user)
     if source is None:
         raise HTTPException(status_code=404, detail="SOURCE_NOT_FOUND")
-    reset_trial_engine()
+    if _primary_mode() != V262_CANDIDATE_MODE:
+        reset_trial_engine()
     return {"source": source, "formal_knowledge_publish": 0}
 
 
@@ -1414,9 +1461,33 @@ def knowledge_search(q: str, limit: int = 20) -> dict[str, Any]:
     return {"items": sorted(items, key=lambda item: -float(item.get("score") or 0))[:maximum], "query": q}
 
 
+def _candidate_knowledge_items() -> list[dict[str, Any]]:
+    candidate = _candidate_primary_runtime()[0]
+    items: dict[str, dict[str, Any]] = {}
+    for chunk in candidate.chunks:
+        card = chunk.get("knowledge_card") or {}
+        record = candidate.atomic.get(str(chunk.get("chunk_id") or ""))
+        if card.get("approval_status") != "OWNER_CONFIRMED" or not card.get("id") or not card.get("node_id") or not record:
+            continue
+        if any(str(chunk.get(key) or "") != str(record.get(key) or "") for key in ("source_id", "source_version", "raw_text")):
+            continue
+        if not record.get("source_version"):
+            continue
+        items.setdefault(card["id"], {
+            "knowledge_id": card["id"], "node_id": card["node_id"],
+            "title": card.get("title") or card["id"], "content": record["raw_text"],
+            "applicability": card.get("applicability") or "",
+            "source_id": record["source_id"], "source_version": record["source_version"],
+            "evidence_id": record["evidence_id"], "version": card.get("version") or 1,
+            "status": "ACTIVE_FROZEN_CANDIDATE", "candidate_hash": candidate.candidate_hash,
+            "formal_note": card.get("formal_note") or {}, "primary_sources": card.get("primary_sources") or [],
+        })
+    return list(items.values())
+
+
 @router.get("/knowledge/items")
 def knowledge_items() -> dict[str, Any]:
-    return {"items": [] if _primary_mode() == V262_CANDIDATE_MODE else KNOWLEDGE_STORE.active_knowledge()}
+    return {"items": _candidate_knowledge_items() if _primary_mode() == V262_CANDIDATE_MODE else KNOWLEDGE_STORE.active_knowledge()}
 
 
 @router.get("/knowledge/change-candidates")
@@ -1503,6 +1574,21 @@ def feedback_workflow() -> dict[str, Any]:
     return {"items": rows}
 
 
+def _prepare_reviewed_source(path: Path, source: dict[str, Any]) -> None:
+    if _primary_mode() != V262_CANDIDATE_MODE:
+        reset_trial_engine()
+        _engine_instance()
+        return
+    current = [r for r in _runtime_evidence_records() if _same_source_path(r.get("source_path"), path) and str(r.get("source_version") or "") == str(source.get("current_hash") or "")]
+    if current:
+        KNOWLEDGE_STORE.mark_indexed(source["source_id"], source_hash_value=source["current_hash"], parse_status="parsed", chunk_count=len(current))
+        return
+    # Parsing an approved review input does not adopt it into the frozen candidate.
+    parsed = build_atomic_evidence(path, CONFIG.root001_path)
+    records = parsed.get("records") or []
+    KNOWLEDGE_STORE.mark_indexed(source["source_id"], source_hash_value=source["current_hash"], parse_status="parsed" if records else str(parsed.get("status") or "read_error"), chunk_count=len(records), error=parsed.get("error") or ("NO_PARSED_BODY" if not records else ""))
+
+
 @router.post("/feedback-workflow/{feedback_id}/review")
 def review_feedback_workflow(feedback_id: str, request: ReviewedFeedbackRequest) -> dict[str, Any]:
     _ensure_user(request.trial_user)
@@ -1523,8 +1609,7 @@ def review_feedback_workflow(feedback_id: str, request: ReviewedFeedbackRequest)
             raise HTTPException(status_code=422, detail="SOURCE_PATH_NOT_APPROVABLE")
         source = KNOWLEDGE_STORE.register_source(path, reactivate=True)
         source_id = str(source["source_id"])
-        reset_trial_engine()
-        _engine_instance()
+        _prepare_reviewed_source(path, source)
         source = KNOWLEDGE_STORE.source(source_id) or source
         if source.get("index_status") != "INDEXED":
             return {"saved": True, "feedback": feedback, "source": source, "status": "SOURCE_INDEX_FAILED", "automatic_knowledge_publish": 0}
@@ -1542,7 +1627,7 @@ def review_feedback_workflow(feedback_id: str, request: ReviewedFeedbackRequest)
         node_id=request.node_id,
         activate=_primary_mode() != V262_CANDIDATE_MODE,
     )
-    if knowledge:
+    if knowledge and _primary_mode() != V262_CANDIDATE_MODE:
         reset_trial_engine()
     return {"saved": True, "feedback": reviewed, "knowledge": knowledge, "source": KNOWLEDGE_STORE.source(source_id) if source_id else None, "automatic_knowledge_publish": 0}
 
@@ -1574,7 +1659,8 @@ def withdraw_knowledge(knowledge_id: str, request: WithdrawKnowledgeRequest) -> 
     knowledge = KNOWLEDGE_STORE.withdraw_knowledge(knowledge_id, reviewer=request.trial_user)
     if knowledge is None:
         raise HTTPException(status_code=404, detail="KNOWLEDGE_NOT_FOUND")
-    reset_trial_engine()
+    if _primary_mode() != V262_CANDIDATE_MODE:
+        reset_trial_engine()
     return {"knowledge": knowledge, "automatic_knowledge_publish": 0}
 
 
@@ -1587,7 +1673,8 @@ def rollback_knowledge(knowledge_id: str, request: RollbackKnowledgeRequest) -> 
         raise HTTPException(status_code=404, detail=str(error)) from error
     if knowledge is None:
         raise HTTPException(status_code=404, detail="KNOWLEDGE_NOT_FOUND")
-    reset_trial_engine()
+    if _primary_mode() != V262_CANDIDATE_MODE:
+        reset_trial_engine()
     return {"knowledge": knowledge, "automatic_knowledge_publish": 0}
 
 
@@ -1681,6 +1768,8 @@ def _display_location(location: dict[str, Any]) -> str:
         return f"第{start}-{end}段" if end != start else f"第{start}段"
     if location.get("config_key"):
         return f"系统配置 {location['config_key']}"
+    if location.get("section_path"):
+        return str(location["section_path"])
     return "位置未定位"
 
 

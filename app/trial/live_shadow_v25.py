@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from .knowledge_store import normalize_source_path
 from rank_bm25 import BM25Okapi
 
 from app.bm25 import tokenize
@@ -633,6 +634,42 @@ def _owner_answer_gold_source_rescue(question: str, atomic: dict[str, dict[str, 
     return []
 
 
+def _referenced_knowledge_card_candidates(question: str, chunks: list[dict[str, Any]], atomic: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    rows = []
+    for chunk in chunks:
+        card = chunk.get("knowledge_card") or {}
+        card_id = str(card.get("id") or "")
+        if card.get("approval_status") != "OWNER_CONFIRMED" or not card_id:
+            continue
+        if not re.search(r"(?<![A-Za-z0-9_-])" + re.escape(card_id) + r"(?![A-Za-z0-9_-])", question, re.I):
+            continue
+        record = atomic.get(str(chunk.get("chunk_id") or ""))
+        if not record or not record.get("source_version") or any(str(chunk.get(key) or "") != str(record.get(key) or "") for key in ("source_id", "source_version", "raw_text")):
+            continue
+        rows.append(_candidate_row(record, len(rows) + 1, "EXPLICIT_KNOWLEDGE_CARD_ID"))
+    return rows
+
+
+def _source_version_key(row: dict[str, Any]) -> tuple[str, str]:
+    return normalize_source_path(str(row.get("source_path") or "")).casefold(), str(row.get("source_version") or "")
+
+
+def _filter_retired_source_versions(chunks: list[dict[str, Any]], vectors: np.ndarray, retirements: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], np.ndarray]:
+    if vectors.shape[0] != len(chunks):
+        raise RuntimeError("SOURCE_RETIREMENT_VECTOR_ALIGNMENT_MISMATCH")
+    retired = {_source_version_key(row) for row in retirements}
+    keep = np.asarray([_source_version_key(row) not in retired for row in chunks], dtype=bool)
+    return [row for row, included in zip(chunks, keep, strict=True) if included], vectors[keep]
+
+
+def _chunk_source_location(chunk: dict[str, Any], parsed: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    ids = chunk.get("atomic_evidence_ids") or []
+    record = parsed.get(str(ids[0])) if len(ids) == 1 else None
+    if record and record.get("document_id") == chunk.get("document_id") and record.get("sha256") == chunk.get("source_version"):
+        return {**_location(str(chunk.get("section_path") or ""), chunk.get("table_id")), **(record.get("location") or {})}
+    return _location(str(chunk.get("section_path") or ""), chunk.get("table_id"))
+
+
 class V25LiveShadow:
     """Read-only V2.5 data branch with separately labelled dev remediation overlays."""
 
@@ -646,6 +683,7 @@ class V25LiveShadow:
         self.docs = {str(row.get("document_id")): row for row in _read_jsonl(STAGING / "documents.jsonl")}
         self.chunks = _read_jsonl(STAGING / "semantic_chunks.jsonl")
         remediation_vectors: np.ndarray | None = None
+        self.retired_source_versions: list[dict[str, Any]] = []
         structured_stages = [STAGING]
         for remediation_manifest in REMEDIATION_MANIFESTS:
             if not remediation_manifest.exists():
@@ -667,12 +705,21 @@ class V25LiveShadow:
                 structured_stages.append(stage)
                 self.candidate_hash = remediation.get("candidate_hash")
                 self.candidate_revision = remediation.get("candidate_revision") or self.candidate_revision
+                self.retired_source_versions = [entry for source in remediation.get("sources") or [] for entry in source.get("retired_source_versions") or []]
                 break
         for chunk in self.chunks:
             document = self.docs.get(str(chunk.get("document_id")), {})
             chunk["file_name"] = chunk.get("file_name") or document.get("file_name")
             chunk["source_path"] = chunk.get("source_path") or document.get("source_path")
             chunk["source_version"] = chunk.get("source_version") or document.get("source_version")
+        base_vectors = np.load(STAGING / "dense_embeddings.npy", mmap_mode="r").astype(np.float32)
+        vectors = np.concatenate((base_vectors, remediation_vectors), axis=0) if remediation_vectors is not None else base_vectors
+        unfiltered_count = len(self.chunks)
+        self.chunks, self.vectors = _filter_retired_source_versions(self.chunks, vectors, self.retired_source_versions)
+        self.retired_chunk_count = unfiltered_count - len(self.chunks)
+        retired_keys = {_source_version_key(row) for row in self.retired_source_versions}
+        self.docs = {key: row for key, row in self.docs.items() if _source_version_key(row) not in retired_keys}
+        parsed_atomic = {str(row.get("evidence_id")): row for stage in structured_stages for row in _read_jsonl(stage / "atomic_evidence.jsonl")}
         self.atomic = {
             str(chunk.get("chunk_id")): {
                 "evidence_id": str(chunk.get("chunk_id")),
@@ -685,7 +732,7 @@ class V25LiveShadow:
                 "file_name": chunk.get("file_name"),
                 "file_type": chunk.get("file_type"),
                 "heading_path": chunk.get("section_path") or "",
-                "location": _location(str(chunk.get("section_path") or ""), chunk.get("table_id")),
+                "location": _chunk_source_location(chunk, parsed_atomic),
                 "text": chunk.get("raw_text") or chunk.get("retrieval_text") or "",
                 "raw_text": chunk.get("raw_text") or chunk.get("retrieval_text") or "",
                 "search_context": chunk.get("retrieval_text") or "",
@@ -701,20 +748,26 @@ class V25LiveShadow:
             for source_row in _read_jsonl(stage / "table_rows.jsonl"):
                 table = tables.get(str(source_row.get("table_id")), {})
                 document = stage_docs.get(str(source_row.get("document_id"))) or self.docs.get(str(source_row.get("document_id")), {})
+                if _source_version_key(document) in retired_keys:
+                    continue
                 row = {
                     **source_row,
                     "row_id": source_row.get("row_id") or source_row.get("table_row_id"),
+                    "source_id": document.get("source_id") or document.get("document_id"),
                     "source_path": document.get("source_path"),
                     "source_version": document.get("source_version") or document.get("source_hash") or document.get("content_hash"),
                     "file_name": document.get("file_name"),
+                    "file_type": document.get("file_type"),
+                    "header_text": " | ".join(dict.fromkeys(str(v) for v in table.get("header") or [])),
                     "sheet_name": table.get("sheet_name"),
                     "expected_table_row_count": table.get("row_count"),
-                    "source_location": {"table": table.get("table_number"), "sheet_name": table.get("sheet_name"), "table_id": source_row.get("table_id")},
+                    "source_location": {**(table.get("source_location") or {}), **(source_row.get("source_location") or {}), "sheet_name": table.get("sheet_name"), "table_id": source_row.get("table_id")},
                     "bundle_evidence_id": "V25-STRUCTURED-" + str(source_row.get("table_id")),
                 }
                 self.structured_rows.append(row)
-        base_vectors = np.load(STAGING / "dense_embeddings.npy", mmap_mode="r").astype(np.float32)
-        self.vectors = np.concatenate((base_vectors, remediation_vectors), axis=0) if remediation_vectors is not None else base_vectors
+        self._structured_tables: dict[str, list[dict[str, Any]]] = {}
+        for row in self.structured_rows:
+            self._structured_tables.setdefault(str(row.get("table_id") or ""), []).append(row)
         if self.vectors.shape[0] != len(self.chunks):
             raise RuntimeError("V2_5_DENSE_CHUNK_MISMATCH")
         weighted = [
@@ -727,6 +780,64 @@ class V25LiveShadow:
             for row in self.chunks
         ]
         self.bm25 = BM25Okapi([tokenize(text) or ["_empty_"] for text in weighted])
+
+    def evidence_record(self, evidence_id: str) -> dict[str, Any] | None:
+        if evidence_id in self.atomic:
+            return self.atomic[evidence_id]
+        if not evidence_id.startswith("V25-STRUCTURED-"):
+            return None
+        if "@rows=" not in evidence_id:
+            rows = self._structured_tables.get(evidence_id.removeprefix("V25-STRUCTURED-"), [])
+            if not rows:
+                return None
+            numbers = ",".join(str(n) for n in sorted({int(r["row_number"]) for r in rows}))
+            full = self.evidence_record(evidence_id + "@rows=" + numbers)
+            if full:
+                self.atomic[evidence_id] = {**full, "evidence_id": evidence_id, "projection_scope": "WHOLE_TABLE"}
+            return self.atomic.get(evidence_id)
+        parent, numbers = evidence_id.split("@rows=", 1)
+        try:
+            wanted = {int(number) for number in numbers.split(",")}
+        except ValueError:
+            return None
+        table_id = parent.removeprefix("V25-STRUCTURED-")
+        rows = [r for r in self._structured_tables.get(table_id, []) if int(r.get("row_number") or 0) in wanted]
+        if not rows or {int(r.get("row_number") or 0) for r in rows} != wanted:
+            return None
+        identities = {(r.get("source_id"), r.get("source_path"), r.get("source_version")) for r in rows}
+        if len(identities) != 1 or not rows[0].get("source_version"):
+            return None
+        first = rows[0]
+        body = [f"表头：{first.get('header_text') or ''}"]
+        for row in rows:
+            values = row.get("values") or [cell.get("value") for cell in row.get("cells") or []]
+            body.append(f"行{row['row_number']}：" + " | ".join(str(v or "") for v in values))
+        raw = "\n".join(body)
+        location = {**(first.get("source_location") or {}), "row_start": min(wanted), "row_end": max(wanted), "source_row_numbers": sorted(wanted), "source_row_ids": [r.get("row_id") for r in rows]}
+        record = {"evidence_id": evidence_id, "parent_evidence_id": parent, "source_id": first["source_id"], "source_version": first["source_version"], "source_path": first["source_path"], "document_id": first.get("document_id"), "file_name": first.get("file_name"), "file_type": first.get("file_type"), "heading_path": first.get("header_text") or "结构化表格行", "location": location, "raw_text": raw, "text": raw, "search_context": first.get("header_text") or "", "lineage_status": "LINEAGE_CONFIRMED"}
+        self.atomic[evidence_id] = record
+        return record
+
+    def cited_evidence_record(self, citation: dict[str, Any]) -> dict[str, Any] | None:
+        evidence_id = str(citation.get("evidence_id") or "")
+        if not evidence_id.startswith("V25-STRUCTURED-") or "@rows=" in evidence_id:
+            return self.evidence_record(evidence_id)
+        if not evidence_id.startswith("V25-STRUCTURED-"):
+            return None
+        table_id = evidence_id.removeprefix("V25-STRUCTURED-")
+        location = citation.get("location") or {}
+        row_ids = set(location.get("source_row_ids") or [])
+        rows = self._structured_tables.get(table_id, [])
+        if row_ids:
+            rows = [r for r in rows if str(r.get("row_id") or "") in row_ids]
+        elif location.get("row_start") is not None:
+            rows = [r for r in rows if int(location["row_start"]) <= int(r.get("row_number") or 0) <= int(location.get("row_end") or location["row_start"])]
+        else:
+            return None
+        if not rows:
+            return None
+        numbers = ",".join(str(n) for n in sorted({int(r["row_number"]) for r in rows}))
+        return self.evidence_record(evidence_id + "@rows=" + numbers)
 
     def run(self, question: str, primary: dict[str, Any], *, query_vector: list[float] | None = None, include_trace: bool = False) -> dict[str, Any]:
         started = time.perf_counter()
@@ -765,6 +876,9 @@ class V25LiveShadow:
                 rescue_rows.append(_candidate_row(record, 0, origin))
                 rescue_ids.add(evidence_id)
         candidate_rows = [*rescue_rows, *[row for row in candidate_rows if row["evidence_id"] not in rescue_ids]]
+        referenced_cards = _referenced_knowledge_card_candidates(question, self.chunks, self.atomic)
+        if referenced_cards:
+            candidate_rows = referenced_cards
         for rank, row in enumerate(candidate_rows, start=1):
             row["rank"] = rank
         documents = {str(key): dict(value) for key, value in self.docs.items()}
@@ -821,7 +935,7 @@ class V25LiveShadow:
                 "claim_evidence_map": answer.get("claim_evidence_map") or {},
                 "validation_errors": validation.get("validation_errors") or [],
                 "chunk_retrieval": {
-                    "method": "BM25_DENSE_RRF",
+                    "method": "EXPLICIT_KNOWLEDGE_CARD_ID" if referenced_cards else "BM25_DENSE_RRF",
                     "candidate_count": len(candidate_rows),
                     "items": [{"chunk_id": row.get("evidence_id"), "document_id": row.get("document_id"), "file_name": row.get("file_name"), "rank": row.get("rank"), "candidate_origin": row.get("candidate_origin")} for row in candidate_rows],
                 },

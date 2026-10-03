@@ -18,7 +18,7 @@ type Source = {
   chunk_count?: number
   error?: string | null
 }
-type Evidence = { evidence_id: string; source_version?: string; parent_evidence_id?: string; location: Record<string, unknown>; heading_path?: string; raw_text?: string; search_context?: string; excerpt: string }
+type Evidence = { evidence_id: string; source_version?: string; parent_evidence_id?: string; location: Record<string, unknown>; heading_path?: string; raw_text?: string; raw_text_truncated?: boolean; projection_scope?: string; search_context?: string; excerpt: string }
 
 const formats = ['全部', '.pdf', '.docx', '.xlsx', '.pptx', '.md', '.wps']
 const statusText: Record<string, string> = { INDEXED: '正文已入库', PENDING: '等待处理', FAILED: '处理失败', PARSED: '解析完成' }
@@ -28,6 +28,7 @@ export function KnowledgeSources() {
   const [params] = useSearchParams()
   const linkedSourceId = params.get('source_id') || ''
   const linkedEvidenceId = params.get('evidence_id') || ''
+  const linkedSourceVersion = params.get('source_version') || ''
   const [sources, setSources] = useState<Source[]>([])
   const [format, setFormat] = useState('全部')
   const [query, setQuery] = useState('')
@@ -52,17 +53,19 @@ export function KnowledgeSources() {
     if (!linkedSourceId) return
     fetch(`/api/v2/knowledge/sources/${encodeURIComponent(linkedSourceId)}`, { cache: 'no-store' })
       .then(async (response) => { if (!response.ok) throw new Error(String(response.status)); return response.json() })
-      .then((payload) => void inspect(payload.source, linkedEvidenceId))
+      .then((payload) => void inspect(payload.source, linkedEvidenceId, linkedSourceVersion))
       .catch(() => setError('引用来源无法定位，请检查当前主答版本。'))
-  }, [linkedSourceId, linkedEvidenceId])
+  }, [linkedSourceId, linkedEvidenceId, linkedSourceVersion])
 
-  async function inspect(source: Source, evidenceId = '') {
+  async function inspect(source: Source, evidenceId = '', expectedVersion = '') {
     setSelected(source)
     setEvidence([])
-    const suffix = evidenceId ? `?evidence_id=${encodeURIComponent(evidenceId)}` : '?limit=12'
+    setError('')
+    const version = expectedVersion || source.runtime_source_version || ''
+    const suffix = (evidenceId ? `?evidence_id=${encodeURIComponent(evidenceId)}` : '?limit=12') + `&source_version=${encodeURIComponent(version)}`
     const response = await fetch(`/api/v2/knowledge/sources/${encodeURIComponent(source.source_id)}/evidence${suffix}`, { cache: 'no-store' })
     const payload = await response.json()
-    if (response.ok) setEvidence(payload.items || [])
+    if (response.ok) { setEvidence(payload.items || []); if (payload.message) setError(payload.message) }
   }
 
   async function operate(action: 'refresh' | 'withdraw') {
@@ -85,7 +88,7 @@ export function KnowledgeSources() {
       {!sources.length && !error && <p className="empty-runtime">没有符合条件的真实来源。</p>}
     </article>
     <div className="source-pagination"><span>共 {total} 条</span><button disabled={page === 0} onClick={() => setPage((value) => value - 1)}>上一页</button><span>第 {page + 1} 页</span><button disabled={(page + 1) * 50 >= total} onClick={() => setPage((value) => value + 1)}>下一页</button></div>
-    {selected && <article className="panel source-inspector"><header><div><span className="eyebrow">SOURCE DETAIL</span><h2>{selected.file_name}</h2></div><button onClick={() => setSelected(null)}>关闭</button></header><p>{selected.source_path}</p><div className="source-meta"><span>{selected.knowledge_root_id}</span><span>{runtimeText[selected.runtime_status || ''] || '运行状态待核实'}</span><span>运行版本 {(selected.runtime_source_version || '未收录').slice(0, 12)}</span></div>{selected.approval_status === 'USER_APPROVED_SHADOW_READ' && <div className="source-actions"><button onClick={() => void operate('refresh')}>{selected.runtime_status === 'ACTIVE_FROZEN_CANDIDATE' ? '刷新本地来源（不改变候选）' : '重新读取并刷新试用索引'}</button><button onClick={() => void operate('withdraw')}>{selected.runtime_status === 'ACTIVE_FROZEN_CANDIDATE' ? '撤回本地登记（不改变候选）' : '撤回试用来源'}</button></div>}{selected.error && <p className="runtime-error">{selected.error}</p>}<h3>当前主答证据预览</h3>{evidence.length ? evidence.map((item) => <div className="evidence-preview" key={item.evidence_id}><b>{locationText(item.location)} {item.heading_path || ''}</b><small>证据 {item.evidence_id} · 父块 {item.parent_evidence_id || '无'} · 版本 {(item.source_version || '待核实').slice(0, 12)}</small>{item.search_context && <details><summary>检索上下文（不作为引用事实）</summary><p>{item.search_context}</p></details>}<pre>{item.raw_text || item.excerpt}</pre></div>) : <p className="empty-runtime">当前主答未收录这个来源的此版本。</p>}</article>}
+    {selected && <article className="panel source-inspector"><header><div><span className="eyebrow">SOURCE DETAIL</span><h2>{selected.file_name}</h2></div><button onClick={() => setSelected(null)}>关闭</button></header><p>{selected.source_path}</p><div className="source-meta"><span>{selected.knowledge_root_id}</span><span>{runtimeText[selected.runtime_status || ''] || '运行状态待核实'}</span><span>运行版本 {(selected.runtime_source_version || '未收录').slice(0, 12)}</span></div>{selected.approval_status === 'USER_APPROVED_SHADOW_READ' && <div className="source-actions"><button onClick={() => void operate('refresh')}>{selected.runtime_status === 'ACTIVE_FROZEN_CANDIDATE' ? '刷新本地来源（不改变候选）' : '重新读取并刷新试用索引'}</button><button onClick={() => void operate('withdraw')}>{selected.runtime_status === 'ACTIVE_FROZEN_CANDIDATE' ? '撤回本地登记（不改变候选）' : '撤回试用来源'}</button></div>}{selected.error && <p className="runtime-error">{selected.error}</p>}<h3>当前主答证据预览</h3>{evidence.length ? evidence.map((item) => <div className="evidence-preview" key={item.evidence_id}><b>{locationText(item.location)} {item.heading_path || ''}</b><small>证据 {item.evidence_id} · 父块 {item.parent_evidence_id || '无'} · 版本 {(item.source_version || '待核实').slice(0, 12)}</small>{item.search_context && <details><summary>检索上下文（不作为引用事实）</summary><p>{item.search_context}</p></details>}<pre>{item.raw_text || item.excerpt}</pre>{item.raw_text_truncated && <small>预览已截断，请查看原件核对完整内容。</small>}{item.projection_scope === 'WHOLE_TABLE' && <small>历史表格引用展示该版本整表，请按引用行号核对。</small>}</div>) : <p className="empty-runtime">当前主答未收录这个来源的此版本。</p>}</article>}
   </section>
 }
 

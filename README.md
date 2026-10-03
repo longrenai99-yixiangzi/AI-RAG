@@ -18,6 +18,8 @@ V2.6.2候选 `823d3b32b68f84ba397b9035556cc252cf075ea09b2d7df3923e125f1a74b73a` 
 
 8010持续切换和回滚演练默认只做无写入预检；未来获具体授权后的参数及恢复语义见[NEW-07切换保护说明](docs/NEW_07_8010_CUTOVER_GUARD.md)。
 
+2026-10-03新增任务进展：[NEW-05完整运行范围收口](docs/NEW_05_RUNTIME_SCOPE_CLOSURE.md)、[NEW-10知识卡与节点收口摘要](docs/NEW_10_KNOWLEDGE_CARDS_CLOSURE.md)。两项已完成受控本机验收，NEW-11正在启动真实业务验收；这不改变原批准版本或生产部署状态。
+
 当前基础检索闭环为：
 
 ```

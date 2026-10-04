@@ -1,8 +1,16 @@
-# AI设计管理知识库 · V0.2
+# AI设计管理知识库 · 最新成果入口
 
-这是一个本地运行的设计管理RAG程序。业务知识源保存在仓库外并按只读方式使用；公开仓库不包含原始资料、文本切片、向量、逐题日志或内部路径。
+最新代码与全部后续成果在[rag-v1-refactor分支](https://github.com/longrenai99-yixiangzi/AI-RAG/tree/rag-v1-refactor)。本默认分支保留历史V0.2源码；查看当前状态与操作请使用下面的新成果入口。
 
-当前V2.6.2候选已获Owner版本批准但尚未部署，8000仍未获启动、写入或切换授权。详见[当前发布状态](docs/CURRENT_RELEASE_STATE.md)和[公共仓库数据政策](docs/PUBLIC_REPOSITORY_DATA_POLICY.md)。
+- [当前发布及真实验收结果](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/CURRENT_RELEASE_STATE.md)
+- [NEW-01～12和部署任务台账](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/NEXT_WORK_STATUS.md)
+- [详细操作指导手册](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/KNOWLEDGE_BASE_OPERATIONS_HANDBOOK.md)
+- [已完成成果与验证范围](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/COMPLETED_RESULTS.md)
+- [使用、启动、引用、反馈及恢复](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/LOCAL_OPERATION_GUIDE.md)
+
+本机正式8000已按Owner确认采用复合题修复包5bb15a33并完成技术验收。实际运行资料、原件、知识卡正文、模型、向量、审计和恢复状态不上传公开仓库。真实使用观察与独立备份待办如实保留，源码发布不代表全库业务验收完成。
+
+## 历史V0.2开发资料
 
 V0.2 在不更换 V0.1 RAG 底座的前提下增加知识治理和检索诊断：
 

@@ -1,15 +1,7 @@
-# 当前发布状态
+# 当前成果入口
 
-核对日期：2026-09-27（Asia/Shanghai）。本页只发布经Owner确认的聚合状态，不包含逐题问题、答案、引用、来源路径或内部文件位置。
+本默认分支保留旧版本源码；当前开发和已完成成果发布在rag-v1-refactor。
 
-| 项目 | 当前状态 |
-|---|---|
-| 候选版本 | `823d3b32b68f84ba397b9035556cc252cf075ea09b2d7df3923e125f1a74b73a` |
-| Owner决定 | 候选版本批准，尚未部署 |
-| Live Shadow | 33条有效样本，门槛30条，已通过 |
-| T5离线兼容性 | 387条：199 ANSWERED、185 PARTIAL、2 INSUFFICIENT、1 CONFLICTING |
-| T6回滚验证 | 对应候选已通过并恢复到V1配置 |
-| 8010主答配置 | `V1_PRIMARY` |
-| 8000授权 | 未授权启动、写入或切换 |
+当前正式包已获Owner采用并完成部署与技术验收。请读取[最新发布状态与验证证据摘要](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/CURRENT_RELEASE_STATE.md)和[完整任务台账](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/NEXT_WORK_STATUS.md)。旧“尚未部署/8000未授权”是历史时点，不代表当前运行。
 
-上述状态说明候选验证和版本批准已经完成，不表示生产部署已经发生。逐题T5、Gold、Live Shadow、Trace、向量和来源派生数据按[公共仓库数据政策](PUBLIC_REPOSITORY_DATA_POLICY.md)保存在受控本机范围，不进入公开Git历史。
+公开资料为通用源码与脱敏汇总；私有知识来源、逐题问答、向量、模型及恢复记录继续保留受控本机。

@@ -78,6 +78,12 @@ def plan_query(question: str) -> QueryPlan:
         "period": [period] if period else [],
         "specialty": specialties,
     }.items() if value}
+    transfer = _project_fact_transfer(normalized)
+    if transfer:
+        scope["project_fact_transfer"] = transfer
+    constraints = _response_constraints(normalized)
+    if constraints:
+        scope["response_constraints"] = constraints
     subquestions = _subquestions(normalized, aggregation, projects)
     confidence = 0.45 + 0.12 * bool(years) + 0.14 * bool(projects) + 0.1 * bool(specialties) + 0.08 * bool(metrics) + 0.06 * bool(aggregation)
     return QueryPlan(
@@ -142,6 +148,8 @@ def _entities(question: str) -> list[str]:
 
 
 def _is_named_project(value: str) -> bool:
+    if re.fullmatch(r"(?:不填(?:写)?|不要填写|无需填写)(?:本|当前)?项目", value):
+        return False
     if not value or value in {"设计示范项目", "EPC项目", "项目"}:
         return False
     if _is_generic_project_phrase(value):
@@ -207,7 +215,8 @@ def _aggregation_plan(question: str) -> list[str]:
     )) or ("合计" in question and any(term in question for term in ("金额", "利润", "创效", "合同额", "收益", "效益", "收入", "费用", "成本", "产值", "造价", "投资额", "万元", "亿元")))
     if re.search(r"(?:多少|几)(?:个|条|项|家|份|次|人|座)", question) or "总数" in question or ("合计" in question and not sum_request) or ("数量" in question and "是多少" not in question):
         operations.append("COUNT")
-    if any(term in question for term in ("其中", "利润>0", "利润大于0", "满足条件", "增加效益")):
+    subset_count_lookup = bool(re.search(r"其中[^？?；;]{1,40}(?:多少|几)(?:件|项|次|个)", question)) and not any(term in question for term in ("利润>0", "利润大于0", "满足条件", "增加效益", "筛选", "哪些"))
+    if any(term in question for term in ("利润>0", "利润大于0", "满足条件", "增加效益")) or ("其中" in question and not subset_count_lookup):
         operations.append("FILTER")
     if sum_request:
         operations.append("SUM")
@@ -222,7 +231,24 @@ def _comparison_plan(question: str) -> list[str]:
     return ["COMPARE_OPTIONS"] if any(term in question for term in ("比选", "比较", "区别", "优缺点", "方案")) else []
 
 
+def _project_fact_transfer(question: str) -> list[str]:
+    # Preserve an applicability question even when it contains count/amount numbers.
+    match = re.search(r"^([\u3400-\u9fffA-Za-z0-9（）()·+\-]{2,40})的[^？?；;]{1,80}?(?:能否|是否|可否)直接(?:采用|套用)([\u3400-\u9fffA-Za-z0-9（）()·+\-]{2,40})的(?=\d)", question)
+    if not match:
+        return []
+    target, source = match.groups()
+    if target in source or source in target or not any(marker in target for marker in ("项目", "工程", "学校", "中学", "医院", "厂房", "大楼", "园区", "校区")):
+        return []
+    return [target, source]
+
+
 def _query_type(question: str, aggregation: list[str], comparison: list[str]) -> str:
+    if _project_fact_transfer(question):
+        return "PROJECT_FACT_APPLICABILITY"
+    if definition_target(question):
+        return "DEFINITION_QUERY"
+    if any(term in question for term in ("评审", "会议", "会审")) and any(term in question for term in ("参加", "参会", "参与")) and any(term in question for term in ("单位", "部门", "专家", "谁")) and not any(op in aggregation for op in ("COUNT", "SUM", "MAX", "MIN", "FILTER")):
+        return "MEETING_PARTICIPANTS"
     if comparison and not any(item in aggregation for item in ("GROUP_BY", "COUNT", "FILTER", "SUM", "MAX", "MIN")):
         return "COMPARISON_QUERY" if "比较" in question or "区别" in question else "OPTION_QUERY"
     if re.search(r"[ABC]级", question) and any(term in question for term in ("做法", "品牌", "供应商")):
@@ -246,7 +272,20 @@ def _query_type(question: str, aggregation: list[str], comparison: list[str]) ->
     return "MULTI_FACT" if "、" in question or "和" in question else "SOURCE_LOOKUP"
 
 
+def definition_target(question: str) -> str:
+    text = question.strip().rstrip('？?。 ').removeprefix('请问')
+    match = re.fullmatch(r'(.{2,30})的(?:定义|含义|概念)(?:是什么)?|什么是(.{2,30})|([^的，,、；;]{2,20})是什么', text)
+    target = next((part for part in match.groups() if part), '') if match else ''
+    if any(term in target for term in ('金额', '日期', '型号', '品牌', '数量', '负责人', '分值', '评分', '做法', 'A级', 'B级', 'C级', '项目中')):
+        return ''
+    return target.strip()
+
+
 def _document_hints(question: str, query_type: str) -> tuple[list[str], list[str]]:
+    if query_type == "MEETING_PARTICIPANTS":
+        return ["MEETING_MINUTES"], ["会议纪要"]
+    if query_type == "PROJECT_FACT_APPLICABILITY":
+        return ["PROJECT_CASE", "RETROSPECTIVE"], ["项目案例"]
     if "责任状" in question:
         return ["RESPONSIBILITY_CONTRACT"], ["责任文件"]
     if "任务书" in question:
@@ -266,7 +305,13 @@ def _document_hints(question: str, query_type: str) -> tuple[list[str], list[str
     return [], []
 
 
+def _response_constraints(question: str) -> list[str]:
+    return [part.strip() for part in re.split(r"[；;]", question)[1:] if any(term in part for term in ("不得写成", "不要填写", "无需填写")) and not any(term in part for term in ("？", "?", "是否", "为什么", "怎么", "如何", "哪些", "多少"))]
+
+
 def _subquestions(question: str, aggregation: list[str], entities: list[str]) -> list[str]:
+    if _query_type(question, aggregation, []) == "MEETING_PARTICIPANTS":
+        return [question]
     values = []
     task_book_count = "任务书" in question and any(marker in question for marker in ("多少个项目", "收录多少", "收录了多少"))
     task_book_coverage = "任务书" in question and "覆盖" in question and any(marker in question for marker in ("业态", "专业"))
@@ -277,6 +322,8 @@ def _subquestions(question: str, aggregation: list[str], entities: list[str]) ->
     if task_book_count or task_book_coverage:
         return values
     clauses = [value.strip() for value in re.split(r"[？?；;]+", question) if value.strip()]
+    constraints = set(_response_constraints(question))
+    clauses = [clause for clause in clauses if clause not in constraints]
     if len(clauses) > 1:
         return clauses
     if re.search(r"(?:哪|哪些)\s*[0-9一二三四五六七八九十]+\s*(?:个|项|条|步|维度|方面)", question):

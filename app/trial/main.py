@@ -594,7 +594,11 @@ def approved_source_rows(
 
 
 def current_readiness() -> dict[str, Any]:
-    return {**_readiness, "service_ready": _pipeline is not None}
+    from . import v2
+    from .runtime_readiness import describe_primary_runtime
+
+    runtime = describe_primary_runtime(v2._primary_mode(), bool(_readiness.get("ready")), v1_initialized=_pipeline is not None, candidate=getattr(v2, "_candidate_primary_engine", None), dense=getattr(v2, "_candidate_primary_dense", None), expected_candidate_hash=v2._current_candidate_hash())
+    return {**_readiness, **runtime}
 
 
 def root_label(root_id: str | None) -> dict[str, str]:
@@ -1088,7 +1092,8 @@ def v2_trial_home() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"service": "AI设计管理知识库 V1.0 Internal Trial", "status": "ok", "readiness": current_readiness()}
+    readiness = current_readiness()
+    return {"service": "AI设计管理知识库 V1.0 Internal Trial", "status": "ok" if readiness["service_ready"] else "not_ready", "service_ready": readiness["service_ready"], "runtime_mode": readiness["runtime_mode"], "candidate_hash": readiness["candidate_hash"], "readiness": readiness}
 
 
 @app.get("/api/readiness")

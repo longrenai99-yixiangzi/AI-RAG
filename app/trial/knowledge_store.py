@@ -312,20 +312,41 @@ class TrialKnowledgeStore:
         applicability: str = "",
         node_id: str = "",
         activate: bool = True,
+        resolution_kind: str = "",
     ) -> tuple[dict[str, Any], dict[str, Any] | None]:
         def action(state: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any] | None]:
             feedback = state["feedback"].get(feedback_id)
             if feedback is None:
                 raise KeyError(feedback_id)
+            review_terms = required_terms
             if decision == "APPROVE" and feedback.get("system_fix_required"):
-                raise ValueError("SYSTEM_DEFECT_CANNOT_PUBLISH_AS_STANDARD_ANSWER")
-            feedback.update({"status": {"APPROVE": "APPROVED", "REJECT": "REJECTED", "DEFER": "DEFERRED"}.get(decision, "RECORDED"), "reviewer": reviewer, "reviewed_at": _now(), "source_id": source_id or feedback.get("source_id", ""), "source_location": location or feedback.get("source_location", ""), "required_terms": required_terms or feedback.get("required_terms", []), "updated_at": _now()})
+                if resolution_kind != "SOURCE_SUPPLEMENT" or feedback.get("failure_code") != "EVIDENCE_INSUFFICIENT":
+                    raise ValueError("SYSTEM_DEFECT_CANNOT_PUBLISH_AS_STANDARD_ANSWER")
+            if decision == "APPROVE" and resolution_kind == "SOURCE_SUPPLEMENT":
+                if feedback.get("failure_code") != "EVIDENCE_INSUFFICIENT":
+                    raise ValueError("SYSTEM_DEFECT_CANNOT_PUBLISH_AS_STANDARD_ANSWER")
+                source = state["sources"].get(source_id, {})
+                path = Path(str(source.get("source_path") or ""))
+                original_path = feedback.get("original_source_path") or feedback.get("source_path") or ""
+                if not path.is_file() or normalize_source_path(path).casefold() == normalize_source_path(original_path).casefold() or source.get("index_status") != "INDEXED" or source.get("current_hash") != source_hash(path):
+                    raise ValueError("SUPPLEMENT_REQUIRES_NEW_VERIFIED_SOURCE")
+                from app.ingestion.atomic_evidence import build_atomic_evidence
+                parsed = build_atomic_evidence(path, path.parent)
+                body = " ".join(str(row.get("raw_text") or row.get("text") or "") for row in parsed.get("records") or [])
+                expected = str(feedback.get("expected_answer") or "").strip()
+                terms = list(dict.fromkeys([*(feedback.get("required_terms") or []), *required_terms]))
+                if not expected or not terms or " ".join(expected.split()) not in " ".join(body.split()) or any(term not in body for term in terms):
+                    raise ValueError("SUPPLEMENT_DOES_NOT_SUPPORT_REVIEWED_ANSWER")
+                feedback.update({"original_system_fix_required": True, "original_source_path": original_path, "source_path": str(path), "system_fix_required": False, "standard_answer_required": True, "resolution_kind": resolution_kind, "resolution_source_version": source["current_hash"]})
+                state["events"].append({"event_id": "EV_" + uuid.uuid4().hex, "type": "FEEDBACK_REVIEWED_SOURCE_SUPPLEMENT", "feedback_id": feedback_id, "reviewer": reviewer, "source_id": source_id, "source_version": source["current_hash"], "original_failure_code": feedback.get("failure_code"), "at": _now()})
+                review_terms = terms
+            feedback.update({"status": {"APPROVE": "APPROVED", "REJECT": "REJECTED", "DEFER": "DEFERRED"}.get(decision, "RECORDED"), "reviewer": reviewer, "reviewed_at": _now(), "source_id": source_id or feedback.get("source_id", ""), "source_location": location or feedback.get("source_location", ""), "required_terms": review_terms or feedback.get("required_terms", []), "updated_at": _now()})
             knowledge = None
             if decision == "APPROVE" and feedback.get("expected_answer") and feedback.get("source_id"):
                 knowledge_id = "KN_" + uuid.uuid5(uuid.NAMESPACE_URL, feedback_id).hex[:20]
                 source = state["sources"].get(feedback["source_id"], {})
                 content = str(feedback["expected_answer"]).strip()
-                facts = required_terms or [sentence.strip() for sentence in content.split("。") if sentence.strip()]
+                facts = review_terms or [sentence.strip() for sentence in content.split("。") if sentence.strip()]
                 standard = standard_question.strip() or str(feedback.get("standard_question") or feedback.get("question") or "").strip()
                 similar = list(dict.fromkeys(similar_questions or feedback.get("similar_questions") or []))
                 negative = list(dict.fromkeys(negative_questions or feedback.get("negative_questions") or []))

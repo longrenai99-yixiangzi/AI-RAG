@@ -443,18 +443,22 @@ class DocumentIntelligenceV2Builder:
         if loaded.status != "parsed":
             return result
         paragraphs = loaded.paragraphs
-        heading_specs = [
-            (int(item["paragraph_number"]), level, clean_text(item["text"]))
-            for item in paragraphs
-            if (level := _heading_level(str(item.get("style") or ""))) is not None
-        ]
+        def heading_level(item):
+            text = clean_text(item["text"])
+            # Legacy Word/WPS minutes often use plain styled paragraphs for headings.
+            if re.fullmatch(r"[一二三四五六七八九十]+、.{2,80}", text):
+                return 1
+            if re.fullmatch(r"[（(]\d+[）)].{2,40}", text):
+                return 2
+            return _heading_level(str(item.get("style") or ""))
+        heading_specs = [(int(item["paragraph_number"]), level, clean_text(item["text"])) for item in paragraphs if (level := heading_level(item)) is not None]
         max_location = max((int(item["paragraph_number"]) for item in paragraphs), default=1)
         headings, sections = _make_heading_sections(did, heading_specs, max_location, "wps")
         result["headings"], result["sections"] = headings, sections
         for item in paragraphs:
             index = int(item["paragraph_number"])
             text = clean_text(item["text"])
-            if not text or _heading_level(str(item.get("style") or "")) is not None:
+            if not text or heading_level(item) is not None:
                 continue
             section = _section_for_location(sections, index)
             result["paragraphs"].append({

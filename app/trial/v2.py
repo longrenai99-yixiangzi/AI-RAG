@@ -111,6 +111,7 @@ class ReviewedFeedbackRequest(BaseModel):
     negative_questions: list[str] = Field(default_factory=list)
     applicability: str = ""
     node_id: str = ""
+    resolution_kind: str = ""
 
 
 class WithdrawKnowledgeRequest(BaseModel):
@@ -1054,6 +1055,8 @@ def _candidate_primary_answer(question: str) -> dict[str, Any]:
         if record and not citation.get("source_version"):
             citation["source_version"] = record.get("source_version")
         if record:
+            if (record.get("knowledge_card") or {}).get("primary_sources"):
+                citation["primary_sources"] = record["knowledge_card"]["primary_sources"]
             for key in ("source_id", "source_path", "file_name", "location"):
                 if not citation.get(key):
                     citation[key] = record.get(key)
@@ -1341,6 +1344,11 @@ def knowledge_overview() -> dict[str, Any]:
         "active_knowledge": len(_candidate_knowledge_items()) if _primary_mode() == V262_CANDIDATE_MODE else overview["active_knowledge"],
         "runtime_mode": _primary_mode(),
     })
+    if _primary_mode() == V262_CANDIDATE_MODE:
+        current = {item["knowledge_id"]: item for item in _candidate_knowledge_items()}
+        adopted = sum(_feedback_adopted_in_candidate(row, KNOWLEDGE_STORE.source(str(row.get("source_id") or "")), current) for row in KNOWLEDGE_STORE.list_feedback() if row.get("status") == "PENDING_CANDIDATE")
+        overview["local_pending_candidate_records"] = overview["pending_candidate_knowledge"]
+        overview["pending_candidate_knowledge"] = max(0, overview["pending_candidate_knowledge"] - adopted)
     return overview
 
 
@@ -1563,13 +1571,21 @@ def knowledge_diagnostic_defects(offset: int = 0, limit: int = 50) -> dict[str, 
     return {"items": rows[start:start + size], "total": len(rows), "offset": start, "limit": size}
 
 
+def _feedback_adopted_in_candidate(feedback: dict[str, Any], source: dict[str, Any] | None, current: dict[str, dict[str, Any]]) -> bool:
+    adopted = current.get(str(feedback.get("knowledge_id") or ""))
+    return bool(adopted and source and not source.get("withdrawn") and adopted.get("source_version") == source.get("current_hash") and adopted.get("content") == feedback.get("expected_answer"))
+
+
 @router.get("/feedback-workflow")
 def feedback_workflow() -> dict[str, Any]:
     rows = []
+    current = {item["knowledge_id"]: item for item in _candidate_knowledge_items()} if _primary_mode() == V262_CANDIDATE_MODE else {}
     for feedback in KNOWLEDGE_STORE.list_feedback():
         source = KNOWLEDGE_STORE.source(str(feedback.get("source_id") or "")) if feedback.get("source_id") else None
         state = str(source.get("index_status")) if source else "SOURCE_CONFIRMATION_REQUIRED"
         closure = "PENDING_CANDIDATE" if _primary_mode() == V262_CANDIDATE_MODE and feedback.get("status") == "ACTIVE" else "ACTIVE" if feedback.get("status") == "ACTIVE" else "SOURCE_CLOSURE_REQUIRED" if feedback.get("status") == "APPROVED" and state != "INDEXED" else str(feedback.get("status") or "RECORDED")
+        if closure == "PENDING_CANDIDATE" and _feedback_adopted_in_candidate(feedback, source, current):
+            closure = "ACTIVE_FROZEN_CANDIDATE"
         rows.append({**feedback, "source": source, "source_runtime_status": state, "closure_status": closure})
     return {"items": rows}
 
@@ -1594,10 +1610,12 @@ def review_feedback_workflow(feedback_id: str, request: ReviewedFeedbackRequest)
     _ensure_user(request.trial_user)
     if request.decision not in {"APPROVE", "REJECT", "DEFER"}:
         raise HTTPException(status_code=422, detail="INVALID_REVIEW_DECISION")
+    if request.resolution_kind not in {"", "SOURCE_SUPPLEMENT"}:
+        raise HTTPException(status_code=422, detail="INVALID_REVIEW_RESOLUTION")
     feedback = KNOWLEDGE_STORE.feedback(feedback_id)
     if feedback is None:
         raise HTTPException(status_code=404, detail="FEEDBACK_NOT_FOUND")
-    if request.decision == "APPROVE" and feedback.get("system_fix_required"):
+    if request.decision == "APPROVE" and feedback.get("system_fix_required") and not (request.resolution_kind == "SOURCE_SUPPLEMENT" and feedback.get("failure_code") == "EVIDENCE_INSUFFICIENT"):
         raise HTTPException(status_code=409, detail="SYSTEM_DEFECT_CANNOT_PUBLISH_AS_STANDARD_ANSWER")
     source_path = _normalize_source_path(request.source_path or str(feedback.get("source_path") or ""))
     if request.decision == "APPROVE" and not source_path:
@@ -1613,20 +1631,24 @@ def review_feedback_workflow(feedback_id: str, request: ReviewedFeedbackRequest)
         source = KNOWLEDGE_STORE.source(source_id) or source
         if source.get("index_status") != "INDEXED":
             return {"saved": True, "feedback": feedback, "source": source, "status": "SOURCE_INDEX_FAILED", "automatic_knowledge_publish": 0}
-    reviewed, knowledge = KNOWLEDGE_STORE.review_feedback(
-        feedback_id,
-        decision=request.decision,
-        source_id=source_id,
-        location=request.source_location.strip(),
-        required_terms=_clean_terms(request.required_terms),
-        reviewer=request.trial_user,
-        standard_question=request.standard_question,
-        similar_questions=[item.strip() for item in request.similar_questions if item.strip()],
-        negative_questions=[item.strip() for item in request.negative_questions if item.strip()],
-        applicability=request.applicability,
-        node_id=request.node_id,
-        activate=_primary_mode() != V262_CANDIDATE_MODE,
-    )
+    try:
+        reviewed, knowledge = KNOWLEDGE_STORE.review_feedback(
+            feedback_id,
+            decision=request.decision,
+            source_id=source_id,
+            location=request.source_location.strip(),
+            required_terms=_clean_terms(request.required_terms),
+            reviewer=request.trial_user,
+            standard_question=request.standard_question,
+            similar_questions=[item.strip() for item in request.similar_questions if item.strip()],
+            negative_questions=[item.strip() for item in request.negative_questions if item.strip()],
+            applicability=request.applicability,
+            node_id=request.node_id,
+            activate=_primary_mode() != V262_CANDIDATE_MODE,
+            resolution_kind=request.resolution_kind or str(feedback.get("resolution_kind") or ""),
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     if knowledge and _primary_mode() != V262_CANDIDATE_MODE:
         reset_trial_engine()
     return {"saved": True, "feedback": reviewed, "knowledge": knowledge, "source": KNOWLEDGE_STORE.source(source_id) if source_id else None, "automatic_knowledge_publish": 0}

@@ -1,7 +1,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
-type Citation = { citation_id: string; evidence_id?: string; source_id?: string; source_version?: string; file_name?: string; source_path?: string; display_location?: string; excerpt?: string; location?: Record<string, unknown> }
+type Citation = { citation_id: string; evidence_id?: string; source_id?: string; source_version?: string; file_name?: string; source_path?: string; display_location?: string; excerpt?: string; location?: Record<string, unknown>; primary_sources?: { source_path: string; sha256?: string; location?: string; page?: number }[] }
 type Claim = { claim_id: string; rendered_claim_text: string; claim_type: string }
 type ReviewCandidate = Citation & { role?: string; scope?: Record<string, string> }
 type V2Result = { query_id: string; query_run_id: string; question: string; resolved_question?: string; answer: string; answer_status: string; status_label: string; citations: Citation[]; claims: Claim[]; growth_candidate_ids: string[]; latency: { total_ms: number }; failure_reason?: string; failure_message?: string; review_candidates?: ReviewCandidate[]; debug: unknown }
@@ -52,6 +52,7 @@ const QUESTION_DRAFT_KEY = 'v2_trial_ai_chat_draft'
 const FEEDBACK_DRAFT_KEY = 'v2_trial_feedback_draft_'
 const PERSISTED_MESSAGE_LIMIT = 20
 const workflowLabel: Record<string, string> = {
+  ACTIVE_FROZEN_CANDIDATE: '当前候选已采用',
   RECORDED: '已记录，待核对',
   APPROVED: '来源已确认，待生效',
   ACTIVE: '更正已生效',
@@ -323,7 +324,7 @@ function AnswerCard({ message, onCitation, onFeedback, onRetry }: { message: Cha
       <label>必须出现的关键事实<input value={draft.required_terms} onChange={(event) => change({ required_terms: event.target.value })} placeholder="用逗号分隔" /></label>
       <details><summary>相似问、反例与适用范围</summary><label>标准问题<input value={draft.standard_question} onChange={(event) => change({ standard_question: event.target.value })} /></label><label>相似问<textarea value={draft.similar_questions} onChange={(event) => change({ similar_questions: event.target.value })} placeholder="一行一个或逗号分隔" /></label><label>容易误套的反例<textarea value={draft.negative_questions} onChange={(event) => change({ negative_questions: event.target.value })} /></label><label>适用范围<textarea value={draft.applicability} onChange={(event) => change({ applicability: event.target.value })} placeholder="主体、时间、条件、必设/选设边界" /></label></details>
       <button className="primary-button" type="submit" disabled={submitting}>{submitting ? '正在提交…' : '保存更正并进入核对'}</button>
-      <small>保存不等于生效；核对来源并发布到试用知识后，普通问答才会使用。</small>
+      <small>保存后须审核来源；冻结候选还需纳入新版本，才能被当前主答采用。</small>
     </form></details><details><summary>查看检索诊断</summary><pre>{JSON.stringify(result.debug, null, 2)}</pre></details></footer>
   </article>
 }
@@ -339,9 +340,10 @@ function WorkflowItem({ item, onRefresh }: { item: Workflow; onRefresh: () => Pr
   const [terms, setTerms] = useState(Array.isArray(item.required_terms) ? item.required_terms.join('、') : String(item.required_terms || ''))
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
+  const [sourceSupplement, setSourceSupplement] = useState(false)
   async function review(decision: 'APPROVE' | 'REJECT' | 'DEFER') {
     setBusy(true)
-    const response = await fetch(`/api/v2/feedback-workflow/${item.feedback_id}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trial_user: 'reviewer-001', decision, source_path: sourcePath, source_location: sourceLocation, required_terms: splitTerms(terms), standard_question: item.standard_question || item.question, similar_questions: item.similar_questions || [], negative_questions: item.negative_questions || [], applicability: item.applicability || '' }) })
+    const response = await fetch(`/api/v2/feedback-workflow/${item.feedback_id}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trial_user: 'reviewer-001', decision, resolution_kind: sourceSupplement ? 'SOURCE_SUPPLEMENT' : '', source_path: sourcePath, source_location: sourceLocation, required_terms: splitTerms(terms), standard_question: item.standard_question || item.question, similar_questions: item.similar_questions || [], negative_questions: item.negative_questions || [], applicability: item.applicability || '' }) })
     const payload = await response.json()
     setNotice(response.ok ? payload.status === 'SOURCE_INDEX_FAILED' ? '来源解析或索引失败，请查看知识资产中的原因。' : decision === 'APPROVE' ? payload.knowledge?.status === 'PENDING_CANDIDATE' ? '已审核，待纳入下一版候选；当前主答尚未采用。' : '已核对并发布到试用知识。' : decision === 'REJECT' ? '已驳回。' : '已暂缓。' : (payload.detail || '操作失败。'))
     setBusy(false)
@@ -373,13 +375,13 @@ function WorkflowItem({ item, onRefresh }: { item: Workflow; onRefresh: () => Pr
     if (response.ok) await onRefresh()
   }
   const reviewed = ['ACTIVE', 'PENDING_CANDIDATE'].includes(item.status)
-  return <article className="closure-item"><b>{item.feedback_type} · {workflowLabel[item.closure_status] || workflowLabel[item.status] || item.closure_status}</b><p>{item.question}</p>{item.failure_code && <small>{item.failure_stage || '待分类'} · {item.failure_code}：{item.root_cause}</small>}{item.system_fix_required && <p>已进入 RAG 系统缺陷池，不能发布为标准答案。</p>}{!item.system_fix_required && !reviewed && !['REJECTED', 'DEFERRED', 'WITHDRAWN'].includes(item.status) && <><input value={sourcePath} onChange={(event) => setSourcePath(event.target.value)} placeholder="来源文件路径" /><input value={sourceLocation} onChange={(event) => setSourceLocation(event.target.value)} placeholder="页码、段落或Sheet" /><input value={terms} onChange={(event) => setTerms(event.target.value)} placeholder="关键事实，逗号分隔" /><div><button disabled={busy} onClick={() => void review('APPROVE')}>核对并发布</button><button disabled={busy} onClick={() => void review('DEFER')}>暂缓</button><button disabled={busy} onClick={() => void review('REJECT')}>驳回</button></div></>}{reviewed && <div><button disabled={busy} onClick={() => void regress()}>运行当前主答回归</button><button disabled={busy} onClick={() => void withdraw()}>撤回更正知识</button></div>}{item.status === 'WITHDRAWN' && <div><button disabled={busy} onClick={() => void rollback()}>回滚到首次审核版本</button></div>}{notice && <small>{notice}</small>}</article>
+  return <article className="closure-item"><b>{item.feedback_type} · {workflowLabel[item.closure_status] || workflowLabel[item.status] || item.closure_status}</b><p>{item.question}</p>{item.failure_code && <small>{item.failure_stage || '待分类'} · {item.failure_code}：{item.root_cause}</small>}{item.system_fix_required && <p>该记录需核对处理原因；系统故障进入缺陷修复，资料缺口须有新的补充来源。</p>}{item.system_fix_required && item.failure_code === 'EVIDENCE_INSUFFICIENT' && !reviewed && <label><input type="checkbox" checked={sourceSupplement} onChange={(event) => setSourceSupplement(event.target.checked)} />已确认是资料缺口，审核补充来源（须完整包含已确认内容）</label>}{(!item.system_fix_required || (item.failure_code === 'EVIDENCE_INSUFFICIENT' && sourceSupplement)) && !reviewed && !['REJECTED', 'DEFERRED', 'WITHDRAWN'].includes(item.status) && <><input value={sourcePath} onChange={(event) => setSourcePath(event.target.value)} placeholder="来源文件路径" /><input value={sourceLocation} onChange={(event) => setSourceLocation(event.target.value)} placeholder="页码、段落或Sheet" /><input value={terms} onChange={(event) => setTerms(event.target.value)} placeholder="关键事实，逗号分隔" /><div><button disabled={busy} onClick={() => void review('APPROVE')}>{sourceSupplement ? '审核补充来源' : '核对并审核'}</button><button disabled={busy} onClick={() => void review('DEFER')}>暂缓</button><button disabled={busy} onClick={() => void review('REJECT')}>驳回</button></div></>}{reviewed && <div><button disabled={busy} onClick={() => void regress()}>运行当前主答回归</button><button disabled={busy} onClick={() => void withdraw()}>撤回更正知识</button></div>}{item.status === 'WITHDRAWN' && <div><button disabled={busy} onClick={() => void rollback()}>回滚到首次审核版本</button></div>}{notice && <small>{notice}</small>}</article>
 }
 
 function SourceDetail({ citation }: { citation: Citation }) {
   const ext = citation.file_name?.split('.').pop()?.toUpperCase() || '文件'
   const sourceLink = citation.source_id && citation.evidence_id ? `/sources?source_id=${encodeURIComponent(citation.source_id)}&evidence_id=${encodeURIComponent(citation.evidence_id)}&source_version=${encodeURIComponent(citation.source_version || '')}` : ''
-  return <div className="source-card"><b>{citation.file_name}</b><span>{ext} · {citation.display_location}</span><p>{citation.source_path}</p><small>{citation.source_id || '来源ID待补'} · 版本 {(citation.source_version || '待核实').slice(0, 12)}</small>{sourceLink && <a href={sourceLink}>查看当前主答中的这条来源证据</a>}<h3>原文证据</h3><div className="evidence-text">{citation.excerpt || '当前引用未提供可展开的原文。'}</div></div>
+  return <div className="source-card"><b>{citation.file_name}</b><span>{ext} · {citation.display_location}</span><p>{citation.source_path}</p><small>{citation.source_id || '来源ID待补'} · 版本 {(citation.source_version || '待核实').slice(0, 12)}</small>{sourceLink && <a href={sourceLink}>查看当前主答中的这条来源证据</a>}{citation.primary_sources?.map((source) => <small key={source.source_path}>原始资料：{source.source_path.split(/[\\/]/).pop()} · {source.location || (source.page ? `第${source.page}页` : '位置待核')} · 版本 {(source.sha256 || '待核实').slice(0, 12)}</small>)}<h3>原文证据</h3><div className="evidence-text">{citation.excerpt || '当前引用未提供可展开的原文。'}</div></div>
 }
 
 function loadMessages(): ChatMessage[] {

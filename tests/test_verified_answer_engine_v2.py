@@ -2,6 +2,75 @@ from app.verified_answer_engine_v2 import _answer, _claim, _narrative_count_docu
 from app.retrieval.query_planner_v1 import plan_query
 
 
+def test_definition_query_requires_subject_definition_not_certification_reference():
+    from app.retrieval.query_planner_v1 import definition_target
+    from app.ingestion.atomic_search import definition_sentence
+    question='什么是合成建筑'
+    plan=plan_query(question)
+    assert plan.query_type=='DEFINITION_QUERY'
+    evidence=_evidence('DIRECT',text='认证依据：《合成空间评价标准》。')
+    bundle=_bundle('VERIFIED',[evidence],[{'subquestion_id':'SQ1','coverage_status':'COVERED'}],question=question)
+    bundle['query_plan']=plan.to_dict()
+    assert render(bundle)['answer_status']=='INSUFFICIENT_EVIDENCE'
+    text='合成建筑是指满足指定试验条件的测试建筑。'
+    evidence.update(text=text,raw_text=text)
+    answer=render(bundle)
+    assert answer['answer_status']=='ANSWERED' and text in answer['answer_text']
+    assert definition_target('合成建筑的定义是什么？')=='合成建筑'
+    assert not definition_target('某项目的实际金额是什么？')
+    assert not definition_sentence('全阶段合成建筑是指另一个范围的测试建筑。','合成建筑')
+    assert not definition_sentence('合成空间是指另一种对象。','合成建筑')
+
+
+def test_approved_method_body_is_complete_and_not_used_for_project_or_numeric_facts():
+    import hashlib
+    from app.ingestion.atomic_search import reviewed_method_card_matches
+    question = '设计复核清单应包含哪些内容？'
+    body = '## 输入核对\n核对输入版本。\n\n| 项目 | 方法 |\n|---|---|\n| 完整性 | 对照成果目录 |\n| 复核 | 对照修改记录 |\n\n例外：缺资料不得认定合格。'
+    evidence = _evidence('DIRECT', text=body)
+    evidence.update(raw_text=body, source_version='sha-approved', knowledge_card={'approval_status':'OWNER_CONFIRMED','response_format':'METHOD_GUIDE','topic_terms':['设计复核'],'approved_content_sha256':hashlib.sha256(body.encode()).hexdigest()})
+    plan = plan_query(question)
+    bundle = _bundle('VERIFIED',[evidence],[{'subquestion_id':'SQ1','coverage_status':'COVERED'}],question=question)
+    bundle['query_plan']=plan.to_dict()
+    answer=render(bundle)
+    assert answer['answer_status']=='ANSWERED' and '缺资料不得认定合格' in answer['answer_text'] and '| 完整性 |' in answer['answer_text']
+    assert not reviewed_method_card_matches(evidence,question,{**plan.to_dict(),'project':['合成项目']})
+    assert not reviewed_method_card_matches(evidence,'设计复核清单有多少条？',plan_query('设计复核清单有多少条？').to_dict())
+    assert not reviewed_method_card_matches(evidence,'请给设计复核清单，实际费用是多少？',plan_query('请给设计复核清单，实际费用是多少？').to_dict())
+    assert not reviewed_method_card_matches({**evidence,'raw_text':body+'未核内容'},question,plan.to_dict())
+    assert not reviewed_method_card_matches({**evidence,'knowledge_card':{**evidence['knowledge_card'],'approval_status':'PENDING'}},question,plan.to_dict())
+    extra_question = '设计复核清单应包含哪些内容？请给检查要点。'
+    extra_body = body.replace('| 项目 | 方法 |', '| 复核项 | 方法 |')
+    evidence.update(text=extra_body,raw_text=extra_body,knowledge_card={**evidence['knowledge_card'],'approved_content_sha256':hashlib.sha256(extra_body.encode()).hexdigest()})
+    bundle['question']=extra_question;bundle['query_plan']=plan_query(extra_question).to_dict()
+    assert render(bundle)['answer_status']=='ANSWERED'
+
+
+def test_method_instructions_are_not_project_names_or_missing_facts():
+    plan=plan_query('厂房项目施工图设计任务书应包含哪些内容？请列骨架，不填项目日期和金额。')
+    assert plan.project==[]
+    plan=plan_query('方案比选依据表应记录哪些内容？请列审批和入图核验；项目计划和估算不得写成已实现成果。')
+    assert len(plan.subquestions)==2
+    assert plan.scope_constraints['response_constraints']==['项目计划和估算不得写成已实现成果。']
+    assert '甲校区项目' in plan_query('甲校区项目的图纸审查意见多少条？').project
+    assert len(plan_query('方案比选依据表包含什么？哪些估算不得写成实际成果？').subquestions)==2
+
+
+def test_project_fact_transfer_keeps_applicability_intent_instead_of_echoing_amount():
+    question = "甲方校区的图审总数能否直接采用乙方厂房的8条，风险金额用9万元？"
+    plan = plan_query(question)
+    assert plan.query_type == "PROJECT_FACT_APPLICABILITY"
+    assert plan.scope_constraints['project_fact_transfer'] == ['甲方校区', '乙方厂房']
+    evidence = _evidence('DIRECT', text='某项目金额9万元。')
+    bundle = _bundle('VERIFIED', [evidence], [{'subquestion_id': 'SQ1', 'coverage_status': 'COVERED'}], question=question)
+    bundle['query_plan'] = plan.to_dict()
+    answer = render(bundle)
+    assert answer['answer_status'] == 'INSUFFICIENT_EVIDENCE'
+    assert '不能直接' in answer['answer_text'] and '金额为' not in answer['answer_text']
+    assert not plan_query('甲方校区的图审总数能否直接采用甲方校区的8条？').scope_constraints.get('project_fact_transfer')
+    assert not plan_query('两项目的图审数量分别是多少？').scope_constraints.get('project_fact_transfer')
+
+
 def test_parallel_fact_split_preserves_named_project_entities():
     single_fact = plan_query("EPC项目清单台账中，宜昌市协和医院项目的结算上限如何约定？")
     assert single_fact.entities == ["宜昌市协和医院项目"]

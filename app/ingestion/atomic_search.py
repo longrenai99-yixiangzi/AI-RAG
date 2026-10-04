@@ -1,11 +1,97 @@
 from __future__ import annotations
 
 import math
+import hashlib
 import re
 from functools import lru_cache
 from typing import Any, Iterable
 
 from app.bm25 import tokenize
+
+
+def reviewed_method_card_matches(candidate: dict[str, Any], question: str, plan: dict[str, Any]) -> bool:
+    card = candidate.get("knowledge_card") or {}
+    body = str(candidate.get("raw_text") or candidate.get("text") or "")
+    if card.get("approval_status") != "OWNER_CONFIRMED" or card.get("response_format") != "METHOD_GUIDE" or not candidate.get("source_version"):
+        return False
+    if card.get("approved_content_sha256") != hashlib.sha256(body.encode("utf-8")).hexdigest():
+        return False
+    if plan.get("project") or plan.get("year") or any(op in plan.get("aggregation_plan", []) for op in ("COUNT", "SUM", "MAX", "MIN")):
+        return False
+    if re.search(r"(?:金额|费用|造价|面积|比例|评分|分值|日期|时间|工期).{0,12}(?:是多少|为多少|多少|几[分天])|(?:哪种|哪一个).{0,8}(?:最优|最好|更好)|(?:何时|哪天|谁)(?:批准|审批|完成)", question):
+        return False
+    return any(term in question for term in card.get("topic_terms") or []) and any(term in question for term in ("骨架", "要点", "目录", "清单", "依据表", "复核", "编制", "应包含", "包含哪些内容", "包括哪些内容"))
+
+
+def reviewed_fact_rows(candidate: dict[str, Any], question: str, plan: dict[str, Any]) -> list[str]:
+    card = candidate.get("knowledge_card") or {}
+    body = str(candidate.get("raw_text") or candidate.get("text") or "")
+    if card.get("response_format") != "VERIFIED_FACT_SHEET" or card.get("approval_status") != "OWNER_CONFIRMED" or not candidate.get("source_version"):
+        return []
+    if hashlib.sha256(body.encode("utf-8")).hexdigest() != card.get("approved_content_sha256"):
+        return []
+    if any(term in question for term in ("能否直接", "是否直接", "可以直接", "套用", "断定同口径")):
+        return []
+    if card.get("project_terms") and plan.get("project") and not all(any(term in name for term in card["project_terms"]) for name in plan["project"]):
+        return []
+    if card.get("project_terms") and not any(term in question for term in card["project_terms"]):
+        return []
+    years = list(plan.get("year") or [])
+    if not card.get("year") and years and not all(year + "年" in body for year in years):
+        return []
+    if card.get("year") and ((years and years != [str(card["year"])]) or (not years and not card.get("project_terms")) or plan.get("period") not in {"", card.get("period")}):
+        return []
+    if plan.get("organization") and not all(value in body for value in plan["organization"]):
+        return []
+    rows = [row["text"] for row in card.get("fact_rows") or [] if any(term in question for term in row.get("topic_terms") or [])]
+    return rows if rows and all(text in body for text in rows) else []
+
+
+def reviewed_fact_missing(candidate: dict[str, Any], question: str, plan: dict[str, Any]) -> list[str]:
+    """A matching topic does not prove that all requested facts are supported."""
+    rows = reviewed_fact_rows(candidate, question, plan)
+    if not rows:
+        return [question]
+    card = candidate.get("knowledge_card") or {}
+    supported = " ".join(rows + [str(term) for row in card.get("fact_rows") or [] for term in row.get("topic_terms") or []])
+    clauses = list(plan.get("subquestions") or []) if len(plan.get("subquestions") or []) > 1 else []
+    if not clauses:
+        clauses = [part for part in re.split(r"[，,；;？?]|以及|同时|并(?:请|且)?|(?<=[\u3400-\u9fff])(?:和|及|与)(?=[\u3400-\u9fff])", question) if part.strip()]
+    aliases = {"金额": ("万元", "亿元", "元"), "收益": ("节约", "创效", "工期"), "上限": ("最高", "上限"), "赔偿": ("赔偿", "赔付", "元"), "次数": ("次",), "形式": ("固定总价", "价格形式")}
+    ignored = {"多少", "哪些", "什么", "是什么", "是否", "分别", "其中", "项目", "预计", "预估", "怎样", "调整", "各", "多少万元", "万元", "元", "万平方米", "平方米", "记载", "总结", "合同", "暂定", "最高", "各部门", "单位", "参加", "参与", "参会"}
+    missing = []
+    for clause in clauses:
+        # Keep property words, while removing the project context and question verbs.
+        clean = clause
+        for project in plan.get("project") or []:
+            clean = clean.replace(project, "")
+        # A currency unit alone cannot support a different qualified measurement.
+        qualified = re.findall(r"([\u3400-\u9fff]{2})(?:金额|面积|用量|人数|高度|长度|数量)", clean)
+        if any(prefix not in supported and prefix not in {"预计", "预估", "估算", "合计", "各自"} for prefix in qualified):
+            missing.append(clause)
+            continue
+        terms = [term for term in query_terms(clean) if term not in ignored and not any(term in value for value in card.get("project_terms") or []) and not term.isdigit()]
+        hits = [term for term in terms if term in supported or any(alias in supported for alias in aliases.get(term, ()))]
+        if terms and not hits:
+            missing.append(clause)
+    return missing
+
+
+def cross_period_comparison(question: str) -> bool:
+    return bool(re.search(r"(?:能否|是否|可否|断定|直接).{0,100}(?:同口径|增长|增量|同比|相减)", question) and any(term in question for term in ("上半年", "半年")) and any(term in question for term in ("全年", "年度")) and len(set(re.findall(r"20\d{2}", question))) >= 2)
+
+
+def definition_sentence(text: str, target: str) -> str:
+    if not target:
+        return ''
+    subject = r'\s*'.join(re.escape(char) for char in target)
+    match = re.search(r'(?<![\u3400-\u9fffA-Za-z0-9])' + subject + r'\s*(?:是\s*指|指\s*的\s*是|定义\s*为|是)([^。；;]{5,500})[。；;]?', text)
+    if not match:
+        return ''
+    sentence = ''.join(match.group(0).split())
+    if '《' in sentence or '认证依据' in sentence or '采用标准' in sentence:
+        return ''
+    return sentence.rstrip('；;') + ('' if sentence.endswith('。') else '。')
 
 
 COMMON_TERMS = {

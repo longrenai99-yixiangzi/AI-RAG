@@ -17,7 +17,7 @@ from .knowledge_store import normalize_source_path
 from rank_bm25 import BM25Okapi
 
 from app.bm25 import tokenize
-from app.ingestion.atomic_search import query_terms, scoring_target_phrase, search_atomic_evidence
+from app.ingestion.atomic_search import query_terms, scoring_target_phrase, search_atomic_evidence, reviewed_fact_rows
 from app.retrieval.query_planner_v1 import plan_query
 from app.verified_answer_engine_v2 import render, validate
 from scripts.build_verified_evidence_bundle_v1 import _link_only
@@ -641,6 +641,10 @@ def _referenced_knowledge_card_candidates(question: str, chunks: list[dict[str, 
         card_id = str(card.get("id") or "")
         if card.get("approval_status") != "OWNER_CONFIRMED" or not card_id:
             continue
+        record = atomic.get(str(chunk.get("chunk_id") or ""))
+        if record and reviewed_fact_rows(record, question, plan_query(question).to_dict()):
+            rows.append(_candidate_row(record, len(rows) + 1, "OWNER_VERIFIED_FACT_SHEET_SCOPE"))
+            continue
         if not re.search(r"(?<![A-Za-z0-9_-])" + re.escape(card_id) + r"(?![A-Za-z0-9_-])", question, re.I):
             continue
         record = atomic.get(str(chunk.get("chunk_id") or ""))
@@ -736,6 +740,7 @@ class V25LiveShadow:
                 "text": chunk.get("raw_text") or chunk.get("retrieval_text") or "",
                 "raw_text": chunk.get("raw_text") or chunk.get("retrieval_text") or "",
                 "search_context": chunk.get("retrieval_text") or "",
+                "knowledge_card": chunk.get("knowledge_card") or {},
                 "lineage_status": "LINEAGE_CONFIRMED",
             }
             for chunk in self.chunks

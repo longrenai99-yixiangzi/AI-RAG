@@ -1,11 +1,68 @@
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 import app.trial.v2 as v2
 import app.trial.batch as batch
 from app.trial.knowledge_store import TrialKnowledgeStore, source_id_for_path
 from app.trial.live_shadow_v25 import _referenced_knowledge_card_candidates, _filter_retired_source_versions, _chunk_source_location, V25LiveShadow
+
+
+def test_reviewed_source_supplement_requires_new_complete_body_and_stays_pending(tmp_path, monkeypatch):
+    store = TrialKnowledgeStore(tmp_path / "state.json")
+    old = tmp_path / "original.md"
+    old.write_text("# 项目案例\n\n部门甲意见3条；部门乙意见5条。", encoding="utf-8")
+    expected = "合成项目审查意见按已确认分项推导合计8条。"
+    fb, _ = store.record_feedback({"question": "合成项目意见共几条", "source_path": str(old), "expected_answer": expected, "required_terms": ["8"], "failure_code": "EVIDENCE_INSUFFICIENT", "system_fix_required": True}, "supplement")
+    monkeypatch.setattr(v2, "KNOWLEDGE_STORE", store)
+    monkeypatch.setattr(v2, "_primary_mode", lambda: v2.V262_CANDIDATE_MODE)
+    monkeypatch.setattr(v2, "_runtime_evidence_records", lambda: [])
+    with pytest.raises(v2.HTTPException) as error:
+        v2.review_feedback_workflow(fb["feedback_id"], v2.ReviewedFeedbackRequest(decision="APPROVE", source_path=str(old)))
+    assert error.value.status_code == 409
+    with pytest.raises(v2.HTTPException, match="SUPPLEMENT_REQUIRES_NEW_VERIFIED_SOURCE"):
+        v2.review_feedback_workflow(fb["feedback_id"], v2.ReviewedFeedbackRequest(decision="APPROVE", source_path=str(old), resolution_kind="SOURCE_SUPPLEMENT"))
+    supplement = tmp_path / "reviewed.md"
+    supplement.write_text("# 仅有关联信息\n\n没有已审核的完整合计依据。", encoding="utf-8")
+    with pytest.raises(v2.HTTPException, match="SUPPLEMENT_DOES_NOT_SUPPORT_REVIEWED_ANSWER"):
+        v2.review_feedback_workflow(fb["feedback_id"], v2.ReviewedFeedbackRequest(decision="APPROVE", source_path=str(supplement), resolution_kind="SOURCE_SUPPLEMENT"))
+    assert store.feedback(fb["feedback_id"])["system_fix_required"] is True
+    supplement.write_text("# Owner已核实\n\n" + expected, encoding="utf-8")
+    reviewed = v2.review_feedback_workflow(fb["feedback_id"], v2.ReviewedFeedbackRequest(decision="APPROVE", source_path=str(supplement), resolution_kind="SOURCE_SUPPLEMENT"))
+    assert reviewed["knowledge"]["status"] == "PENDING_CANDIDATE"
+    assert reviewed["knowledge"]["required_terms"] == ["8"]
+    assert reviewed["feedback"]["original_system_fix_required"] is True
+    assert reviewed["feedback"]["system_fix_required"] is False
+    assert reviewed["feedback"]["source_path"] == str(supplement)
+    assert reviewed["feedback"]["original_source_path"] == str(old)
+    assert store.active_knowledge() == []
+    monkeypatch.setattr(v2, "_candidate_knowledge_items", lambda: [])
+    assert next(r for r in v2.feedback_workflow()["items"] if r["feedback_id"] == fb["feedback_id"])["closure_status"] == "PENDING_CANDIDATE"
+    monkeypatch.setattr(v2, "_candidate_knowledge_items", lambda: [{"knowledge_id": reviewed["knowledge"]["knowledge_id"], "source_version": reviewed["knowledge"]["source_version"], "content": expected}])
+    assert next(r for r in v2.feedback_workflow()["items"] if r["feedback_id"] == fb["feedback_id"])["closure_status"] == "ACTIVE_FROZEN_CANDIDATE"
+    monkeypatch.setattr(v2, "_sync_trial_sources", lambda: None)
+    overview = v2.knowledge_overview()
+    assert overview['pending_candidate_knowledge'] == 0 and overview['local_pending_candidate_records'] == 1
+    supplement.write_text("# 已换版\n\n不同正文", encoding="utf-8")
+    store.register_source(supplement)
+    assert next(r for r in v2.feedback_workflow()["items"] if r["feedback_id"] == fb["feedback_id"])["closure_status"] != "ACTIVE_FROZEN_CANDIDATE"
+    defect, _ = store.record_feedback({"expected_answer": expected, "system_fix_required": True, "failure_code": "RECALL_MISS"}, "actual-system-defect")
+    with pytest.raises(ValueError, match="SYSTEM_DEFECT_CANNOT_PUBLISH_AS_STANDARD_ANSWER"):
+        store.review_feedback(defect["feedback_id"], decision="APPROVE", source_id=reviewed["source"]["source_id"], location="", required_terms=["8"], reviewer="owner", resolution_kind="SOURCE_SUPPLEMENT", activate=False)
+
+
+def test_review_count_prefers_verified_total_after_partial_source_and_keeps_derivation():
+    from app.verified_answer_engine_v2 import _review_count_claim
+    bundle = {"question": "合成项目图纸审查意见共提出多少条？", "verified_evidence": [{"evidence_id": "OLD", "raw_text": "图纸审查3条；图审单位5条。"}, {"evidence_id": "NEW", "raw_text": "审查意见按已确认分项推导合计8条，非原件印刷总计。"}]}
+    claim = _review_count_claim(bundle)
+    assert claim["evidence_ids"] == ["NEW"]
+    assert "推导" in claim["rendered_claim_text"] and "非原件印刷总计" in claim["rendered_claim_text"]
+    bundle["verified_evidence"] = bundle["verified_evidence"][:1]
+    assert _review_count_claim(bundle)["claim_type"] == "LIMITATION"
+    bundle["verified_evidence"].append({"evidence_id": "REVIEW", "raw_text": "图纸审查3条；图审单位5条；按已确认分项相加为8条，8是推导总数，非原件印刷总计。全部意见已回复和修改。"})
+    claim = _review_count_claim(bundle)
+    assert all(term in claim["rendered_claim_text"] for term in ['3', '5', '8', '推导', '回复', '修改'])
 
 
 def test_chunk_preserves_parsed_row_only_for_same_document_and_version():

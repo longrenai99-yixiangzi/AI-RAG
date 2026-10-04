@@ -8,7 +8,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from app.ingestion.atomic_search import query_terms, scoring_target_phrase
+from app.ingestion.atomic_search import query_terms, scoring_target_phrase, reviewed_method_card_matches, definition_sentence, reviewed_fact_rows, reviewed_fact_missing, cross_period_comparison
+from app.retrieval.query_planner_v1 import definition_target
 from app.ingestion.loaders.pdf_loader import extract_value_creation_rows, extract_value_creation_summary
 from app.ingestion.normalization.markdown_normalizer import strip_markdown_links
 
@@ -75,15 +76,38 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
         },
     }
     status = bundle["bundle_status"]
+    transfer = ((bundle.get("query_plan") or {}).get("scope_constraints") or {}).get("project_fact_transfer")
+    if cross_period_comparison(str(bundle.get("question") or "")):
+        return _refusal(bundle, "INSUFFICIENT_EVIDENCE", "不能直接把半年与全年的统计相减，或据此断定同口径增长；必须先统一统计期间、指标对象和计量单位。")
+    if transfer:
+        return _refusal(bundle, "INSUFFICIENT_EVIDENCE", f"不能直接把{transfer[1]}的项目统计量套用为{transfer[0]}的事实；需要目标项目同口径资料或明确的复核依据。")
     if status == "SOURCE_SCOPE_MISSING":
-        # Scope guard. Policy for this trial environment is "never refuse, always return
-        # output", so still surface whatever was retrieved rather than a bare refusal.
-        fallback = _evidence_excerpt_claims(bundle)
-        if fallback:
-            return _answer(bundle, "PARTIAL_ANSWER", fallback, limitations=[])
-        return _refusal(bundle, "SOURCE_SCOPE_MISSING", "当前已纳入的知识范围中没有足够来源支持该问题。")
+        return _refusal(bundle, "SOURCE_SCOPE_MISSING", "当前已纳入的知识范围中没有与所问项目、年份和适用范围相符的充分证据，暂不能确认结论。")
     if status == "CONFLICTING_EVIDENCE":
         return _conflict_answer(bundle)
+    target = definition_target(str(bundle.get("question") or ""))
+    if target:
+        for evidence in bundle.get("verified_evidence") or []:
+            sentence = definition_sentence(str(evidence.get("raw_text") or evidence.get("text") or ''), target)
+            if sentence:
+                claim = _claim('C1', 'DIRECT', 'SQ1', sentence, [evidence['evidence_id']], raw_evidence_text=sentence)
+                return _answered(bundle, [claim]) if status == 'VERIFIED' else _partial_answer(bundle, [claim])
+        return _refusal(bundle, 'INSUFFICIENT_EVIDENCE', f'当前引用未提供“{target}”的直接定义，不能用相关标准名称或认证依据代替概念解释。')
+    for evidence in bundle.get("verified_evidence") or []:
+        if reviewed_method_card_matches(evidence, str(bundle.get("question") or ""), bundle.get("query_plan") or {}):
+            raw = str(evidence.get("raw_text") or evidence.get("text") or "")
+            claim = _claim("C1", "DIRECT", "SQ1", raw, [evidence["evidence_id"]], raw_evidence_text=raw)
+            return _answer(bundle, "ANSWERED", [claim], limitations=[]) if status == "VERIFIED" else _partial_answer(bundle, [claim])
+    for evidence in bundle.get("verified_evidence") or []:
+        rows = reviewed_fact_rows(evidence, str(bundle.get("question") or ""), bundle.get("query_plan") or {})
+        if rows:
+            claim = _claim("C1", "DIRECT", "SQ1", "；".join(rows), [evidence["evidence_id"]], raw_evidence_text=str(evidence.get("raw_text") or ""))
+            missing = reviewed_fact_missing(evidence, str(bundle.get("question") or ""), bundle.get("query_plan") or {})
+            if missing:
+                return _partial_answer(bundle, [claim])
+            return _answer(bundle, "ANSWERED", [claim], limitations=[]) if status == "VERIFIED" else _partial_answer(bundle, [claim])
+    if (bundle.get("query_plan") or {}).get("query_type") == "MEETING_PARTICIPANTS":
+        return _refusal(bundle, "INSUFFICIENT_EVIDENCE", "已检索到相关资料，但尚未取得该项目、该次评审的完整参会单位与专家名单，暂不能确认结论。")
     assembly_rate_claims = _assembly_rate_pdf_claims(bundle)
     if assembly_rate_claims:
         return _partial_answer(bundle, assembly_rate_claims)
@@ -302,7 +326,7 @@ def _strip_evidence_links(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         {
             **item,
-            **{field: strip_markdown_links(str(item[field])) for field in ("text", "raw_text") if item.get(field) is not None},
+            **{field: strip_markdown_links(str(item[field])) for field in (("text",) if (item.get("knowledge_card") or {}).get("response_format") == "METHOD_GUIDE" else ("text", "raw_text")) if item.get(field) is not None},
         }
         for item in (items or [])
     ]
@@ -1505,21 +1529,30 @@ def _review_count_claim(bundle: dict[str, Any]) -> dict[str, Any] | None:
             (f"SQ{index}" for index, subquestion in enumerate(subquestions, start=1) if "意见" in str(subquestion) or any(marker in str(subquestion) for marker in ("多少条", "几条"))),
             "SQ1",
         )
+        fallback = None
         for evidence in bundle.get("verified_evidence") or []:
             raw = str(evidence.get("text") or evidence.get("raw_text") or "")
-            total = re.search(r"(?:合计|共计|总计|共提出|共)[^\d]{0,12}(\d+)\s*条", raw)
+            total = re.search(r"(?:合计|共计|总计|共提出|相加为|共)[^\d]{0,12}(\d+)\s*条", raw)
             if total:
-                return _claim("C1", "DIRECT", count_id, f"图纸审查意见共{total.group(1)}条。", [evidence["evidence_id"]], raw_evidence_text=total.group(0))
+                sentence = next((s.strip() for s in re.split(r"[。；;\n]", raw) if total.group(0) in s), total.group(0))
+                text = _short_text(_clean_display(sentence)) if "推导" in sentence else f"图纸审查意见共{total.group(1)}条。"
+                breakdown = [(label.strip(), value) for label, value in re.findall(r"([^，,；;。\n]{2,60}?)(\d+)\s*条", raw) if any(marker in label for marker in ("图纸审查", "图审单位", "外部专家")) and total.group(0) not in label + value + "条"]
+                if len(breakdown) > 1:
+                    text += "；分项：" + "；".join(f"{label}{value}条" for label, value in breakdown)
+                reply = next((s.strip() for s in re.split(r"[。；;\n]", raw) if "意见" in s and any(term in s for term in ("全数", "全部")) and "回复" in s and "修改" in s), "")
+                if reply:
+                    text += "；" + reply
+                return _claim("C1", "DIRECT", count_id, text, [evidence["evidence_id"]], raw_evidence_text=raw)
             parts = [
                 (label.strip(), value)
                 for label, value in re.findall(r"([^，,；;。\n]{2,60}?)(\d+)\s*条", raw)
                 if any(marker in label for marker in ("图纸审查", "图审单位", "外部专家"))
             ]
-            if len(parts) > 1:
+            if len(parts) > 1 and fallback is None:
                 breakdown = "；".join(f"{label}{value}条" for label, value in parts)
                 text = f"原文分别列出：{breakdown}。原文未明示合计意见数，暂不能确认总数。"
-                return _claim("C1", "LIMITATION", count_id, text, [evidence["evidence_id"]], raw_evidence_text=raw)
-        return None
+                fallback = _claim("C1", "LIMITATION", count_id, text, [evidence["evidence_id"]], raw_evidence_text=raw)
+        return fallback
     if "意见" not in question or "落实" not in question:
         return None
     for item in bundle.get("verified_evidence") or []:
@@ -2313,7 +2346,7 @@ def _answer(bundle: dict[str, Any], status: str, claims: list[dict[str, Any]], l
     if missing_subquestions:
         evidence_ids = next((claim.get("evidence_ids") for claim in claims if claim.get("evidence_ids")), [])
         subquestions = list(bundle.get("subquestions") or (bundle.get("query_plan") or {}).get("subquestions") or [])
-        if len(missing_subquestions) == len(subquestions):
+        if {qid for qid, _ in missing_subquestions} == {f"SQ{index + 1}" for index, _ in enumerate(subquestions)}:
             claims = [
                 claim for claim in claims
                 if claim.get("claim_type") != "DIRECT" or _claim_relevant_to_any_subquestion(bundle, claim)
@@ -2369,13 +2402,17 @@ def _uncovered_answer_subquestions(bundle: dict[str, Any], claims: list[dict[str
     question = str(bundle.get("question") or "")
     if not subquestions and re.search(r"(?:哪|哪些)\s*[0-9一二三四五六七八九十]+\s*(?:个|项|条|步|维度|方面)", question):
         subquestions = [question]
+    for evidence in bundle.get("verified_evidence") or []:
+        if reviewed_fact_rows(evidence, question, bundle.get("query_plan") or {}):
+            missing = reviewed_fact_missing(evidence, question, bundle.get("query_plan") or {})
+            return [(f"SQ{subquestions.index(text) + 1}" if text in subquestions else f"SQ{len(subquestions) + index + 1}", text) for index, text in enumerate(missing)]
     if len(subquestions) < 2 and not any(re.search(r"(?:哪|哪些)\s*[0-9一二三四五六七八九十]+\s*(?:个|项|条|步|维度|方面)", value) for value in subquestions):
         return []
     direct_claims = [claim for claim in claims if claim.get("claim_type") == "DIRECT"]
     limited_ids = {str(claim.get("subquestion_id")) for claim in claims if claim.get("claim_type") in {"LIMITATION", "INSUFFICIENT"}}
     direct_text = "\n".join(str(claim.get("rendered_claim_text") or claim.get("claim_text") or "") for claim in direct_claims)
     answer = re.sub(r"\s+", "", direct_text).casefold()
-    stop = {"多少", "几个", "哪些", "哪", "哪个", "如何", "什么", "是否", "分为", "方面", "内容", "项目", "任务书", "个", "的", "与", "和", "及"}
+    stop = {"多少", "几个", "哪些", "哪", "哪个", "如何", "什么", "是否", "分为", "方面", "内容", "项目", "任务书", "个", "的", "与", "和", "及", "请给", "请提供", "请列"}
     coverage_aliases = {
         "包含": ("包含", "包括", "含"),
         "规模": ("规模", "总建筑面积", "建筑面积", "占地面积"),
@@ -2383,6 +2420,9 @@ def _uncovered_answer_subquestions(bundle: dict[str, Any], claims: list[dict[str
         "金额": ("金额", "万元", "亿元", "总额"),
         "合计金额": ("合计金额", "合计", "万元", "亿元", "总额"),
     }
+    if any(reviewed_method_card_matches(e, question, bundle.get("query_plan") or {}) for e in bundle.get("verified_evidence") or []):
+        coverage_aliases["要点"] = ("要点", "复核项", "检查项")
+        coverage_aliases["检查"] = ("检查", "复核", "核对")
     missing = []
     for index, subquestion in enumerate(subquestions, start=1):
         question_id = f"SQ{index}"

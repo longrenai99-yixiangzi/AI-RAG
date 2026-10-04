@@ -9,10 +9,10 @@ from typing import Any
 
 import yaml
 
-from app.ingestion.atomic_search import query_terms
+from app.ingestion.atomic_search import query_terms, reviewed_method_card_matches, definition_sentence, reviewed_fact_rows
 from app.ingestion.normalization.markdown_normalizer import strip_markdown_links
 from app.retrieval.hierarchical_v1 import HierarchicalIndex
-from app.retrieval.query_planner_v1 import plan_query
+from app.retrieval.query_planner_v1 import plan_query, definition_target
 from app.verified_answer_engine_v2 import _narrative_count_document_score, render
 from scripts.build_verified_evidence_bundle_v1 import _candidate, _coverage, _direct_candidate, _same_scope_conflicts, _structured_facts, _sufficiency, _supporting_candidate
 
@@ -168,6 +168,16 @@ def _runtime_bundle(question: str, plan: dict[str, Any], result: dict[str, Any],
             _attach_structured_rows(candidates, structured_rows)
         elif any(candidate.get("role") == "DIRECT" and (candidate.get("candidate_origin") == "SOURCE_TITLE_RESCUE" or candidate.get("table_id") or (candidate.get("location") or {}).get("table_id")) for candidate in candidates):
             _attach_structured_rows(candidates, structured_rows)
+    # Source rescue and row-continuation promotion must still honor explicit scope.
+    for candidate in candidates:
+        if candidate.get("role") != "DIRECT":
+            continue
+        missing_scope = [field for field in ("project", "year", "organization") if plan.get(field) and candidate.get("scope", {}).get(field) != "MATCH"]
+        if plan.get("period") and candidate.get("scope", {}).get("period") != "MATCH":
+            missing_scope.append("period")
+        if missing_scope:
+            candidate["role"] = "CONTEXT_ONLY"
+            candidate["why_context_only"] = "Rescue cannot bypass explicit scope: " + ", ".join(missing_scope)
     subquestions = plan.get("subquestions") or ["回答原始问题"]
     direct = [candidate for candidate in candidates if candidate["role"] == "DIRECT"]
     inventory_direct = any(_inventory_register_direct(question, candidate) for candidate in direct)
@@ -222,6 +232,12 @@ def _inventory_register_direct(question: str, candidate: dict[str, Any]) -> bool
 
 def _answer_relevant(candidate: dict[str, Any], question: str, plan: dict[str, Any]) -> bool:
     text = strip_markdown_links(str(candidate["text"]))
+    if reviewed_fact_rows(candidate, question, plan):
+        return True
+    if reviewed_method_card_matches(candidate, question, plan):
+        return True
+    if plan.get('query_type') == 'DEFINITION_QUERY':
+        return bool(definition_sentence(str(candidate.get('raw_text') or text), definition_target(question)))
     expected_list = re.search(r"(?:哪|哪些)\s*([0-9]+|[一二三四五六七八九十]+)\s*(?:个|项|条|步|维度|方面)", question)
     if expected_list:
         value = expected_list.group(1)

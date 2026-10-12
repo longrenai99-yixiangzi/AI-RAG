@@ -13,9 +13,17 @@ import { TopicKnowledge } from './pages/TopicKnowledge'
 import { SearchResults } from './pages/SearchResults'
 import { Diagnostics } from './pages/Diagnostics'
 import { GoldReview } from './pages/GoldReview'
+import { FeedbackRecords } from './pages/FeedbackRecords'
+import { ProjectRecords } from './pages/ProjectRecords'
+import { PeriodRecords } from './pages/PeriodRecords'
+import { SourceReader } from './pages/SourceReader'
+import { TaskbookDraft } from './pages/TaskbookDraft'
+import { AssessmentHandoff } from './pages/AssessmentHandoff'
+import { SchemeComparison } from './pages/SchemeComparison'
+import { RuntimeCapabilitiesProvider, RuntimeFeature } from './components/layout/RuntimeCapabilities'
 
 export default function App() {
-  return <AppErrorBoundary><Routes>
+  return <AppErrorBoundary><RuntimeCapabilitiesProvider><Routes>
     <Route element={<AppLayout />}>
       <Route path="/" element={<Dashboard />} />
       <Route path="/knowledge-os" element={<Dashboard />} />
@@ -24,18 +32,25 @@ export default function App() {
       <Route path="/node/:id" element={<KnowledgeNode />} />
       <Route path="/topics" element={<TopicKnowledgeList />} />
       <Route path="/topics/:id" element={<TopicKnowledge />} />
-      <Route path="/projects" element={<PlaceholderPage title="项目知识" description="V0.1 保留入口，项目知识将在下一阶段关联项目页、项目案例与知识节点。" />} />
+      <Route path="/projects" element={<RuntimeFeature feature="projects" title="项目资料"><ProjectRecords /></RuntimeFeature>} />
+      <Route path="/projects/:id" element={<RuntimeFeature feature="projects" title="项目资料"><ProjectRecords /></RuntimeFeature>} />
+      <Route path="/projects/:id/assessment-tasks" element={<RuntimeFeature feature="projects" title="评估任务准备"><AssessmentHandoff /></RuntimeFeature>} />
+      <Route path="/projects/:id/scheme-comparison" element={<RuntimeFeature feature="projects" title="方案比选准备"><SchemeComparison /></RuntimeFeature>} />
+      <Route path="/periods" element={<RuntimeFeature feature="periods" title="部门与期间资料"><PeriodRecords /></RuntimeFeature>} />
+      <Route path="/read" element={<SourceReader />} />
       <Route path="/ai" element={<AIChat />} />
-      <Route path="/batch" element={<BatchWorkbench />} />
+      <Route path="/taskbook" element={<RuntimeFeature feature="taskbook_draft" title="任务书编制"><TaskbookDraft /></RuntimeFeature>} />
+      <Route path="/batch" element={<RuntimeFeature feature="batch" title="批量验收"><BatchWorkbench /></RuntimeFeature>} />
       <Route path="/sources" element={<KnowledgeSources />} />
       <Route path="/search" element={<SearchResults />} />
       <Route path="/knowledge-os/diagnostics" element={<Diagnostics />} />
-      <Route path="/knowledge-os/gold-review" element={<GoldReview />} />
-      <Route path="/favorites" element={<PlaceholderPage title="我的收藏" description="V0.1 先保留个人入口，后续接入收藏关系。" />} />
-      <Route path="/recent" element={<PlaceholderPage title="最近浏览" description="V0.1 先保留个人入口，后续接入最近浏览记录。" />} />
+      <Route path="/knowledge-os/gold-review" element={<RuntimeFeature feature="gold_review" title="来源审核"><GoldReview /></RuntimeFeature>} />
+      <Route path="/feedback" element={<RuntimeFeature feature="feedback_records" title="反馈记录"><FeedbackRecords /></RuntimeFeature>} />
+      <Route path="/favorites" element={<RuntimeFeature feature="favorites" title="我的收藏"><PlaceholderPage title="我的收藏" description="收藏入口尚待接入。" /></RuntimeFeature>} />
+      <Route path="/recent" element={<RuntimeFeature feature="recent" title="最近浏览"><PlaceholderPage title="最近浏览" description="最近浏览入口尚待接入。" /></RuntimeFeature>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>
-  </Routes></AppErrorBoundary>
+  </Routes></RuntimeCapabilitiesProvider></AppErrorBoundary>
 }
 
 class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {

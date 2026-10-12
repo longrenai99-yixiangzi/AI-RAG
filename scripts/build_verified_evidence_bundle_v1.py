@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import re
+from decimal import Decimal
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
 from app.retrieval.hierarchical_v1 import HierarchicalIndex
-from app.ingestion.atomic_search import query_terms
+from app.ingestion.atomic_search import query_terms, answer_support_gap, scalar_fact_parts, organization_placement
 from app.ingestion.normalization.markdown_normalizer import strip_markdown_links
 from app.retrieval.query_planner_v1 import ORGANIZATION_ALIASES
 
@@ -106,7 +107,8 @@ def _candidate(row: dict[str, Any], plan: dict[str, Any], documents: dict[str, d
     scope, scope_reason = _scope(plan, document, source, row)
     text = str(row.get("text_override") or source.get("text") or row.get("text") or "")
     raw_text = str(row.get("raw_text_override") or source.get("raw_text") or row.get("raw_text") or text)
-    return {"knowledge_card": source.get("knowledge_card") or {}, "evidence_id": evidence_id, "source_id": row.get("source_id") or source.get("source_id"), "source_version": row.get("source_version") or source.get("source_version"), "knowledge_id": row.get("knowledge_id") or source.get("knowledge_id"), "approved_trial_knowledge": bool(row.get("approved_trial_knowledge") or source.get("approved_trial_knowledge")), "parent_evidence_id": row.get("parent_evidence_id") or source.get("parent_evidence_id"), "raw_text": raw_text, "search_context": str(source.get("search_context") or row.get("search_context") or ""), "negative_questions": list(source.get("negative_questions") or row.get("negative_questions") or []), "document_id": row.get("document_id"), "section_id": row.get("section_id"), "table_id": source.get("table_id"), "file_name": row.get("file_name"), "source_path": row.get("source_path"), "heading_path": row.get("heading_path") or source.get("heading_path"), "location": row.get("location") or source.get("location"), "text": text, "focus_markers": row.get("focus_markers") or [], "candidate_rank": row.get("rank"), "candidate_origin": row.get("candidate_origin"), "exact_core_phrase_matches": row.get("exact_core_phrase_matches") or [], "document_role": row.get("document_role") or document.get("document_role"), "document_type": row.get("document_type") or document.get("document_type"), "authority": row.get("authority") or document.get("authority_level"), "scope": scope, "scope_reason": scope_reason, "lineage_status": row.get("lineage_status") or source.get("lineage_status") or "LINEAGE_NOT_APPLICABLE", "registration_page_flag": document.get("document_type") == "REGISTER_PAGE" or "\\wiki\\sources\\" in path, "query_page_flag": "\\wiki\\queries\\" in path, "link_only": _link_only(text), "role": "INSUFFICIENT", "why_selected": "Selected by 020C hierarchical candidate generation."}
+    source_projects = ((document.get('document_profile') or {}).get('project') or {}).get('value') or []
+    return {"source_family": document.get('source_family'), "publication_status": document.get('publication_status'), "source_content_role": document.get('source_content_role'), "observation_date": document.get('observation_date'), "source_projects": source_projects, "knowledge_card": source.get("knowledge_card") or {}, "evidence_id": evidence_id, "source_id": row.get("source_id") or source.get("source_id"), "source_version": row.get("source_version") or source.get("source_version"), "knowledge_id": row.get("knowledge_id") or source.get("knowledge_id"), "approved_trial_knowledge": bool(row.get("approved_trial_knowledge") or source.get("approved_trial_knowledge")), "parent_evidence_id": row.get("parent_evidence_id") or source.get("parent_evidence_id"), "raw_text": raw_text, "search_context": str(source.get("search_context") or row.get("search_context") or ""), "negative_questions": list(source.get("negative_questions") or row.get("negative_questions") or []), "document_id": row.get("document_id"), "section_id": row.get("section_id"), "table_id": source.get("table_id"), "file_name": row.get("file_name"), "source_path": row.get("source_path"), "heading_path": row.get("heading_path") or source.get("heading_path"), "location": row.get("location") or source.get("location"), "text": text, "focus_markers": row.get("focus_markers") or [], "candidate_rank": row.get("rank"), "candidate_origin": row.get("candidate_origin"), "exact_core_phrase_matches": row.get("exact_core_phrase_matches") or [], "document_role": row.get("document_role") or document.get("document_role"), "document_type": row.get("document_type") or document.get("document_type"), "authority": row.get("authority") or document.get("authority_level"), "scope": scope, "scope_reason": scope_reason, "lineage_status": row.get("lineage_status") or source.get("lineage_status") or "LINEAGE_NOT_APPLICABLE", "registration_page_flag": document.get("document_type") == "REGISTER_PAGE" or "\\wiki\\sources\\" in path, "query_page_flag": "\\wiki\\queries\\" in path, "link_only": _link_only(text), "role": "INSUFFICIENT", "why_selected": "Selected by 020C hierarchical candidate generation."}
 
 
 def _scope(plan: dict[str, Any], document: dict[str, Any], source: dict[str, Any], row: dict[str, Any]) -> tuple[dict[str, str], str]:
@@ -125,6 +127,10 @@ def _scope(plan: dict[str, Any], document: dict[str, Any], source: dict[str, Any
         identity = " ".join(str(value or "") for value in (row.get("source_path"), row.get("file_name"), source.get("source_path"), source.get("file_name"))).casefold()
         if not values:
             result[field] = "NOT_APPLICABLE"
+        elif field == 'year' and document.get('observation_date'):
+            result[field] = 'MATCH' if document['observation_date'][:4] in {str(value) for value in values} else 'MISMATCH'
+        elif field == 'year' and document.get('declared_edition_year'):
+            result[field] = 'MATCH' if str(document['declared_edition_year']) in {str(value) for value in values} else 'MISMATCH'
         elif any(str(value).casefold() in json.dumps(candidate_values, ensure_ascii=False).casefold() for value in values):
             result[field] = "MATCH"
         elif field == "year":
@@ -160,7 +166,9 @@ def _scope(plan: dict[str, Any], document: dict[str, Any], source: dict[str, Any
     }
     result["metric"] = "NOT_APPLICABLE" if not metrics else "MATCH" if all(any(alias.casefold() in text for alias in metric_aliases.get(str(value), (str(value),))) for value in metrics) else "MISMATCH"
     period = str(plan.get("period") or "")
-    result["period"] = "NOT_APPLICABLE" if not period else _period_status(period, f"{identity} {evidence_text}")
+    declared = (row.get('location') or source.get('location') or {}).get('declared_periods')
+    period_text = ' '.join(declared) if period.startswith('MONTH:') and declared is not None else f"{identity} {evidence_text}"
+    result["period"] = "NOT_APPLICABLE" if not period else _period_status(period, period_text)
     return result, "Field-level scope is recorded; MATCH alone does not resolve same-scope fact conflicts."
 
 
@@ -175,6 +183,9 @@ def _organization_in_text(value: str, text: str) -> bool:
 
 def _period_status(period: str, text: str) -> str:
     compact = re.sub(r"\s+", "", text).casefold()
+    if period.startswith('MONTH:'):
+        periods = {f'{year}-{int(month):02d}' for year,month in re.findall(r'(20\d{2})年(\d{1,2})月', compact) if 1 <= int(month) <= 12}
+        return 'MATCH' if periods == {period.removeprefix('MONTH:')} else 'MISMATCH' if periods and period.removeprefix('MONTH:') not in periods else 'UNKNOWN'
     h1_markers = ("\u4e0a\u534a\u5e74", "\u534a\u5e74\u603b\u7ed3")
     annual_markers = ("\u5e74\u5ea6\u603b\u7ed3", "\u5e74\u5ea6\u8ff0\u804c", "\u5e74\u5ea6\u5de5\u4f5c", "\u8ff0\u804c\u62a5\u544a", "\u5168\u5e74\u5de5\u4f5c", "\u5168\u5e74\u521b\u6548")
     if period == "H1":
@@ -201,7 +212,23 @@ def _link_only(text: str) -> bool:
     return len(re.sub(r"\s+", "", body)) < 40
 
 
+def _deliverable_source_in_scope(candidate: dict[str, Any], plan: dict[str, Any]) -> bool:
+    from app.retrieval.query_planner_v1 import design_deliverable_stages, design_depth_stages
+    question = str(plan.get('original_question') or '')
+    if plan.get('project') or not (design_deliverable_stages(question) or design_depth_stages(question)):
+        return True
+    projects = [str(name) for name in candidate.get('source_projects') or [] if not re.fullmatch(r'[Xx某]+项目', str(name))]
+    identity = str(candidate.get('file_name') or '') + ' ' + str(candidate.get('source_path') or '')
+    return not any(name in identity for name in projects) if identity.strip() else not projects
+
+
 def _direct_candidate(candidate: dict[str, Any], plan: dict[str, Any]) -> bool:
+    if not _deliverable_source_in_scope(candidate, plan):
+        return False
+    if plan.get('query_type') in {'METHOD_QUERY', 'MULTI_FACT', 'POLICY_QUERY'}:
+        requests = plan.get('subquestions') or ['回答原始问题']
+        if not any(_supports_subquestion(candidate, request, plan) for request in requests):
+            return False
     if candidate["lineage_status"] == "LINEAGE_NOT_CONFIRMED":
         return False
     if candidate.get("link_only"):
@@ -226,7 +253,7 @@ def _direct_candidate(candidate: dict[str, Any], plan: dict[str, Any]) -> bool:
     strong_scope_relevance = rank <= 20 and all(
         not plan.get(field) or candidate["scope"].get(field) == "MATCH"
         for field in ("organization", "project", "year", "specialty")
-    ) and sum(term.casefold() in str(candidate.get("text") or "").casefold() for term in query_terms(question) if len(term) >= 2) >= 3
+    ) and not answer_support_gap(question,str(candidate.get('text') or ''),plan)
     return (
         rank <= 10
         or strong_scope_relevance
@@ -252,23 +279,75 @@ def _supporting_candidate(candidate: dict[str, Any], plan: dict[str, Any]) -> bo
 
 
 def _same_scope_conflicts(candidates: list[dict[str, Any]], plan: dict[str, Any]) -> dict[str, str]:
-    if not plan.get("organization") or not plan.get("year") or not plan.get("metric"):
+    metrics = list(plan.get('metric') or [])
+    if '月份' in str(plan.get('original_question') or ''):
+        metrics.append('月份')
+    if not plan.get("organization") or not plan.get("year") or not metrics:
         return {}
     period = str(plan.get("period") or "")
-    matched = [candidate for candidate in candidates if candidate["scope"].get("organization") == "MATCH" and candidate["scope"].get("year") == "MATCH" and candidate["scope"].get("metric") == "MATCH" and (not period or candidate["scope"].get("period") == "MATCH")]
-    metric_values = {candidate["evidence_id"]: _metric_values(candidate["text"], plan.get("metric", [])) for candidate in matched}
-    observed = {values for values in metric_values.values() if values}
-    if len(observed) < 2:
-        return {}
-    return {candidate["evidence_id"]: "SAME_SCOPE_CONFLICT: same organization/year/metric with different numeric facts; rank cannot resolve." for candidate in matched}
+    matched = [candidate for candidate in candidates if candidate["scope"].get("organization") == "MATCH" and candidate["scope"].get("year") == "MATCH" and (not plan.get('metric') or candidate["scope"].get("metric") == "MATCH") and (not period or candidate["scope"].get("period") == "MATCH")]
+    from app.retrieval.query_planner_v1 import fact_request
+    focus = fact_request(str(plan.get('original_question') or ''))
+    for organization in plan.get('organization') or []:
+        for alias in ORGANIZATION_ALIASES.get(organization, (organization,)):
+            focus = focus.replace(alias, '')
+    focus = re.sub(r'20\d{2}\s*年?', '', focus).strip(' 的')
+    subject = re.match(r'(.+?)(?:的)?(?:数量|金额|月份|时间|期限|日期|比例)(?:分别|各|是|有|为|和|与|及|、)', focus)
+    requests = plan.get('subquestions') or ([subject[1]] if subject else [])
+    anchors = re.findall(r'[A-Za-z][A-Za-z0-9-]{1,}', focus)
+    matched = [candidate for candidate in matched if not any(candidate.get(key) for key in ('link_only', 'registration_page_flag', 'query_page_flag')) and not any(candidate['scope'].get(field) == 'MISMATCH' for field in ('project', 'specialty')) and all(anchor.casefold() in candidate['text'].casefold() for anchor in anchors) and (not requests or any(not answer_support_gap(request, candidate['text'], plan) for request in requests))]
+    groups: dict[tuple[str, str, str], dict[str, set[str]]] = {}
+    for candidate in matched:
+        selected = [scalar_fact_parts(request, candidate['text']) for request in requests]
+        fragments = [part for fields in selected if fields is not None for parts in fields.values() for part in parts]
+        text = '\n'.join(dict.fromkeys(fragments)) if any(fields is not None for fields in selected) else candidate['text']
+        for dimension, values in _metric_values(text, metrics).items():
+            if len(values) == 1:
+                groups.setdefault(dimension, {})[candidate['evidence_id']] = values
+    conflicts = {}
+    for values in groups.values():
+        if len({next(iter(value)) for value in values.values()}) > 1:
+            conflicts.update({evidence_id: 'SAME_SCOPE_CONFLICT: same requested fact, scope, unit and qualifier with different values; rank cannot resolve.' for evidence_id in values})
+    return conflicts
 
 
-def _metric_values(text: str, metrics: list[str]) -> tuple[str, ...]:
-    values = []
+def _metric_values(text: str, metrics: list[str]) -> dict[tuple[str, str, str], set[str]]:
+    # ponytail: compare unambiguous statement values; differing conditions need typed fact extraction.
+    values: dict[tuple[str, str, str], set[str]] = {}
+    text = re.sub(r'(?<!\d)\d+\.(?=\d{1,2}月份)', '', text)
     for metric in metrics:
-        values.extend(re.findall(rf"{re.escape(metric)}[^。；;\n]{{0,20}}?(-?\d+(?:\.\d+)?)", text))
-        values.extend(re.findall(rf"(-?\d+(?:\.\d+)?)[^。；;\n]{{0,8}}{re.escape(metric)}", text))
-    return tuple(sorted(set(values)))
+        if metric in {'数量', '条数', '上传'}:
+            pattern = r'(-?\d+(?:\.\d+)?)\s*(个(?!百分点)|项|份|件|条|次|座|家|人)'
+            kind = '数量'
+        elif metric == '月份':
+            pattern = r'(\d{1,2})\s*(月)'
+            kind = metric
+        elif any(word in metric for word in ('金额', '合同额', '创效', '效益', '利润')):
+            pattern = r'(-?\d+(?:\.\d+)?)\s*(亿元|万元|元|亿|万|%|％)'
+            kind = metric
+        elif metric in {'比例', '量差率', '创效率'}:
+            pattern = r'(-?\d+(?:\.\d+)?)\s*(%|％)'
+            kind = metric
+        elif metric == '工期':
+            pattern = r'(-?\d+(?:\.\d+)?)\s*(个月|月|天|日)'
+            kind = metric
+        else:
+            pattern = re.escape(metric) + r'[^。；;\n|]{0,20}?(-?\d+(?:\.\d+)?)([^\d\s，。；|]{0,5})'
+            kind = metric
+        for match in re.finditer(pattern, text):
+            prefix = text[max(0, match.start() - 8):match.start()]
+            if re.search(r'第$|(?:每少|每缺|扣)[^。；;，,|]{0,3}$', prefix):
+                continue
+            number, unit = match[1], match[2]
+            if kind == '月份' and not 1 <= int(number) <= 12:
+                continue
+            factor = {'亿元': 100000000, '亿': 100000000, '万元': 10000, '万': 10000}.get(unit, 1)
+            if unit in {'亿元', '亿', '万元', '万'}:
+                unit = '元'
+            unit = {'％': '%', '个月': '月', '日': '天'}.get(unit, unit)
+            qualifier = '>=' if re.search(r'不少于|不低于|至少|>=|≥', prefix) else '<=' if re.search(r'不超过|不高于|至多|<=|≤', prefix) else '='
+            values.setdefault((kind, unit, qualifier), set()).add(format((Decimal(number) * factor).normalize(), 'f'))
+    return values
 
 
 def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[dict[str, Any]], structured_rows: list[dict[str, Any]] | None = None, *, inventory_direct: bool = False) -> list[dict[str, Any]]:
@@ -283,7 +362,7 @@ def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[di
             status = "EVIDENCE_INSUFFICIENT"
             evidence = []
         elif direct:
-            supported = [candidate for candidate in direct if _supports_subquestion(candidate, subquestion)]
+            supported = [candidate for candidate in direct if _supports_subquestion(candidate, subquestion, plan)]
             status = "COVERED" if supported else "EVIDENCE_INSUFFICIENT"
             evidence = [candidate["evidence_id"] for candidate in supported]
         else:
@@ -293,10 +372,23 @@ def _coverage(subquestions: list[str], plan: dict[str, Any], candidates: list[di
     return rows
 
 
-def _supports_subquestion(candidate: dict[str, Any], subquestion: str) -> bool:
+def _supports_subquestion(candidate: dict[str, Any], subquestion: str, plan: dict[str, Any] | None = None) -> bool:
+    if candidate.get('structured_row_ids') and candidate.get('structured_evidence_complete') is True:
+        columns=set(candidate.get('structured_columns') or [])
+        if subquestion=='列出目标单位的全部督办事项' and columns & {'分公司','责任单位','部门','单位'} and columns & {'工作任务','督办事项','监督任务'}:
+            return any(len(value)>=3 and value in str((plan or {}).get('original_question') or '') for value in candidate.get('structured_unit_values') or [])
+        if subquestion in {'列出目标范围内的类别或专业', '按目标分组统计每组数量'} and candidate.get('structured_professionals'):
+            return True
+        if subquestion == '按条件筛选后统计数量' and '价值创造分析' in (candidate.get('structured_columns') or []) and any(term in str((plan or {}).get('original_question') or '') for term in ('增加效益', '增加收益', '增加利润', '提高利润', '提升利润', '增效', '收益')):
+            return True
     text = str(candidate.get("text") or "")
     body = strip_markdown_links(text)
     compact_body = re.sub(r"\s+", "", body)
+    request = (plan or {}).get('original_question', subquestion) if subquestion in {'回答原始问题', '列出目标范围内的类别或专业'} else subquestion
+    if subquestion == '组织定位和隶属关系':
+        return organization_placement(body)
+    if answer_support_gap(request, body, {**(plan or {}), 'evidence_file_name':candidate.get('file_name','')}):
+        return False
     if subquestion == "任务书汇编收录的项目数量":
         return bool(re.search(r"\d+个项目", compact_body) and any(marker in compact_body for marker in ("收录", "汇编", "包含")))
     if subquestion == "任务书覆盖的业态范围":

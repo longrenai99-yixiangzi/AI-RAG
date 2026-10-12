@@ -17,10 +17,10 @@ from .knowledge_store import normalize_source_path
 from rank_bm25 import BM25Okapi
 
 from app.bm25 import tokenize
-from app.ingestion.atomic_search import query_terms, scoring_target_phrase, search_atomic_evidence, reviewed_fact_rows
+from app.ingestion.atomic_search import query_terms, scoring_target_phrase, search_atomic_evidence, reviewed_fact_rows, source_statement_reviews, answer_support_gap, business_term_aliases, design_procedure_question
 from app.retrieval.query_planner_v1 import plan_query
 from app.verified_answer_engine_v2 import render, validate
-from scripts.build_verified_evidence_bundle_v1 import _link_only
+from scripts.build_verified_evidence_bundle_v1 import _link_only, _supports_subquestion
 from scripts.run_verified_answer_engine_v2 import _runtime_bundle
 
 
@@ -670,8 +670,28 @@ def _chunk_source_location(chunk: dict[str, Any], parsed: dict[str, dict[str, An
     ids = chunk.get("atomic_evidence_ids") or []
     record = parsed.get(str(ids[0])) if len(ids) == 1 else None
     if record and record.get("document_id") == chunk.get("document_id") and record.get("sha256") == chunk.get("source_version"):
-        return {**_location(str(chunk.get("section_path") or ""), chunk.get("table_id")), **(record.get("location") or {})}
-    return _location(str(chunk.get("section_path") or ""), chunk.get("table_id"))
+        return {**_location(str(chunk.get("section_path") or ""), chunk.get("table_id")), **(record.get("location") or {}), **(chunk.get('location') or {})}
+    return {**_location(str(chunk.get("section_path") or ""), chunk.get("table_id")), **(chunk.get('location') or {})}
+
+
+def _document_structure_record(document: dict[str, Any], sections: list[dict[str, Any]], parent: dict[str, Any], profession_fields: bool) -> dict[str, Any] | None:
+    did=str(parent.get('document_id') or '')
+    version=document.get('source_version') or document.get('content_hash') or document.get('source_hash')
+    if version and version!=parent.get('source_version'):
+        return None
+    headings=sorted([section for section in sections if section.get('document_id')==did and section.get('heading') and (bool(re.search(r'【专业(?:类别)?】',str(section['heading']))) if profession_fields else section.get('parent_section_id') is None and not re.fullmatch(r'Page\s+\d+',str(section['heading']),re.I))],key=lambda section:int(section.get('section_order') or 0))
+    if not headings:
+        return None
+    identity=str(document.get('file_name') or parent.get('file_name') or '')
+    if profession_fields:
+        values=list(dict.fromkeys(re.sub(r'^.*?【专业(?:类别)?】','',str(section['heading'])).strip() for section in headings))
+        raw=identity+'\n同版原文“专业类别”字段共有'+str(len(values))+'种取值：'+'、'.join(values)+'。\n这些是本资料的原文分类，不作为所有项目统一的专业范围或审批依据。'
+        label='同版文件专业类别字段汇总'
+    else:
+        raw=identity+'\n同版原件一级章节目录：\n'+'\n'.join(str(index)+'. '+str(section['heading']) for index,section in enumerate(headings,1))+'\n目录仅为这份资料的结构参考，不能据此认定已审批，也不作为所有项目统一要求。'
+        label='同版文件一级章节目录'
+    eid='OUTLINE-'+hashlib.sha256((did+'|'+str(parent.get('source_version'))+'|'+raw).encode()).hexdigest()[:24]
+    return {**parent,'evidence_id':eid,'text':raw,'raw_text':raw,'heading_path':label,'location':{'section_path':label,'heading_locations':[section.get('location_start') for section in headings]},'table_id':None,'origin':'DERIVED_ORIGINAL_STRUCTURE_NOT_NEW_APPROVAL','knowledge_card':{},'approved_trial_knowledge':False}
 
 
 class V25LiveShadow:
@@ -685,8 +705,12 @@ class V25LiveShadow:
         self.candidate_hash = manifest.get("candidate_hash")
         self.candidate_revision = CANDIDATE_REVISION
         self.docs = {str(row.get("document_id")): row for row in _read_jsonl(STAGING / "documents.jsonl")}
+        self.document_sections = _read_jsonl(STAGING / 'sections.jsonl')
         self.chunks = _read_jsonl(STAGING / "semantic_chunks.jsonl")
         remediation_vectors: np.ndarray | None = None
+        base_chunk_count = len(self.chunks)
+        replacements: set[tuple[str, str]] = set()
+        replaced_doc_ids: set[str] = set()
         self.retired_source_versions: list[dict[str, Any]] = []
         structured_stages = [STAGING]
         for remediation_manifest in REMEDIATION_MANIFESTS:
@@ -695,6 +719,7 @@ class V25LiveShadow:
             remediation = json.loads(remediation_manifest.read_text(encoding="utf-8"))
             source_approved = (remediation.get("source") or {}).get("approval_status") == "APPROVED" or all(item.get("approval_status") == "APPROVED" for item in remediation.get("sources") or [])
             if remediation.get("status") == "DEV_REMEDIATION_EMBEDDED_NOT_RELEASED" and source_approved:
+                replacements = {_source_version_key(row) for row in remediation.get('replaced_source_versions') or []}
                 vector_path = Path(str((remediation.get("dense_embeddings") or {}).get("path") or ""))
                 stage = vector_path.parent
                 side_docs = _read_jsonl(stage / "documents.jsonl")
@@ -705,6 +730,9 @@ class V25LiveShadow:
                 if remediation_vectors.shape[0] != len(side_chunks):
                     raise RuntimeError("V2_6_1_REMEDIATION_VECTOR_CHUNK_MISMATCH")
                 self.docs.update({str(row.get("document_id")): row for row in side_docs})
+                side_sections = _read_jsonl(stage / 'sections.jsonl')
+                side_section_docs = {section.get('document_id') for section in side_sections}
+                self.document_sections = [section for section in self.document_sections if section.get('document_id') not in side_section_docs] + side_sections
                 self.chunks.extend(side_chunks)
                 structured_stages.append(stage)
                 self.candidate_hash = remediation.get("candidate_hash")
@@ -717,13 +745,18 @@ class V25LiveShadow:
             chunk["source_path"] = chunk.get("source_path") or document.get("source_path")
             chunk["source_version"] = chunk.get("source_version") or document.get("source_version")
         base_vectors = np.load(STAGING / "dense_embeddings.npy", mmap_mode="r").astype(np.float32)
+        if replacements:
+            keep = np.asarray([_source_version_key(chunk) not in replacements for chunk in self.chunks[:base_chunk_count]], dtype=bool)
+            replaced_doc_ids = {str(chunk.get('document_id')) for chunk, included in zip(self.chunks[:base_chunk_count], keep, strict=True) if not included}
+            self.chunks = [chunk for chunk, included in zip(self.chunks[:base_chunk_count], keep, strict=True) if included] + self.chunks[base_chunk_count:]
+            base_vectors = base_vectors[keep]
         vectors = np.concatenate((base_vectors, remediation_vectors), axis=0) if remediation_vectors is not None else base_vectors
         unfiltered_count = len(self.chunks)
         self.chunks, self.vectors = _filter_retired_source_versions(self.chunks, vectors, self.retired_source_versions)
         self.retired_chunk_count = unfiltered_count - len(self.chunks)
         retired_keys = {_source_version_key(row) for row in self.retired_source_versions}
         self.docs = {key: row for key, row in self.docs.items() if _source_version_key(row) not in retired_keys}
-        parsed_atomic = {str(row.get("evidence_id")): row for stage in structured_stages for row in _read_jsonl(stage / "atomic_evidence.jsonl")}
+        parsed_atomic = {str(row.get("evidence_id")): row for stage in structured_stages for row in _read_jsonl(stage / "atomic_evidence.jsonl") if not (stage == STAGING and str(row.get('document_id')) in replaced_doc_ids)}
         self.atomic = {
             str(chunk.get("chunk_id")): {
                 "evidence_id": str(chunk.get("chunk_id")),
@@ -751,6 +784,8 @@ class V25LiveShadow:
             stage_docs = {str(row.get("document_id")): _restore_source_origin(row) for row in _read_jsonl(stage / "documents.jsonl")}
             tables = {str(row.get("table_id")): row for row in _read_jsonl(stage / "tables.jsonl")}
             for source_row in _read_jsonl(stage / "table_rows.jsonl"):
+                if stage == STAGING and str(source_row.get('document_id')) in replaced_doc_ids:
+                    continue
                 table = tables.get(str(source_row.get("table_id")), {})
                 document = stage_docs.get(str(source_row.get("document_id"))) or self.docs.get(str(source_row.get("document_id")), {})
                 if _source_version_key(document) in retired_keys:
@@ -758,6 +793,7 @@ class V25LiveShadow:
                 row = {
                     **source_row,
                     "row_id": source_row.get("row_id") or source_row.get("table_row_id"),
+                    "professional": source_row.get('professional') or next((str(cell.get('value') or cell.get('cell_value') or cell.get('raw_value') or '').strip() for cell in source_row.get('cells') or [] if str(cell.get('header') or cell.get('column_name') or cell.get('normalized_column_name') or '').strip() in {'专业类别', '专业'}), ''),
                     "source_id": document.get("source_id") or document.get("document_id"),
                     "source_path": document.get("source_path"),
                     "source_version": document.get("source_version") or document.get("source_hash") or document.get("content_hash"),
@@ -765,11 +801,14 @@ class V25LiveShadow:
                     "file_type": document.get("file_type"),
                     "header_text": " | ".join(dict.fromkeys(str(v) for v in table.get("header") or [])),
                     "sheet_name": table.get("sheet_name"),
+                    "table_title": table.get('table_title') or table.get('sheet_name'),
                     "expected_table_row_count": table.get("row_count"),
                     "source_location": {**(table.get("source_location") or {}), **(source_row.get("source_location") or {}), "sheet_name": table.get("sheet_name"), "table_id": source_row.get("table_id")},
                     "bundle_evidence_id": "V25-STRUCTURED-" + str(source_row.get("table_id")),
                 }
                 self.structured_rows.append(row)
+        # The inherited overlay repeats unchanged base rows; each physical row counts once.
+        self.structured_rows = list({(_source_version_key(row), row.get('table_id'), row.get('row_number')): row for row in self.structured_rows}.values())
         self._structured_tables: dict[str, list[dict[str, Any]]] = {}
         for row in self.structured_rows:
             self._structured_tables.setdefault(str(row.get("table_id") or ""), []).append(row)
@@ -786,9 +825,24 @@ class V25LiveShadow:
         ]
         self.bm25 = BM25Okapi([tokenize(text) or ["_empty_"] for text in weighted])
 
-    def evidence_record(self, evidence_id: str) -> dict[str, Any] | None:
+    def evidence_record(self, evidence_id: str, source_id: str = '', source_version: str = '') -> dict[str, Any] | None:
         if evidence_id in self.atomic:
-            return self.atomic[evidence_id]
+            record=self.atomic[evidence_id]
+            return record if (not source_id or record.get('source_id')==source_id) and (not source_version or record.get('source_version')==source_version) else None
+        if evidence_id.startswith('OUTLINE-'):
+            parents={}
+            for chunk in self.chunks:
+                if source_id and chunk.get('source_id')!=source_id or source_version and chunk.get('source_version')!=source_version:
+                    continue
+                parent=self.atomic.get(str(chunk.get('chunk_id') or ''))
+                if parent:parents.setdefault(str(parent.get('document_id') or ''),parent)
+            for did,parent in parents.items():
+                for fields in (False,True):
+                    record=_document_structure_record(self.docs.get(did,{}),self.document_sections,parent,fields)
+                    if record and record['evidence_id']==evidence_id:
+                        self.atomic[evidence_id]=record
+                        return record
+            return None
         if not evidence_id.startswith("V25-STRUCTURED-"):
             return None
         if "@rows=" not in evidence_id:
@@ -799,7 +853,8 @@ class V25LiveShadow:
             full = self.evidence_record(evidence_id + "@rows=" + numbers)
             if full:
                 self.atomic[evidence_id] = {**full, "evidence_id": evidence_id, "projection_scope": "WHOLE_TABLE"}
-            return self.atomic.get(evidence_id)
+                return self.evidence_record(evidence_id,source_id,source_version)
+            return None
         parent, numbers = evidence_id.split("@rows=", 1)
         try:
             wanted = {int(number) for number in numbers.split(",")}
@@ -821,12 +876,12 @@ class V25LiveShadow:
         location = {**(first.get("source_location") or {}), "row_start": min(wanted), "row_end": max(wanted), "source_row_numbers": sorted(wanted), "source_row_ids": [r.get("row_id") for r in rows]}
         record = {"evidence_id": evidence_id, "parent_evidence_id": parent, "source_id": first["source_id"], "source_version": first["source_version"], "source_path": first["source_path"], "document_id": first.get("document_id"), "file_name": first.get("file_name"), "file_type": first.get("file_type"), "heading_path": first.get("header_text") or "结构化表格行", "location": location, "raw_text": raw, "text": raw, "search_context": first.get("header_text") or "", "lineage_status": "LINEAGE_CONFIRMED"}
         self.atomic[evidence_id] = record
-        return record
+        return self.evidence_record(evidence_id,source_id,source_version)
 
     def cited_evidence_record(self, citation: dict[str, Any]) -> dict[str, Any] | None:
         evidence_id = str(citation.get("evidence_id") or "")
         if not evidence_id.startswith("V25-STRUCTURED-") or "@rows=" in evidence_id:
-            return self.evidence_record(evidence_id)
+            return self.evidence_record(evidence_id,str(citation.get('source_id') or ''),str(citation.get('source_version') or ''))
         if not evidence_id.startswith("V25-STRUCTURED-"):
             return None
         table_id = evidence_id.removeprefix("V25-STRUCTURED-")
@@ -844,13 +899,26 @@ class V25LiveShadow:
         numbers = ",".join(str(n) for n in sorted({int(r["row_number"]) for r in rows}))
         return self.evidence_record(evidence_id + "@rows=" + numbers)
 
-    def run(self, question: str, primary: dict[str, Any], *, query_vector: list[float] | None = None, include_trace: bool = False) -> dict[str, Any]:
+    def run(self, question: str, primary: dict[str, Any], *, query_vector: list[float] | None = None, include_trace: bool = False, allowed_evidence_ids: set[str] | None = None) -> dict[str, Any]:
         started = time.perf_counter()
         plan = plan_query(question)
+        reference = plan.scope_constraints.get('source_reference') or []
+        if reference:
+            terms = [term for term in query_terms(reference[0]) if term not in {'课件', '资料', '文件'}]
+            matching_documents = {did for did, document in self.docs.items() if terms and all(term.casefold() in (str(document.get('file_name') or '')+' '+str(document.get('source_path') or '')).casefold() for term in terms)}
+            source_ids = {eid for eid, record in self.atomic.items() if record.get('document_id') in matching_documents}
+            allowed_evidence_ids = source_ids if allowed_evidence_ids is None else allowed_evidence_ids & source_ids
         vector = np.asarray(query_vector if query_vector is not None else primary.get("query_vector") or [], dtype=np.float32)
         if vector.size != self.vectors.shape[1]:
             raise RuntimeError("V2_5_QUERY_VECTOR_MISSING")
         bm = np.asarray(self.bm25.get_scores(tokenize(question) or ["_empty_"]), dtype=np.float32)
+        general_method = not plan.project and plan.query_type in {'METHOD_QUERY', 'POLICY_QUERY'} and design_procedure_question(question)
+        expanded = []
+        if general_method:
+            aliases = business_term_aliases(question)
+            expanded = [value for term in query_terms(question) if term in {'交付', '衔接', '质量检查', '检查'} for value in aliases.get(term, ()) if value != term]
+            if expanded:
+                bm += 0.35 * np.asarray(self.bm25.get_scores(tokenize(' '.join(expanded))), dtype=np.float32)
         dense = np.asarray(self.vectors @ vector, dtype=np.float32)
         scores: dict[int, float] = {}
         for rank, index in enumerate(np.argsort(-bm).tolist(), start=1):
@@ -858,6 +926,30 @@ class V25LiveShadow:
         for rank, index in enumerate(np.argsort(-dense).tolist(), start=1):
             scores[index] = scores.get(index, 0.0) + 1.0 / (60 + rank)
         order = [index for index, _ in sorted(scores.items(), key=lambda item: (-item[1], item[0]))]
+        if allowed_evidence_ids is not None:
+            order = [index for index in order if str(self.chunks[index].get('chunk_id')) in allowed_evidence_ids]
+        # Check a bounded wider pool so a topic-matched page does not hide the actual answer.
+        wider = order[:120]
+        if plan.query_type in {'METHOD_QUERY', 'MULTI_FACT', 'POLICY_QUERY'}:
+            for request in plan.subquestions[:8]:
+                leaf_scores = self.bm25.get_scores(tokenize(request))
+                leaf_pool = [index for index in np.argsort(-np.asarray(leaf_scores)).tolist() if allowed_evidence_ids is None or str(self.chunks[index].get('chunk_id')) in allowed_evidence_ids]
+                wider = list(dict.fromkeys([*wider, *leaf_pool[:40]]))
+        if expanded:
+            # Keep a separate bounded policy pool so numerous project cases cannot crowd out procedures.
+            policy = [index for index in np.argsort(-bm).tolist() if (self.docs.get(str(self.chunks[index].get('document_id')), {}).get('document_profile', {}).get('document_role') or {}).get('value') in {'正式制度', '管理指南'} and (allowed_evidence_ids is None or str(self.chunks[index].get('chunk_id')) in allowed_evidence_ids)]
+            wider = list(dict.fromkeys([*wider, *policy[:120]]))
+        supporting = []
+        requests = plan.subquestions or ['回答原始问题']
+        for index in wider:
+            record = self.atomic[str(self.chunks[index].get('chunk_id'))]
+            candidate = {**record, 'text':str(record.get('text') or ''), 'file_name':Path(str(record.get('source_path') or '')).name}
+            if any(_supports_subquestion(candidate, request, plan.to_dict()) for request in requests):
+                supporting.append(index)
+        if expanded:
+            supporting.sort(key=lambda index: ((self.docs.get(str(self.chunks[index].get('document_id')), {}).get('document_profile', {}).get('document_role') or {}).get('value') not in {'正式制度', '管理指南'}, -sum(marker in str(self.atomic[str(self.chunks[index].get('chunk_id'))].get('text') or '') for marker in ('审查意见', '修改', '复查', '复核', '交底'))))
+        supported_ids = set(supporting)
+        order = supporting + [index for index in wider if index not in supported_ids]
         candidate_rows = []
         for rank, index in enumerate(order[:20], start=1):
             candidate_rows.append(_candidate_row(self.atomic[str(self.chunks[index].get("chunk_id"))], rank, "FROZEN_V2_5_RRF"))
@@ -873,6 +965,37 @@ class V25LiveShadow:
         keyword_body_rescued = _keyword_body_rescue(question, plan, self.atomic)
         rescue_specs = [("PERIOD_SCOPE_RESCUE", record) for record in period_rescued] + [("EXACT_NAMED_SOURCE_RESCUE", record) for record in named_rescued] + [("APPROVED_GOLD_SOURCE_RESCUE", record) for record in gold_rescued] + [("OWNER_ANSWER_GOLD_SOURCE_RESCUE", record) for record in owner_gold_rescued] + [("PROJECT_SCOPE_SOURCE_RESCUE", record) for record in project_scope_rescued] + [("SOURCE_TITLE_RESCUE", record) for record in source_title_rescued] + [("ATOMIC_EXACT_PHRASE_RESCUE", record) for record in exact_phrase_rescued] + [("BODY_FACT_RESCUE", record) for record in body_fact_rescued] + [("KEYWORD_BODY_RESCUE", record) for record in keyword_body_rescued]
         rescue_specs += [("REGISTER_INVENTORY_RESCUE", record) for record in register_inventory_rescued]
+        asks_profession_fields = bool(re.search(r'哪些专业|哪几个专业|专业类别', question)) and not any(op in plan.aggregation_plan for op in ('GROUP_BY','FILTER','SUM'))
+        if asks_profession_fields or re.search(r'章节|目录|大纲|(?:哪|几|多少)[一二三四五六七八九十\d]*章', question):
+            ignored = {'模板', '章节', '目录', '大纲', '哪些', '分为', '多少', '应有', '应该', '包含', '包括', '专业', '类别', '哪几个'}
+            terms = [term for term in query_terms(re.sub(r'(?:哪|几|多少)[一二三四五六七八九十\d]*章', '', question)) if term not in ignored]
+            outlines = []
+            for did, document in self.docs.items():
+                identity = str(document.get('file_name') or '')
+                hits = sum(term in identity for term in terms)
+                if not terms or hits * 3 < len(terms) * 2:
+                    continue
+                version=document.get('source_version') or document.get('content_hash') or document.get('source_hash')
+                parent = next((record for eid, record in self.atomic.items() if record.get('document_id') == did and (not version or record.get('source_version')==version) and (allowed_evidence_ids is None or eid in allowed_evidence_ids)), None)
+                if not parent:
+                    continue
+                record=_document_structure_record(document,self.document_sections,parent,asks_profession_fields)
+                if not record:
+                    continue
+                eid=record['evidence_id']
+                self.atomic[eid] = record
+                if allowed_evidence_ids is not None:
+                    allowed_evidence_ids.add(eid)
+                outlines.append((hits + int('模板' in question and '模板' in str(document.get('source_path') or '')), record))
+            if outlines:
+                outlines.sort(key=lambda item: (-item[0], item[1]['file_name']))
+                rescue_specs.append(('DOCUMENT_OUTLINE_RESCUE', outlines[0][1]))
+        for issue in source_statement_reviews(question):
+            for statement in issue['statements']:
+                matches = [record for eid, record in self.atomic.items() if record.get('source_version') == issue['source_version'] and (record.get('location') or {}).get('page') == statement['page'] and (allowed_evidence_ids is None or eid in allowed_evidence_ids)]
+                if matches:
+                    matches.sort(key=lambda record: (-sum(term in str(record.get('text') or '') for term in issue['topic_terms']), -len(str(record.get('text') or ''))))
+                    rescue_specs.append(('SOURCE_STATEMENT_REVIEW', matches[0]))
         rescue_rows = []
         rescue_ids = set()
         for origin, record in rescue_specs:
@@ -884,16 +1007,35 @@ class V25LiveShadow:
         referenced_cards = _referenced_knowledge_card_candidates(question, self.chunks, self.atomic)
         if referenced_cards:
             candidate_rows = referenced_cards
+        scoped_atomic = self.atomic
+        scoped_rows = self.structured_rows
+        if allowed_evidence_ids is not None:
+            candidate_rows = [row for row in candidate_rows if row['evidence_id'] in allowed_evidence_ids]
+            scoped_atomic = {eid: record for eid, record in self.atomic.items() if eid in allowed_evidence_ids}
+            source_versions = {(r.get('source_id'), r.get('source_version')) for r in scoped_atomic.values()}
+            scoped_rows = [row for row in self.structured_rows if (row.get('source_id'), row.get('source_version')) in source_versions]
         for rank, row in enumerate(candidate_rows, start=1):
             row["rank"] = rank
         documents = {str(key): dict(value) for key, value in self.docs.items()}
         for document in documents.values():
             document.setdefault("scope", {})
-            document.setdefault("document_role", document.get("document_type"))
-            document.setdefault("authority_level", "UNKNOWN")
+            profile = document.get('document_profile') or {}
+            if not document.get('document_type'):
+                document['document_type'] = (profile.get('document_type') or {}).get('value')
+            if not document.get('document_role'):
+                document['document_role'] = (profile.get('document_role') or {}).get('value') or document.get('document_type')
+            if not document.get('authority_level'):
+                document['authority_level'] = (profile.get('authority_level') or {}).get('value') or 'UNKNOWN'
         result = {"atomic_candidates": candidate_rows}
-        bundle = _runtime_bundle(question, plan.to_dict(), result, documents, self.atomic, self.structured_rows)
+        bundle = _runtime_bundle(question, plan.to_dict(), result, documents, scoped_atomic, scoped_rows)
         answer = render(bundle)
+        requested_object = re.search(r'是否(?:都)?(?:包含|包括)([^？?，,。；;]{2,30})', question)
+        if requested_object and plan.project and answer.get('answer_status') in {'ANSWERED', 'PARTIAL_ANSWER'}:
+            target=requested_object[1].strip()
+            cited=[self.evidence_record(str(c.get('evidence_id') or '')) or {} for c in answer.get('citations') or []]
+            if not any(target in str(r.get('raw_text') or r.get('text') or '') for r in cited):
+                answer.update(answer_status='INSUFFICIENT_EVIDENCE',answer_text='已找到该项目的合同范围资料，但没有明确覆盖“'+target+'”，暂不能确认是否包含。',citations=[],claims=[],claim_evidence_map={})
+                bundle.update(bundle_status='INSUFFICIENT_EVIDENCE',failure_reason='NAMED_OBJECT_NOT_COVERED')
         validation = validate(answer, bundle)
         citations = answer.get("citations") or []
         primary_citations = primary.get("citations") or []

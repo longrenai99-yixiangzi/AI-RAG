@@ -15,6 +15,7 @@ from urllib.parse import unquote, urlparse
 
 import pymupdf
 from docx import Document as WordDocument
+from docx.text.paragraph import Paragraph
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from pptx import Presentation
@@ -407,32 +408,77 @@ class DocumentIntelligenceV2Builder:
                 "style": paragraph.style.name if paragraph.style else "Normal",
                 "source_block_id": stable_id("source-block", did, index),
             })
-        for table_index, table in enumerate(document.tables, start=1):
+        table_positions = []
+        paragraph_positions = {}
+        paragraph_index = 0
+        previous_text = ''
+        for body_order, item in enumerate(document.iter_inner_content(), 1):
+            if isinstance(item, Paragraph):
+                paragraph_index += 1
+                paragraph_positions[paragraph_index] = body_order
+                if clean_text(item.text):
+                    previous_text = clean_text(item.text)
+            else:
+                table_positions.append((item, paragraph_index, body_order, previous_text))
+        for paragraph in result['paragraphs']:
+            paragraph['location']['body_order'] = paragraph_positions[paragraph['location']['paragraph_start']]
+        for table_index, (table, paragraph_index, body_order, previous_text) in enumerate(table_positions, start=1):
             values = [[clean_text(cell.text) for cell in row.cells] for row in table.rows]
             if not values:
                 continue
             table_text = "\n".join(" | ".join(row) for row in values)
-            matching = [section for section in sections if section["heading"] and section["heading"] in table_text]
-            section = matching[-1] if matching else sections[-1]
-            header = values[0]
+            section = _section_for_location(sections, max(paragraph_index, 1))
+            caption = list(dict.fromkeys(value for value in values[0] if value))
+            has_caption = len(caption) == 1 and len(values[0]) > 1
+            title = caption[0] if has_caption else previous_text if len(previous_text) <= 80 and re.fullmatch(r'(?:表\s*\d+.*|附表.*|.*(?:清单|计划表|评估表|统计表|指标表))', previous_text) else ''
+            header_index = 1 if has_caption and len(values) > 1 else 0
+            # Participant or note rows above the real columns remain source rows, not column names.
+            for candidate in range(header_index, min(len(values), 6)):
+                labels = [value for value in values[candidate] if value]
+                if len(set(labels)) >= 3 and any(re.fullmatch(r'序\s*号|专业(?:类别)?|资料类型|阶段|评估分类|类别', value) for value in labels):
+                    header_index = candidate
+                    break
+            header = values[header_index]
+            header_rows = [header_index + 1]
+            if header_index + 1 < len(values):
+                following = values[header_index + 1]
+                if len(following) == len(header) and following and (following[0] == header[0] or re.fullmatch(r'序\s*号', following[0])) and not re.search(r'\d', following[0]) and any(value != header[index] for index, value in enumerate(following)):
+                    header = [label if not following[index] or following[index] == label else label+' / '+following[index] for index, label in enumerate(header)]
+                    header_rows.append(header_index + 2)
+            key_value = len(header) == 2 and len(values) > 1 and values[0][0] in {'项目名称', '工程名称'} and len({row[0] for row in values}) > 1
+            if key_value:
+                header = ['字段', '原文内容']
+                header_rows = []
+            has_image = bool(table._element.xpath('.//w:drawing | .//w:pict'))
+            image_only = has_image and len(''.join(value for row in values for value in row)) < 30
             table_id = stable_id("table", did, table_index)
             table_record = {
                 "table_id": table_id,
                 "section_id": section["section_id"],
                 "sheet_name": None,
-                "table_title": next((p["text"] for p in result["paragraphs"] if "清单" in p["text"] or "表" in p["text"]), ""),
+                "table_title": title or f'未标明表名（原件第{table_index}表）',
                 "header": header,
                 "row_count": len(values),
                 "column_count": max((len(row) for row in values), default=0),
-                "source_location": {"table": table_index},
-                "semantic": {"title": "", "header": header, "semantic_summary": table_text[:500], "business_fields": header, "representative_rows": values[1:3]},
+                "source_location": {"table": table_index, "preceding_paragraph": paragraph_index, "body_order": body_order, "header_row": header_index + 1},
+                "header_source_rows": header_rows,
+                "table_kind": 'FIGURE_CONTAINER' if image_only else 'KEY_VALUE' if key_value else 'DATA_TABLE',
+                "header_origin": 'SYNTHETIC_KEY_VALUE_LABELS' if key_value else 'ORIGINAL_ROWS',
+                "contains_image": has_image,
+                "image_reading_status": 'NOT_VERIFIED' if has_image else 'NOT_APPLICABLE',
+                "semantic": {"title": title, "header": header, "semantic_summary": table_text[:500], "business_fields": header, "representative_rows": values[max(header_rows, default=0):max(header_rows, default=0)+2]},
                 "structured": {"columns": header, "rows": [], "cells": [], "formulas": [], "cached_values": [], "source_row_numbers": list(range(1, len(values) + 1))},
             }
             result["tables"].append(table_record)
             for row_index, row in enumerate(values, start=1):
-                result["table_rows"].append(_table_row(table_id, section["section_id"], row_index, row, header, {"table": table_index, "row": row_index}))
+                record = _table_row(table_id, section["section_id"], row_index, row, header, {"table": table_index, "row": row_index, "preceding_paragraph": paragraph_index, "body_order": body_order, "header_row": header_index + 1})
+                record['is_header'] = row_index <= max(header_rows, default=0)
+                record['is_table_preamble'] = row_index < min(header_rows, default=1)
+                result["table_rows"].append(record)
         result["title"] = next((p.text for p in document.paragraphs if clean_text(p.text)), path.stem)
-        result["text"] = "\n".join([p["text"] for p in result["paragraphs"]] + [t["semantic"]["semantic_summary"] for t in result["tables"]])
+        content = [(p['location']['body_order'], p['text']) for p in result['paragraphs']]
+        content.extend((table['source_location']['body_order'], '\n'.join(' | '.join(str(value) for value in row['values']) for row in result['table_rows'] if row['table_id']==table['table_id'])) for table in result['tables'])
+        result['text'] = '\n'.join(value for _, value in sorted(content))
         result["parse_status"] = "parsed"
         return result
 
@@ -591,6 +637,8 @@ class DocumentIntelligenceV2Builder:
                 if not nonempty:
                     continue
                 header_number, header_cells = _find_xlsx_header(nonempty)
+                preamble = ' '.join(clean_text(cell['display']) for number, cells in nonempty if number < header_number for cell in cells)
+                declared_periods = list(dict.fromkeys(re.findall(r'20\d{2}年\d{1,2}月', preamble)))
                 headers = [clean_text(cell["display"]) or f"列{index}" for index, cell in enumerate(header_cells, start=1)]
                 carry_index = next((index for index, header in enumerate(headers) if any(term in header for term in ("专业", "类别", "单位", "分公司"))), None)
                 carry_value = None
@@ -600,11 +648,11 @@ class DocumentIntelligenceV2Builder:
                     "table_id": table_id,
                     "section_id": section_id,
                     "sheet_name": sheet.title,
-                    "table_title": sheet.title,
+                    "table_title": next((clean_text(cells[0]['display']) for number, cells in nonempty if number < header_number and clean_text(cells[0]['display'])), sheet.title),
                     "header": headers,
                     "row_count": len([item for item in nonempty if item[0] >= header_number]),
                     "column_count": len(headers),
-                    "source_location": {"sheet_name": sheet.title, "row_start": header_number, "row_end": last_row, "column_start": 1, "column_end": len(headers)},
+                    "source_location": {"sheet_name": sheet.title, "row_start": header_number, "row_end": last_row, "column_start": 1, "column_end": len(headers), "declared_periods": declared_periods},
                     "semantic": {"title": sheet.title, "header": headers, "semantic_summary": "Workbook sheet/region", "business_fields": headers, "representative_rows": []},
                     "structured": {"columns": headers, "rows": [], "cells": [], "formulas": [], "cached_values": [], "source_row_numbers": []},
                     "merged_ranges": [str(item) for item in sheet.merged_cells.ranges],
@@ -623,6 +671,7 @@ class DocumentIntelligenceV2Builder:
                     values = [cell["display"] for cell in cells[: len(headers)]]
                     row_record = _table_row(table_id, section_id, row_number, values, headers, {"sheet_name": sheet.title, "row_start": row_number, "row_end": row_number, "column_count": len(headers), "header_row": header_number})
                     row_record["is_header"] = row_number == header_number
+                    row_record['source_location']['declared_periods'] = declared_periods
                     row_record["is_summary"] = _is_summary_row(values, cells)
                     row_record["cells"] = [
                         {"column": get_column_letter(index + 1), "header": headers[index], "value": json_value(cell["display"]), "formula": json_value(cell["formula"]), "cached_value": json_value(cell["cached"]), "inherited_from_merged": cell.get("inherited_from_merged"), "inherited_from_blank": cell.get("inherited_from_blank")}
@@ -735,6 +784,10 @@ class DocumentIntelligenceV2Builder:
         values.extend(item.get("semantic", {}).get("semantic_summary", "") for item in tables if item.get("section_id") == section["section_id"])
         section["paragraph_ids"] = [item["paragraph_id"] for item in paragraphs if item.get("section_id") == section["section_id"]]
         section["table_ids"] = [item["table_id"] for item in tables if item.get("section_id") == section["section_id"]]
+        if any((item.get('location') or {}).get('body_order') for item in paragraphs if item.get('section_id')==section['section_id']) or any((item.get('source_location') or {}).get('body_order') for item in tables if item.get('section_id')==section['section_id']):
+            ordered = [((item.get('location') or {}).get('body_order', 0), item['text']) for item in paragraphs if item.get('section_id')==section['section_id']]
+            ordered.extend(((item.get('source_location') or {}).get('body_order', 0), '\n'.join(' | '.join(str(value) for value in row['values']) for row in rows if row['table_id']==item['table_id'])) for item in tables if item.get('section_id')==section['section_id'])
+            values = [value for _, value in sorted(ordered)]
         return "\n".join(value for value in values if value)
 
     def _attach_parent_links(self, bundle: dict[str, list[dict[str, Any]]], atomic_records: list[dict[str, Any]]) -> None:
@@ -939,12 +992,17 @@ def _field_confidence(metadata: dict[str, Any], field: str) -> float:
 
 
 def _project_candidates(path_text: str, title: str, text: str) -> list[str]:
-    source = f"{path_text} {title} {text[:2_000]}"
+    # Names come from identities or explicit name fields, not sentences mentioning projects.
     values = []
-    for part in re.split(r"[\\/\n，。；：()（）]", source):
-        part = part.strip()
-        if "项目" in part and 2 <= len(part) <= 80:
-            values.append(part.rsplit(".", 1)[0])
+    generic = {'本项目', '该项目', '新建项目', '新建设项目', '建设项目', '设计项目', 'EPC项目', 'epc项目'}
+    for part in re.split(r"[\\/\n，。；：()（）\-_—]", f"{path_text} {title}"):
+        match = re.search(r'([\u3400-\u9fffA-Za-z0-9·]{2,40}项目)', part)
+        if match and match[1] not in generic and not any(word in match[1] for word in ('管理', '流程', '评估', '策划', '编制')):
+            values.append(match[1])
+    for match in re.finditer(r'(?:项目|工程)名称\s*(?:为|是|[：:])\s*([^\n，,。；;]{2,80})', text[:4000]):
+        value = match[1].strip()
+        if value not in generic:
+            values.append(value)
     return list(dict.fromkeys(values))[:8]
 
 

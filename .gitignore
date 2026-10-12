@@ -17,3 +17,23 @@ logs/
 *.log
 .env
 .env.local
+
+# Private runtime packages and generated outputs
+.venv-*/
+knowledge-ui/node_modules/
+knowledge-ui/dist/
+*.tsbuildinfo
+private_data/
+frozen_sources/
+primary_sources/
+mutable/
+preview-state/
+backups/
+PACKAGE_MANIFEST_PRIVATE.json
+PARENT_PACKAGE_MANIFEST_PRIVATE.json
+*_PRIVATE.json
+assessment_handoff.json
+project_navigation.json
+knowledge_display.json
+release_metadata.json
+release_feedback_status.json

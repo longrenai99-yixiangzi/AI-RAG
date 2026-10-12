@@ -10,7 +10,7 @@ export function GoldReview() {
   const [sourceInput, setSourceInput] = useState('')
   const [sectionInput, setSectionInput] = useState('')
   const [notice, setNotice] = useState('')
-  useEffect(() => { fetch('/api/v2/gold-review/items?status=PENDING&limit=50', { cache: 'no-store' }).then((r) => r.json()).then((data) => setItems(data.items || [])).catch(() => setNotice('Gold 审核数据暂时不可用。')) }, [])
+  useEffect(() => { fetch('/api/v2/gold-review/items?status=PENDING&limit=50', { cache: 'no-store' }).then((r) => { if (!r.ok) throw new Error(); return r.json() }).then((data) => { if (!Array.isArray(data.items)) throw new Error(); setItems(data.items) }).catch(() => setNotice('来源审核数据读取失败，请检查服务；这不表示没有待审核题目。')) }, [])
   const item = items[index]
   useEffect(() => {
     if (!item) return

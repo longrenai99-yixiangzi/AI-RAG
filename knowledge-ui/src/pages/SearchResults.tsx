@@ -1,26 +1,25 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ReadableText } from '../components/ReadableText'
+import { bodyLink } from './ProjectRecords'
 
-type SearchItem = {
-  type: 'SOURCE' | 'KNOWLEDGE' | 'EVIDENCE'
-  score: number
-  source?: { source_id: string; file_name: string; source_path: string; index_status?: string }
-  knowledge?: { knowledge_id: string; title: string; content: string; source_id: string; version: number }
-  evidence?: { evidence_id: string; source_id: string; file_name: string; heading_path?: string; excerpt: string }
-}
-
-export function SearchResults() {
-  const [params] = useSearchParams()
-  const query = params.get('q') || ''
-  const [items, setItems] = useState<SearchItem[]>([])
-  const [message, setMessage] = useState('正在搜索真实知识和来源…')
-  useEffect(() => {
-    if (!query.trim()) { setItems([]); setMessage('请输入关键词后再搜索。'); return }
-    setMessage('正在搜索真实知识和来源…')
-    fetch(`/api/v2/knowledge/search?q=${encodeURIComponent(query)}`, { cache: 'no-store' })
-      .then(async (response) => { if (!response.ok) throw new Error(String(response.status)); return response.json() })
-      .then((payload) => { setItems(payload.items || []); setMessage((payload.items || []).length ? '' : '没有找到匹配的真实知识、来源或正文。') })
-      .catch(() => { setItems([]); setMessage('搜索服务暂时不可用，请检查 8010 服务。') })
-  }, [query])
-  return <section><header className="page-hero compact"><div><span className="eyebrow">SEARCH</span><h1>全局搜索</h1><p>关键词：{query || '未输入'}</p></div></header>{message && <p className="empty-runtime">{message}</p>}<div className="search-results">{items.map((item, index) => <article className="panel" key={`${item.type}-${item.source?.source_id || item.knowledge?.knowledge_id || item.evidence?.evidence_id}-${index}`}><span>{item.type === 'SOURCE' ? '来源' : item.type === 'KNOWLEDGE' ? '已审核知识' : '正文证据'}</span>{item.source && <><h2>{item.source.file_name}</h2><p>{item.source.source_path}</p><Link to="/sources">在知识资产中查看</Link></>}{item.knowledge && <><h2>{item.knowledge.title}</h2><p>{item.knowledge.content}</p><small>版本 {item.knowledge.version} · {item.knowledge.knowledge_id}</small></>}{item.evidence && <><h2>{item.evidence.file_name}</h2><p>{item.evidence.excerpt}</p><small>{item.evidence.heading_path || '未识别章节'} · {item.evidence.evidence_id}</small></>}</article>)}</div></section>
+type Evidence = { body_source?: {source_id:string;source_version:string;file_name:string}; evidence_id: string; source_id: string; source_version: string; file_name: string; heading_path?: string; excerpt: string; source_role?: string; display_title?: string; knowledge_card?: { response_format?: string; primary_sources?: {source_path: string; sha256: string}[] } }
+type Item = { score: number; evidence: Evidence }
+type Original={file_name:string;source_version:string;reader_url:string;file_url:string;note:string}
+type DocumentResult={file_name:string;source_version:string;reader_url?:string;file_url?:string;note:string}
+type Project = {id:string;name:string}
+const labels: Record<string,string>={PRIMARY_BODY:'资料正文',LINK_REGISTRATION:'资料登记线索',NAVIGATION:'目录导航'}
+export function SearchResults(){
+  const [params,setParams]=useSearchParams();const query=params.get('q')||'';const projectId=params.get('project')||'';const mode=params.get('mode')==='content'?'content':'documents'
+  const [items,setItems]=useState<Item[]>([]);const [related,setRelated]=useState<Item[]>([]);const [projects,setProjects]=useState<Project[]>([]);const [message,setMessage]=useState('');const [originals,setOriginals]=useState<Original[]>([]);const [documents,setDocuments]=useState<DocumentResult[]>([]);const [registrations,setRegistrations]=useState<DocumentResult[]>([])
+  useEffect(()=>{const c=new AbortController();fetch('/api/v2/knowledge/projects',{signal:c.signal}).then(r=>r.json()).then(p=>{if(Array.isArray(p.items))setProjects(p.items)}).catch(()=>{});return()=>c.abort()},[])
+  useEffect(()=>{const c=new AbortController();setItems([]);setRelated([]);setOriginals([]);setDocuments([]);setRegistrations([])
+    if(!query.trim()){setMessage('请输入要查的事项或关键词。');return}
+    setMessage('正在查找相关资料…')
+    fetch('/api/v2/knowledge/search?'+new URLSearchParams({q:query,project_id:projectId,mode}),{signal:c.signal,cache:'no-store'}).then(async r=>{const p=await r.json();if(!r.ok)throw new Error(p.detail||'搜索读取失败');return p}).then(p=>{if(c.signal.aborted)return;if(!Array.isArray(p.items))throw new Error();setItems(p.items);setRelated(p.related_items||[]);setOriginals(p.readable_originals||[]);setDocuments(p.documents||[]);setRegistrations(p.registrations||[]);setMessage((mode==='documents'?p.documents?.length:p.items.length)?'':mode==='documents'?'当前范围没有可读的同名文件；可查看登记线索，或切换到查内容和方法。':'当前范围没有匹配段落，可调整关键词。')}).catch(e=>{if(!c.signal.aborted)setMessage(e.message||'搜索读取失败，请检查服务。')});return()=>c.abort()
+  },[query,projectId,mode])
+  function row(item:Item){const e=item.evidence;const title=(e.display_title||e.file_name).replace(/^NEW\d+-C\d+\s*/,'');const preview=e.excerpt.replace(/^NEW\d+-C\d+[^\n]*\n/,'').replace(/(?:原件版本|SHA-256)[^\n]*/g,'')
+    return <article className="panel" key={e.source_id+'|'+e.source_version+'|'+e.evidence_id}><span>{e.source_role==='REVIEWED_KNOWLEDGE'?(e.knowledge_card?.response_format==='VERIFIED_FACT_SHEET'?'已确认事实摘录':'已确认方法参考'):labels[e.source_role||'']||'资料片段'}</span><h2>{title}</h2><ReadableText text={preview.slice(0,360)}/><details><summary>展开命中段落与上下文</summary><ReadableText text={e.excerpt}/></details><div className="source-links"><Link to={bodyLink(e.body_source||e)}>浏览依据资料正文</Link><Link to={'/sources?'+new URLSearchParams({source_id:e.source_id,source_version:e.source_version,evidence_id:e.evidence_id})}>核对本条位置</Link>{e.knowledge_card?.primary_sources?.map(s=><a key={s.sha256+s.source_path} href={'/api/v2/knowledge/primary-sources/'+s.sha256}>打开依据资料 · {s.source_path.split(/[\\/]/).pop()}</a>)}</div><details><summary>来源版本</summary><small>{e.file_name} · {e.heading_path} · {e.source_version.slice(0,12)}</small></details></article>
+  }
+  return <section><header className="page-hero compact"><div><h1>资料与知识搜索</h1><p>关键词：{query||'未输入'}。{mode==='documents'?'现在按文件名找文件，不把提到关键词的经验总结当作该文件。':'现在查询正文或方法，不表示结果文件本身就是任务书。'}</p></div><Link to="/periods">部门与期间资料</Link></header><div className="scope-banner"><label>查询范围 <select value={projectId} onChange={e=>setParams({q:query,mode,...(e.target.value?{project:e.target.value}:{})})}><option value="">全库／通用问题</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>查什么 <select value={mode} onChange={e=>setParams({q:query,mode:e.target.value,...(projectId?{project:projectId}:{})})}><option value="documents">找文件（按文件名）</option><option value="content">查内容和方法（查正文）</option></select></label><p>无项目背景时查全库；已选项目时只查该项目资料。</p></div>{message&&<p className="empty-runtime">{message}</p>}{mode==='documents'?<><h2>标题匹配的文件（{documents.length}）</h2><div className="document-results">{documents.map(d=><article className="panel" key={d.file_name+d.source_version}><h2>{d.file_name}</h2><p>{d.note}</p><div className="source-links">{d.reader_url&&<Link to={d.reader_url}>浏览这份文件正文</Link>}{d.file_url&&<a href={d.file_url}>打开本版原文件</a>}</div></article>)}</div>{registrations.length>0&&<details className="registration-results"><summary>另有{registrations.length}项相关登记或摘录，原件可用性另行核对</summary>{registrations.map(d=><article className="panel" key={d.file_name+d.source_version}><h3>{d.file_name}</h3><p>{d.note}</p>{d.reader_url&&<Link to={d.reader_url}>查看登记或摘录</Link>}</article>)}</details>}</>:<><div className="readable-originals">{originals.map(o=><article className="panel" key={o.source_version}><span>标题匹配的原始资料</span><h2>{o.file_name}</h2><p>{o.note} 自动问答继续使用已确认的方法摘录。</p><div className="source-links"><Link to={o.reader_url}>浏览原始任务书正文与表格</Link><a href={o.file_url}>打开本版Word原件</a></div></article>)}</div><h2>正文或方法中的匹配段落（{items.length}）</h2><div className="search-results">{items.map(row)}</div>{related.length>0&&<details className="related-reading"><summary>扩展阅读（{related.length}）：仅作背景参考</summary><div className="search-results">{related.map(row)}</div></details>}</>}</section>
 }

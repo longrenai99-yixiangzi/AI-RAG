@@ -1,5 +1,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { useRuntimeCapabilities } from '../components/layout/RuntimeCapabilities'
+import { ReadableText } from '../components/ReadableText'
 
 type Citation = { citation_id: string; evidence_id?: string; source_id?: string; source_version?: string; file_name?: string; source_path?: string; display_location?: string; excerpt?: string; location?: Record<string, unknown>; primary_sources?: { source_path: string; sha256?: string; location?: string; page?: number }[] }
 type Claim = { claim_id: string; rendered_claim_text: string; claim_type: string }
@@ -43,6 +45,8 @@ type Workflow = {
   root_cause?: string
   system_fix_required?: boolean
   standard_answer_required?: boolean
+  traffic_kind?: string
+  processing_status?: string
 }
 
 const EXAMPLES = ['中建三局二公司设计与技术支持中心的组织架构是什么样的？', '设计任务书需要包含哪些内容？', '自动喷淋系统管材有哪些方案可以比选？', '2025年公司设计创效情况如何？']
@@ -127,11 +131,14 @@ function loadFeedbackDraft(result: V2Result): FeedbackDraft {
 }
 
 export function AIChat() {
-  const [params] = useSearchParams()
+  const { runtime } = useRuntimeCapabilities()
+  const [params,setParams] = useSearchParams()
   const nodeId = params.get('node') || ''
+  const projectId=params.get('project')||''
+  const [projects,setProjects]=useState<Array<{id:string;name:string}>>([])
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadMessages())
   const [conversationId, setConversationId] = useState(() => localStorage.getItem(CONVERSATION_KEY) || crypto.randomUUID())
-  const [question, setQuestion] = useState(() => localStorage.getItem(QUESTION_DRAFT_KEY) || '')
+  const [question, setQuestion] = useState(() => params.get('q')||localStorage.getItem(QUESTION_DRAFT_KEY) || '')
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<Citation | null>(null)
   const [notice, setNotice] = useState('')
@@ -146,6 +153,7 @@ export function AIChat() {
   useEffect(() => { try { localStorage.setItem(CONVERSATION_KEY, conversationId) } catch { setNotice('本机存储不可用，刷新后会话可能丢失。') } }, [conversationId])
   useEffect(() => { persistMessages(messagesRef.current) }, [])
   useEffect(() => { void refreshWorkflow() }, [])
+  useEffect(()=>{const c=new AbortController();fetch('/api/v2/knowledge/projects',{signal:c.signal,cache:'no-store'}).then(r=>r.json()).then(p=>{if(Array.isArray(p.items))setProjects(p.items)}).catch(()=>{});return()=>c.abort()},[])
 
   function commitMessages(next: ChatMessage[]) {
     messagesRef.current = next
@@ -167,7 +175,8 @@ export function AIChat() {
     try {
       const response = await fetch('/api/v2/feedback-workflow', { cache: 'no-store' })
       const payload = await response.json() as { items?: Workflow[] }
-      if (response.ok) setWorkflow(Array.isArray(payload.items) ? payload.items : [])
+      if (!response.ok || !Array.isArray(payload.items)) throw new Error()
+      setWorkflow(payload.items)
     } catch { setNotice('反馈记录暂时无法读取。') }
   }
 
@@ -184,7 +193,7 @@ export function AIChat() {
     updateQuestion('')
     setLoading(true)
     try {
-      const response = await fetch('/api/v2/query', { method: 'POST', signal: activeController.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, trial_user: 'reviewer-001', conversation_id: currentConversation, node_id: nodeId }) })
+      const response = await fetch('/api/v2/query', { method: 'POST', signal: activeController.signal, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: text, trial_user: 'reviewer-001', conversation_id: currentConversation, node_id: nodeId,project_id:projectId }) })
       const result = await response.json().catch(() => null) as (V2Result & { detail?: string }) | null
       if (!response.ok) throw new Error(typeof result?.detail === 'string' ? result.detail : `HTTP ${response.status}`)
       if (!result || typeof result.answer !== 'string' || !result.query_run_id) throw new Error('服务响应缺少答案或运行编号')
@@ -231,7 +240,7 @@ export function AIChat() {
       const payload = await response.json() as { deduplicated?: boolean }
       if (!response.ok) throw new Error('save failed')
       localStorage.removeItem(feedbackDraftKey(result.query_run_id))
-      setNotice(payload.deduplicated ? '该次提交已记录，无需重复创建。' : '更正已记录，请在右侧核对来源并发布到试用知识。')
+      setNotice(payload.deduplicated ? '该次提交已记录，无需重复创建。' : '更正已记录，请在右侧核对来源并完成受控版本发布。')
       await refreshWorkflow()
       return true
     } catch {
@@ -258,17 +267,18 @@ export function AIChat() {
     if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send() }
   }
 
-  const relevantWorkflow = workflow.filter((item) => !currentRunId || item.query_run_id === currentRunId)
+  const relevantWorkflow = currentRunId ? workflow.filter((item) => item.query_run_id === currentRunId) : []
   return <section className="ai-chat-page">
     <aside className="chat-history panel">
-      <div className="chat-side-head"><div><span className="eyebrow">V2 INTERNAL TRIAL</span><h2>对话历史</h2></div><button onClick={newConversation}>+ 新建对话</button></div>
+      <div className="chat-side-head"><div><span className="eyebrow">CURRENT KNOWLEDGE VERSION</span><h2>对话历史</h2></div><button onClick={newConversation}>+ 新建对话</button></div>
       <div className="history-group"><b>当前会话</b>{history.length ? history.slice().reverse().map((item) => <button key={item.id} onClick={() => setQuestion(item.text)}>{item.text}</button>) : <span>尚无对话记录</span>}</div>
       <p className="history-note">历史问题只帮助恢复追问主体；回答事实仍来自可核查证据。</p>
     </aside>
     <main className="chat-main panel">
-      <header className="chat-hero"><span className="eyebrow">AI KNOWLEDGE Q&A</span><h1>AI知识问答</h1><p>{nodeId ? `当前从知识节点 ${nodeId} 发起；答案仍需可核查来源。` : '基于当前 8010 试用知识范围的可验证问答'}</p></header>
+      <header className="chat-hero"><span className="eyebrow">AI KNOWLEDGE Q&A</span><h1>AI知识问答</h1><p>{nodeId ? `当前从知识节点 ${nodeId} 发起；答案仍需可核查来源。` : '基于当前版本资料范围的可验证问答'}</p></header>
+      <div className="scope-banner"><label>查询范围 <select value={projectId} onChange={e=>{newConversation();setParams(e.target.value?{project:e.target.value}:{})}}><option value="">全库／通用问题（无需项目）</option>{projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>{projectId&&<Link to={'/projects/'+projectId}>查看此项目资料</Link>}<small>明确选项目后在该项目内回答；通用问题和跨项目比较可选全库。</small></div>
       <div className="chat-flow">{messages.length === 0 && <div className="chat-empty"><h2>先查证，再回答</h2><p>回答中的制度、数字和项目事实都应能回到原文位置。</p><div>{EXAMPLES.map((item) => <button key={item} onClick={() => void send(item)}>{item}</button>)}</div></div>}{messages.map((message) => message.role === 'user' ? <div className="user-message" key={message.id}>{message.text}</div> : <AnswerCard key={message.id} message={message} onCitation={setSelected} onFeedback={submitFeedback} onRetry={(item) => void send(item.question || '', item.request_id)} />)}</div>
-      <footer className="chat-composer"><textarea value={question} onChange={(event) => updateQuestion(event.target.value)} onKeyDown={onKeyDown} placeholder="输入设计管理问题，Enter发送，Shift+Enter换行" /><div><span>V2 Verified · 8010内部试用</span><button className="text-button" onClick={() => controller.current?.abort()} disabled={!loading}>停止</button><button className="text-button" onClick={newConversation}>清空并新建会话</button><button className="primary-button" onClick={() => void send()} disabled={loading}>发送</button></div></footer>
+      <footer className="chat-composer"><textarea value={question} onChange={(event) => updateQuestion(event.target.value)} onKeyDown={onKeyDown} placeholder="输入设计管理问题，Enter发送，Shift+Enter换行" /><div><span>{runtime?.display_name || '当前固定版本'}</span><button className="text-button" onClick={() => controller.current?.abort()} disabled={!loading}>停止</button><button className="text-button" onClick={newConversation}>清空并新建会话</button><button className="primary-button" onClick={() => void send()} disabled={loading}>发送</button></div></footer>
     </main>
     <aside className="source-detail panel">
       <div className="source-detail-head"><span className="eyebrow">CITATION & CORRECTION</span><h2>来源与更正</h2></div>
@@ -309,11 +319,11 @@ function AnswerCard({ message, onCitation, onFeedback, onRetry }: { message: Cha
 
   return <article className={`answer-card ${partial ? 'partial' : ''} ${conflict ? 'conflict' : ''}`}>
     <header><span className={`answer-status ${status.toLowerCase()}`}>{result.status_label || status}</span><small>{latencyMs.toFixed(0)} ms</small></header>
-    <div className="answer-body">{message.text}</div>
+    <div className="answer-body"><ReadableText text={message.text}/></div>
     {partial && <div className="partial-grid"><div><b>已确认内容</b>{confirmed.map((item) => <p key={item.claim_id}>{item.rendered_claim_text}</p>)}</div><div><b>证据不足内容</b>{limitations.map((item) => <p key={item.claim_id}>{item.rendered_claim_text}</p>)}</div></div>}
     {result.failure_message && <p className="runtime-error">{result.failure_message}</p>}
     {result.resolved_question && result.resolved_question !== result.question && <small className="resolved-question">本轮检索问题：{result.resolved_question}</small>}
-    <section className="answer-citations"><b>引用来源</b>{citations.length ? citations.map((citation, index) => <button key={citation.citation_id || `${index}`} onClick={() => onCitation(citation)}>[{index + 1}] {citation.file_name} · {citation.display_location}</button>) : <span>本次没有形成可定位引用。</span>}</section>
+    <section className="answer-citations"><b>引用来源</b>{citations.length ? citations.map((citation, index) => <button key={citation.citation_id || `${index}`} onClick={() => onCitation(citation)}>[{index + 1}] {citation.primary_sources?.[0]?.source_path.split(/[\\/]/).pop()||citation.file_name} · {citation.primary_sources?.[0]?.location||citation.display_location}</button>) : <span>本次没有形成可定位引用。</span>}</section>
     <footer className="answer-actions"><details className="feedback-editor"><summary>纠正这条回答</summary><form onSubmit={submit}>
       <label>反馈类型<select value={draft.feedback_type} onChange={(event) => change({ feedback_type: event.target.value })}><option>回答不完整</option><option>答案错误</option><option>引用不对</option><option>没有回答我的问题</option><option>资料缺失</option><option>答案冲突</option></select></label>
       <label>问题说明（必填）<textarea required value={draft.comment} onChange={(event) => change({ comment: event.target.value })} placeholder="错在哪里、缺少什么或适用范围有什么问题" /></label>
@@ -334,7 +344,12 @@ function FeedbackWorkflow({ items, onRefresh }: { items: Workflow[]; onRefresh: 
   return <details className="feedback-closure-panel"><summary>本题更正记录（{safeItems.length}）</summary><p>知识缺失经来源核对后发布；系统能力失败进入缺陷池修复。</p><div className="workflow-scroll">{safeItems.slice(0, 4).map((item) => <WorkflowItem key={item.feedback_id} item={item} onRefresh={onRefresh} />)}{!safeItems.length && <span className="source-empty">本题暂无更正记录。</span>}</div></details>
 }
 
-function WorkflowItem({ item, onRefresh }: { item: Workflow; onRefresh: () => Promise<void> }) {
+function WorkflowItem(props: { item: Workflow; onRefresh: () => Promise<void> }) {
+  const { runtime } = useRuntimeCapabilities()
+  return runtime?.features.knowledge_management_write ? <EditableWorkflowItem {...props} /> : <ReadonlyWorkflowItem {...props} />
+}
+
+function EditableWorkflowItem({ item, onRefresh }: { item: Workflow; onRefresh: () => Promise<void> }) {
   const [sourcePath, setSourcePath] = useState(item.source_path || '')
   const [sourceLocation, setSourceLocation] = useState(item.source_location || '')
   const [terms, setTerms] = useState(Array.isArray(item.required_terms) ? item.required_terms.join('、') : String(item.required_terms || ''))
@@ -376,12 +391,19 @@ function WorkflowItem({ item, onRefresh }: { item: Workflow; onRefresh: () => Pr
   }
   const reviewed = ['ACTIVE', 'PENDING_CANDIDATE'].includes(item.status)
   return <article className="closure-item"><b>{item.feedback_type} · {workflowLabel[item.closure_status] || workflowLabel[item.status] || item.closure_status}</b><p>{item.question}</p>{item.failure_code && <small>{item.failure_stage || '待分类'} · {item.failure_code}：{item.root_cause}</small>}{item.system_fix_required && <p>该记录需核对处理原因；系统故障进入缺陷修复，资料缺口须有新的补充来源。</p>}{item.system_fix_required && item.failure_code === 'EVIDENCE_INSUFFICIENT' && !reviewed && <label><input type="checkbox" checked={sourceSupplement} onChange={(event) => setSourceSupplement(event.target.checked)} />已确认是资料缺口，审核补充来源（须完整包含已确认内容）</label>}{(!item.system_fix_required || (item.failure_code === 'EVIDENCE_INSUFFICIENT' && sourceSupplement)) && !reviewed && !['REJECTED', 'DEFERRED', 'WITHDRAWN'].includes(item.status) && <><input value={sourcePath} onChange={(event) => setSourcePath(event.target.value)} placeholder="来源文件路径" /><input value={sourceLocation} onChange={(event) => setSourceLocation(event.target.value)} placeholder="页码、段落或Sheet" /><input value={terms} onChange={(event) => setTerms(event.target.value)} placeholder="关键事实，逗号分隔" /><div><button disabled={busy} onClick={() => void review('APPROVE')}>{sourceSupplement ? '审核补充来源' : '核对并审核'}</button><button disabled={busy} onClick={() => void review('DEFER')}>暂缓</button><button disabled={busy} onClick={() => void review('REJECT')}>驳回</button></div></>}{reviewed && <div><button disabled={busy} onClick={() => void regress()}>运行当前主答回归</button><button disabled={busy} onClick={() => void withdraw()}>撤回更正知识</button></div>}{item.status === 'WITHDRAWN' && <div><button disabled={busy} onClick={() => void rollback()}>回滚到首次审核版本</button></div>}{notice && <small>{notice}</small>}</article>
+
+}
+
+function ReadonlyWorkflowItem({ item }: { item: Workflow; onRefresh: () => Promise<void> }) {
+  const status = item.processing_status === 'PUBLISHED_PENDING_BUSINESS_REVIEW' ? '修复已发布，待业务复核' : item.processing_status === 'TECHNICAL_RECORD' ? '技术检查记录' : workflowLabel[item.closure_status] || '反馈已保存，待核对'
+  return <article className="closure-item"><b>{item.feedback_type}</b><p>{item.question}</p><small>{status}。内容更正由受控复核处理。</small></article>
 }
 
 function SourceDetail({ citation }: { citation: Citation }) {
   const ext = citation.file_name?.split('.').pop()?.toUpperCase() || '文件'
   const sourceLink = citation.source_id && citation.evidence_id ? `/sources?source_id=${encodeURIComponent(citation.source_id)}&evidence_id=${encodeURIComponent(citation.evidence_id)}&source_version=${encodeURIComponent(citation.source_version || '')}` : ''
-  return <div className="source-card"><b>{citation.file_name}</b><span>{ext} · {citation.display_location}</span><p>{citation.source_path}</p><small>{citation.source_id || '来源ID待补'} · 版本 {(citation.source_version || '待核实').slice(0, 12)}</small>{sourceLink && <a href={sourceLink}>查看当前主答中的这条来源证据</a>}{citation.primary_sources?.map((source) => <small key={source.source_path}>原始资料：{source.source_path.split(/[\\/]/).pop()} · {source.location || (source.page ? `第${source.page}页` : '位置待核')} · 版本 {(source.sha256 || '待核实').slice(0, 12)}</small>)}<h3>原文证据</h3><div className="evidence-text">{citation.excerpt || '当前引用未提供可展开的原文。'}</div></div>
+  const primary=citation.primary_sources?.[0]
+  return <div className="source-card"><b>{primary?.source_path.split(/[\\/]/).pop()||citation.file_name}</b><span>{primary?.location||`${ext} · ${citation.display_location}`}</span>{citation.primary_sources?.map((source) => <p key={source.source_path}>{source.sha256 && <a href={"/api/v2/knowledge/primary-sources/" + source.sha256}>打开原始依据 · {source.source_path.split(/[\\/]/).pop()}</a>}</p>)}<h3>{primary?'当前答复对应的已确认摘录':'当前答复对应的原文段落'}</h3><div className="evidence-text">{citation.excerpt || '当前引用未提供可展开的原文。'}</div><details><summary>查看摘录位置与版本链</summary><p>{citation.file_name} · {citation.display_location}</p><small>{citation.source_id} · 版本 {(citation.source_version||'待核').slice(0,12)}</small>{sourceLink&&<a href={sourceLink}>核对本条摘录证据</a>}</details></div>
 }
 
 function loadMessages(): ChatMessage[] {

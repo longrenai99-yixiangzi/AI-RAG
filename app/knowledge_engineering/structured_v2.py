@@ -57,6 +57,11 @@ def chunk_units(units: Iterable[str], *, target: int = TARGET_CHARS, maximum: in
     if page:
         grouped.append("\n".join(page))
 
+    # Keep a short section's list and its ending conditions in the same evidence window.
+    whole = "\n".join(grouped)
+    if len(whole) <= maximum:
+        return [whole] if whole else []
+
     chunks: list[str] = []
     current: list[str] = []
     current_size = 0
@@ -152,6 +157,8 @@ def build_structured_layer(documents: list[dict[str, Any]], sections: list[dict[
             for index, raw in enumerate(chunk_units(units), start=1):
                 _append_chunk(chunks, bindings, doc, source_id, source_version, section, path_value, raw, index, evidence_by_section[section_id], is_table=False)
             for table in tables_by_section[section_id]:
+                if table.get('table_kind') == 'FIGURE_CONTAINER':
+                    continue
                 header = " | ".join(str(item) for item in table.get("header") or [])
                 table_name = str(table.get("table_title") or table.get("title") or table.get("table_id") or "表格")
                 for row in rows_by_table[str(table.get("table_id") or "")]:
@@ -187,5 +194,7 @@ def _append_chunk(chunks: list[dict[str, Any]], bindings: list[dict[str, Any]], 
     profile = doc.get("document_profile") or {}
     domain = profile.get("business_domain", {}).get("value") or "设计管理"
     token_count = len(re.findall(r"[\u4e00-\u9fff]|[A-Za-z0-9]+", raw_text))
-    chunks.append({"schema_version": SCHEMA_VERSION, "chunk_id": chunk_id, "source_id": source_id, "source_version": source_version, "document_id": document_id, "section_id": section_id, "knowledge_domain": domain, "knowledge_nodes": ["design-management"], "section_path": section_path, "knowledge_type": {"value": infer_knowledge_type(raw_text), "classification": "RULE_INFERRED", "verified": False}, "raw_text": raw_text, "retrieval_text": retrieval_text(domain=domain, document_title=str(doc.get("structure", {}).get("title") or doc.get("file_name") or ""), section_path=section_path, raw_text=raw_text, project=profile.get("project", {}).get("value"), organization=profile.get("organization", {}).get("value"), specialty=profile.get("specialty", {}).get("value")), "parent_chunk_id": None, "atomic_evidence_ids": evidence_ids, "char_count": len(raw_text), "token_count": token_count, "structure_quality": {"score": score, "reasons": reasons}, "metadata_quality": doc.get("metadata_quality"), "chunk_quality_score": score, "quality_reasons": reasons, "table_id": table_id or None})
+    chunks.append({"schema_version": SCHEMA_VERSION, "chunk_id": chunk_id, "source_id": source_id, "source_version": source_version, "document_id": document_id, "section_id": section_id, "knowledge_domain": domain, "knowledge_nodes": ["design-management"], "section_path": section_path, "knowledge_type": {"value": infer_knowledge_type(raw_text), "classification": "RULE_INFERRED", "verified": False}, "raw_text": raw_text, "retrieval_text": retrieval_text(domain=domain, document_title=str(doc.get("file_name") or doc.get("structure", {}).get("title") or ""), section_path=section_path, raw_text=raw_text, project=profile.get("project", {}).get("value"), organization=profile.get("organization", {}).get("value"), specialty=profile.get("specialty", {}).get("value")), "parent_chunk_id": None, "atomic_evidence_ids": evidence_ids, "char_count": len(raw_text), "token_count": token_count, "structure_quality": {"score": score, "reasons": reasons}, "metadata_quality": doc.get("metadata_quality"), "chunk_quality_score": score, "quality_reasons": reasons, "table_id": table_id or None})
+    if row_location:
+        chunks[-1]['location'] = dict(row_location)
     bindings.append({"schema_version": SCHEMA_VERSION, "object_type": "SEMANTIC_CHUNK", "object_id": chunk_id, "knowledge_node_id": "design-management", "status": "BOUND", "method": "INHERITED_FROM_DOCUMENT", "evidence": document_id})

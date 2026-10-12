@@ -1,4 +1,14 @@
-// Public sample content is intentionally omitted. Use Owner-approved local data.
-export const designManagementCategorySeeds: Array<[string, string, string[]]> = []
-export const designManagementGraphNodes: never[] = []
+import type { KnowledgeNode } from '../../types/knowledge'
+export const designManagementCategorySeeds: Array<[string, string, string[]]> = [
+  ['system', '01 设计管理体系', ['01.01 管理制度', '01.02 管理标准', '01.03 管理流程', '01.04 岗位职责', '01.05 管理动作', '01.06 考核评价', '01.07 工作总结与期间指标']],
+  ['bid', '02 投标与前期设计管理', ['02.01 投标设计管理', '02.02 项目设计条件分析', '02.03 设计合同与界面', '02.04 设计资源配置', '02.05 前期设计风险']],
+  ['planning', '03 设计策划管理', ['03.01 设计评估', '03.02 设计管理策划', '03.03 设计任务书', '03.04 设计计划', '03.05 方案比选', '03.06 设计价值创造点', '03.07 限额与概算控制']],
+  ['process', '04 设计过程管理', ['04.01 方案设计管理', '04.02 初步设计管理', '04.03 施工图设计管理', '04.04 设计进度管理', '04.05 设计提资管理', '04.06 专业协调管理', '04.07 设计会议与沟通', '04.08 设计风险跟踪']],
+  ['deliverables', '05 阶段性设计成果管理', ['05.01 设计成果审查', '05.02 审查意见闭环', '05.03 设计变更管理', '05.04 设计成果版本管理', '05.05 设计成果交付']],
+  ['result-library', '06 设计成果库', ['06.01 方案比选案例库', '06.02 设计指标库', '06.03 设计价值创造点库', '06.04 典型问题库', '06.05 标准做法库', '06.06 项目复盘成果库']],
+  ['resource', '07 设计资源库', ['07.01 设计院资源', '07.02 设计大师（专家）资源']],
+  ['materials', '08 设计资料库', ['08.01 规范标准', '08.02 标准图集', '08.03 标准节点', '08.04 模板表单', '08.05 标准化成果', '08.06 参考资料']],
+]
+
+export const designManagementGraphNodes: KnowledgeNode[] = []
 export const designManagementSamplesByNode: Record<string, never> = {}

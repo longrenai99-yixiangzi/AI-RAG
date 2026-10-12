@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 TARGET = Path(os.environ.get('RAG_RELEASE_TARGET', str(ROOT)))
-HASH = "3626608a3d853f7bd1b107c35046a1098c2c025dbd1c883f157c4e952084f37b"
+HASH = os.environ.get("RAG_EXPECTED_CANDIDATE_HASH", "")
 MODELS = Path(os.environ.get('RAG_EMBEDDING_MODEL_PATH', str(ROOT / 'models' / 'bge-m3')))
 
 
@@ -70,6 +70,9 @@ def main():
     if not args.authorization_file:
         raise SystemExit("SEPARATE_DEPLOYMENT_AUTHORIZATION_REQUIRED")
     require_authorization(args.authorization_file, check)
+    os.environ["RAG_RELEASE_SERVICE_KIND"] = "FORMAL"
+    os.environ["RAG_RELEASE_AUTHORIZED"] = "1"
+    os.environ["RAG_RELEASE_SERVICE_PORT"] = "8000"
     with socket.socket() as probe:
         if probe.connect_ex(("127.0.0.1", 8000)) == 0:
             raise SystemExit("8000_OCCUPIED_DO_NOT_STOP_UNRELATED_SERVICE")

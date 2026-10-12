@@ -9,12 +9,12 @@ from typing import Any
 
 import yaml
 
-from app.ingestion.atomic_search import query_terms, reviewed_method_card_matches, definition_sentence, reviewed_fact_rows
+from app.ingestion.atomic_search import query_terms, reviewed_method_card_matches, definition_sentence, reviewed_fact_rows, answer_support_gap, business_term_aliases
 from app.ingestion.normalization.markdown_normalizer import strip_markdown_links
 from app.retrieval.hierarchical_v1 import HierarchicalIndex
 from app.retrieval.query_planner_v1 import plan_query, definition_target
 from app.verified_answer_engine_v2 import _narrative_count_document_score, render
-from scripts.build_verified_evidence_bundle_v1 import _candidate, _coverage, _direct_candidate, _same_scope_conflicts, _structured_facts, _sufficiency, _supporting_candidate
+from scripts.build_verified_evidence_bundle_v1 import _candidate, _coverage, _direct_candidate, _deliverable_source_in_scope, _same_scope_conflicts, _structured_facts, _sufficiency, _supporting_candidate
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -97,7 +97,8 @@ def main() -> int:
 def _runtime_bundle(question: str, plan: dict[str, Any], result: dict[str, Any], documents: dict[str, dict[str, Any]], atomic: dict[str, dict[str, Any]], structured_rows: list[dict[str, Any]]) -> dict[str, Any]:
     candidates = [_candidate(row, plan, documents, atomic) for row in result["atomic_candidates"]]
     trusted_rescue = any(candidate.get("candidate_origin") in {"APPROVED_GOLD_SOURCE_RESCUE", "OWNER_ANSWER_GOLD_SOURCE_RESCUE"} for candidate in candidates)
-    conflicts = {} if trusted_rescue else _same_scope_conflicts(candidates, plan)
+    reference_ids = _prefer_confirmed_current_sources(candidates, plan)
+    conflicts = {} if trusted_rescue else _same_scope_conflicts([c for c in candidates if c["evidence_id"] not in reference_ids], plan)
     for candidate in candidates:
         if candidate["evidence_id"] in conflicts:
             candidate["role"] = "CONFLICTING"
@@ -116,8 +117,8 @@ def _runtime_bundle(question: str, plan: dict[str, Any], result: dict[str, Any],
         elif candidate.get("candidate_origin") == "PERIOD_SCOPE_RESCUE" and not plan.get("metric"):
             candidate["role"] = "SUPPORTING"
             candidate["why_supporting"] = "Period-matched topic evidence is retained as supporting context when no explicit metric anchors the answer sentence."
-        elif candidate.get("candidate_origin") in {"APPROVED_GOLD_SOURCE_RESCUE", "OWNER_ANSWER_GOLD_SOURCE_RESCUE", "PROJECT_SCOPE_SOURCE_RESCUE", "SOURCE_TITLE_RESCUE", "ATOMIC_EXACT_PHRASE_RESCUE", "BODY_FACT_RESCUE", "KEYWORD_BODY_RESCUE"}:
-            aggregation_like = plan.get("query_type") in {"AGGREGATION_QUERY", "STRUCTURED_QUERY"} or any(marker in str(plan.get("original_question") or "") for marker in ("最大", "最多", "最小", "最高", "排名", "占比", "分别", "各"))
+        elif candidate.get("candidate_origin") in {"APPROVED_GOLD_SOURCE_RESCUE", "OWNER_ANSWER_GOLD_SOURCE_RESCUE", "PROJECT_SCOPE_SOURCE_RESCUE", "SOURCE_TITLE_RESCUE", "ATOMIC_EXACT_PHRASE_RESCUE", "BODY_FACT_RESCUE", "KEYWORD_BODY_RESCUE", "DOCUMENT_OUTLINE_RESCUE"}:
+            aggregation_like = plan.get("query_type") in {"AGGREGATION_QUERY", "STRUCTURED_QUERY"} or bool(plan.get('aggregation_plan'))
             if candidate.get("candidate_origin") == "SOURCE_TITLE_RESCUE" and aggregation_like:
                 text = str(candidate.get("text") or "")
                 location = candidate.get("location") or {}
@@ -157,20 +158,53 @@ def _runtime_bundle(question: str, plan: dict[str, Any], result: dict[str, Any],
             candidate["why_supporting"] = "Supporting candidate."
         else:
             candidate["role"] = "CONTEXT_ONLY"
+    from app.retrieval.query_planner_v1 import task_list_request
+    if task_list_request(question, plan.get('aggregation_plan')):
+        from app.verified_answer_engine_v2 import _task_list_claim
+        for candidate in candidates:
+            if candidate.get('link_only') or candidate.get('registration_page_flag') or candidate.get('query_page_flag') or candidate.get('lineage_status') == 'LINEAGE_NOT_CONFIRMED':
+                continue
+            if any(plan.get(field) and candidate.get('scope', {}).get(field) != 'MATCH' for field in ('project', 'year', 'organization', 'period')):
+                continue
+            rows = [row for row in structured_rows if _same_structured_source(candidate, row)]
+            if _task_list_claim({'question': question, 'query_plan': plan, 'structured_rows': rows}) is not None:
+                candidate.update(role='DIRECT', why_direct='Complete same-version task rows match the requested unit and explicit reporting scope.')
     _promote_role_continuations(candidates, plan)
     if plan.get("query_type") in {"AGGREGATION_QUERY", "STRUCTURED_QUERY"}:
+        requested_tables = set()
         for candidate in candidates:
             location = candidate.get("location") or {}
+            table_name = re.search(r'表名：([^\n]+)', str(candidate.get('text') or ''))
+            same_rows = [row for row in structured_rows if _same_structured_source(candidate, row)]
+            if plan.get('query_type') == 'AGGREGATION_QUERY' and candidate['scope'].get('project') == 'MATCH' and table_name and len(table_name[1].strip()) >= 4 and table_name[1].strip() in question and _structured_rows_complete(same_rows) and candidate['lineage_status'] != 'LINEAGE_NOT_CONFIRMED':
+                candidate['role'] = 'DIRECT'
+                candidate['why_direct'] = 'Exact requested table title and project with complete version-matched physical rows.'
+                requested_tables.add((candidate.get('source_path'), candidate.get('source_version'), candidate.get('table_id') or location.get('table_id')))
             if (location.get("table") is not None or location.get("sheet_name") or location.get("table_id")) and candidate["lineage_status"] != "LINEAGE_NOT_CONFIRMED" and (candidate["scope"].get("project") == "MATCH" or candidate.get("candidate_origin") == "SOURCE_TITLE_RESCUE") and (candidate["role"] != "SUPPORTING" or candidate.get("candidate_origin") == "SOURCE_TITLE_RESCUE") and (candidate.get("candidate_origin") == "SOURCE_TITLE_RESCUE" or _answer_relevant(candidate, question, plan)):
                 candidate["role"] = "DIRECT"
                 candidate["why_direct"] = "Single-source structured table with exact project identity."
+        if requested_tables:
+            for candidate in candidates:
+                table_id = candidate.get('table_id') or (candidate.get('location') or {}).get('table_id')
+                if candidate['role'] == 'DIRECT' and table_id and (candidate.get('source_path'), candidate.get('source_version'), table_id) not in requested_tables:
+                    candidate['role'] = 'CONTEXT_ONLY'
+                    candidate['why_context_only'] = 'A different table cannot enter the explicitly named table statistic.'
         if plan.get("project"):
             _attach_structured_rows(candidates, structured_rows)
         elif any(candidate.get("role") == "DIRECT" and (candidate.get("candidate_origin") == "SOURCE_TITLE_RESCUE" or candidate.get("table_id") or (candidate.get("location") or {}).get("table_id")) for candidate in candidates):
             _attach_structured_rows(candidates, structured_rows)
+    if (plan.get('query_type') == 'POLICY_QUERY' and any(term in question for term in ('图审', '审核要点', '审查要点'))) or '督办' in question:
+        _attach_structured_rows(candidates, structured_rows)
     # Source rescue and row-continuation promotion must still honor explicit scope.
     for candidate in candidates:
         if candidate.get("role") != "DIRECT":
+            continue
+        if not _deliverable_source_in_scope(candidate, plan):
+            candidate.update(role='SUPPORTING', why_supporting='A named-project deliverable list cannot supply generic stage requirements.')
+            continue
+        if plan.get('query_type') == 'POLICY_QUERY' and candidate.get('document_role') in {'项目案例', '项目复盘'}:
+            candidate['role'] = 'SUPPORTING'
+            candidate['why_supporting'] = 'Project practice is not a policy requirement.'
             continue
         missing_scope = [field for field in ("project", "year", "organization") if plan.get(field) and candidate.get("scope", {}).get(field) != "MATCH"]
         if plan.get("period") and candidate.get("scope", {}).get("period") != "MATCH":
@@ -178,7 +212,11 @@ def _runtime_bundle(question: str, plan: dict[str, Any], result: dict[str, Any],
         if missing_scope:
             candidate["role"] = "CONTEXT_ONLY"
             candidate["why_context_only"] = "Rescue cannot bypass explicit scope: " + ", ".join(missing_scope)
-    subquestions = plan.get("subquestions") or ["回答原始问题"]
+        elif not candidate.get('structured_row_ids') and not _answer_relevant(candidate, question, plan):
+            candidate['role'] = 'SUPPORTING'
+            candidate['why_supporting'] = '正文未支持任一所问事项，不能因排名或来源补救而提升为直接依据。'
+    _prefer_confirmed_current_sources(candidates, plan)
+    subquestions = plan.get("subquestions") or [question]
     direct = [candidate for candidate in candidates if candidate["role"] == "DIRECT"]
     inventory_direct = any(_inventory_register_direct(question, candidate) for candidate in direct)
     source_scope_missing = bool(candidates) and bool(plan.get("organization") or plan.get("project")) and not direct and not conflicts and all(
@@ -214,7 +252,7 @@ def _runtime_bundle(question: str, plan: dict[str, Any], result: dict[str, Any],
         for candidate in candidates
         if candidate.get("role") == "DIRECT"
     )
-    structured_completion = _structured_rows_complete(matched_structured) if structured_rows and has_structured_candidate and plan.get("query_type") == "AGGREGATION_QUERY" else None
+    structured_completion = _structured_rows_complete(matched_structured) if structured_rows and has_structured_candidate and plan.get("query_type") in {"AGGREGATION_QUERY", "STRUCTURED_QUERY"} else None
     return {"query_id": plan["query_id"], "question": question, "query_plan": plan, "subquestions": subquestions, "bundle_status": status, "candidate_evidence": candidates, "verified_evidence": direct, "supporting_evidence": [candidate for candidate in candidates if candidate["role"] == "SUPPORTING"], "context_only_evidence": [candidate for candidate in candidates if candidate["role"] == "CONTEXT_ONLY"], "conflicting_evidence": [candidate for candidate in candidates if candidate["role"] == "CONFLICTING"], "excluded_evidence": [candidate for candidate in candidates if candidate["role"] == "EXCLUDED"], "coverage_map": coverage, "conflict_map": conflicts, "scope_map": [], "authority_map": [], "lineage_map": [], "structured_rows": matched_structured, "structured_evidence_complete": structured_completion, "structured_fact_map": _structured_facts(plan, candidates, coverage), "evidence_sufficiency": _sufficiency(coverage, conflicts), "failure_reason": "SCOPE_CONFLICT" if source_scope_missing else "RETRIEVAL_MISS" if not candidates else "EVIDENCE_INSUFFICIENT" if not direct else None, "verification_trace": {"fresh_runtime_bundle": True, "gold_runtime_injection": 0, "lineage_auto_join": False}}
 
 
@@ -231,7 +269,18 @@ def _inventory_register_direct(question: str, candidate: dict[str, Any]) -> bool
 
 
 def _answer_relevant(candidate: dict[str, Any], question: str, plan: dict[str, Any]) -> bool:
+    if plan.get('subquestions') and plan.get('query_type') in {'METHOD_QUERY', 'MULTI_FACT', 'POLICY_QUERY'}:
+        return any(_answer_relevant(candidate, request, {**plan, 'subquestions':[]}) for request in plan['subquestions'])
+    from app.ingestion.atomic_search import actual_execution_request, historical_case_scope_gap
+    if candidate.get('source_content_role') == 'HISTORICAL_PROJECT_REPORT' and historical_case_scope_gap(question, plan):
+        return False
+    if actual_execution_request(question) and candidate.get('source_content_role') == 'NORMATIVE_REQUIREMENTS':
+        return False
     text = strip_markdown_links(str(candidate["text"]))
+    if answer_support_gap(question, text, {**plan, 'evidence_file_name':candidate.get('file_name','')}):
+        return False
+    if candidate.get('source_content_role') == 'HISTORICAL_PROJECT_REPORT' and re.search(r'完整度|深度|未评估|截止日期|截至日期|多少张|几张|什么阶段|哪个阶段|投标图纸|初步设计图纸',question):
+        return True
     if reviewed_fact_rows(candidate, question, plan):
         return True
     if reviewed_method_card_matches(candidate, question, plan):
@@ -264,6 +313,9 @@ def _answer_relevant(candidate: dict[str, Any], question: str, plan: dict[str, A
     identity = " ".join(str(candidate.get(field) or "") for field in ("file_name", "source_path", "heading_path"))
     if project_phrases and candidate.get("scope", {}).get("project") != "MATCH" and not any(len(phrase) >= 4 and (phrase in text or phrase in identity or re.sub(r"项目$", "", phrase) in identity) for phrase in project_phrases):
         return False
+    from app.retrieval.query_planner_v1 import design_deliverable_stages
+    if design_deliverable_stages(question):
+        return True
     compact_text = re.sub(r"\s+", "", text)
     if "专业类别" in question and "优化" in question and not any(marker in compact_text for marker in ("专业类别", "结构类", "优化金额")):
         return False
@@ -278,7 +330,8 @@ def _answer_relevant(candidate: dict[str, Any], question: str, plan: dict[str, A
         if not any(marker in text for marker in generic_markers):
             return False
     terms = [term for term in query_terms(question) if len(term) >= 2]
-    if sum(term in text for term in terms) >= 2:
+    aliases = business_term_aliases(question)
+    if sum(any(value.casefold() in compact_text.casefold() for value in aliases.get(term, (term,))) for term in terms) >= 2:
         return True
     return plan.get("query_type") == "METHOD_QUERY" and "计算" in question and "计算" in text
 
@@ -388,10 +441,15 @@ def _attach_structured_rows(candidates: list[dict[str, Any]], structured_rows: l
         if not row_numbers or not first.get("bundle_evidence_id"):
             continue
         row_ids = [str(row.get("row_id") or row.get("table_row_id") or "") for row in group_rows]
+        text = str(parent.get('text') or '') + f'\n本表明细共{len(group_rows)}条。\n' + '\n'.join(f"行{row['row_number']}：" + ' | '.join(str(value or '') for value in row.get('values') or [cell.get('value') or cell.get('cell_value') or cell.get('raw_value') or '' for cell in row.get('cells') or []]) for row in group_rows)
         candidates.append({
-            **parent, "evidence_id": first["bundle_evidence_id"], "role": "DIRECT", "candidate_rank": parent.get("candidate_rank"),
-            "text": "Structured Fact Bundle", "location": {"page": location.get("page"), "sheet_name": first.get("sheet_name"), "table": location.get("table"), "structured_table_id": first["table_id"], "row_start": min(row_numbers), "row_end": max(row_numbers), "source_row_numbers": row_numbers, "source_row_ids": row_ids},
+            **parent, "evidence_id": first["bundle_evidence_id"], "table_id": first['table_id'], "role": "DIRECT", "candidate_rank": parent.get("candidate_rank"),
+            "text": text, "location": {**location, "page": location.get("page"), "sheet_name": first.get("sheet_name"), "table": location.get("table"), "table_id": first["table_id"], "structured_table_id": first["table_id"], "row_start": min(row_numbers), "row_end": max(row_numbers), "source_row_numbers": row_numbers, "source_row_ids": row_ids},
             "lineage_status": "LINEAGE_PARTIAL", "why_direct": "Same-source frozen structured row/cell evidence.", "structured_row_ids": row_ids,
+            "structured_evidence_complete": _structured_rows_complete(group_rows),
+            "structured_columns": list(dict.fromkeys(str(cell.get('header') or cell.get('column_name') or cell.get('normalized_column_name') or '') for row in group_rows for cell in row.get('cells') or [])),
+            "structured_professionals": list(dict.fromkeys(str(row.get('professional') or '').strip() for row in group_rows if not row.get('is_header') and row.get('professional'))),
+            "structured_unit_values": list(dict.fromkeys(str(cell.get('value') or cell.get('cell_value') or cell.get('raw_value') or '').strip() for row in group_rows if not row.get('is_header') for cell in row.get('cells') or [] if str(cell.get('header') or cell.get('column_name') or '').strip() in {'分公司','责任单位','部门','单位'})),
         })
 
 
@@ -408,7 +466,7 @@ def _same_structured_source(candidate: dict[str, Any], row: dict[str, Any]) -> b
         return row_table_id == candidate_table_id
     if row.get("sheet_name") is not None:
         return location.get("sheet_name") == row.get("sheet_name")
-    return location.get("table") == (row.get("source_location") or {}).get("table")
+    return location.get('table') is not None and location.get("table") == (row.get("source_location") or {}).get("table")
 
 
 def _load_authorized_docx_rows() -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -573,3 +631,17 @@ def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def _prefer_confirmed_current_sources(candidates: list[dict[str, Any]], plan: dict[str, Any]) -> set[str]:
+    question = str(plan.get('original_question') or '')
+    if plan.get('query_type') in {'COMPARISON_QUERY', 'OPTION_QUERY'} or len(plan.get('year') or []) > 1 or re.search(r'旧版|历史版|对比|比较|差异|Word|word|docx', question):
+        return set()
+    current = {c['source_family'] for c in candidates if c.get('source_family') and c.get('publication_status') == 'OWNER_CONFIRMED_PUBLISHED_CURRENT'
+               and _answer_relevant(c, question, plan) and not c.get('link_only') and c.get('lineage_status') != 'LINEAGE_NOT_CONFIRMED'
+               and all(not plan.get(field) or c.get('scope', {}).get(field) == 'MATCH' for field in ('organization', 'project', 'year', 'period', 'specialty'))}
+    reference_ids = {c['evidence_id'] for c in candidates if c.get('source_family') in current and c.get('publication_status') != 'OWNER_CONFIRMED_PUBLISHED_CURRENT'}
+    for candidate in candidates:
+        if candidate.get('role') == 'DIRECT' and candidate.get('source_family') in current and candidate.get('publication_status') != 'OWNER_CONFIRMED_PUBLISHED_CURRENT':
+            candidate.update(role='SUPPORTING', why_supporting='同一资料家族已有Owner确认现用的原件；本文件保留参考身份，不自动认定同版或失效。')
+    return reference_ids

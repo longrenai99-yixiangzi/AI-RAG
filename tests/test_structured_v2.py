@@ -5,8 +5,11 @@ from app.document_intelligence.v2 import DocumentIntelligenceV2Builder, document
 
 def test_semantic_chunk_keeps_unit_and_context():
     chunks = chunk_units(["第一项：" + "甲" * 580, "第二项：" + "乙" * 100])
-    assert len(chunks) == 2
-    assert "第二项" in chunks[1]
+    # A short section keeps its ending conditions with the preceding list.
+    assert len(chunks) == 1
+    assert "第一项" in chunks[0] and "第二项" in chunks[0]
+    split = chunk_units(["甲" * 580, "乙" * 100], target=500, maximum=650)
+    assert split == ["甲" * 580, "乙" * 100]
     assert "[章节]" in retrieval_text(domain="设计管理", document_title="制度", section_path="第一章", raw_text="正文")
     assert quality_for("表名：台账\n表头：项目\n行：" + "甲" * 40, has_context=True, is_table=True)[0] == 100
 

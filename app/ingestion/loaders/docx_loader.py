@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from docx import Document as WordDocument
+from docx.text.paragraph import Paragraph
 
 from app.domain import SourceBlock
 
@@ -74,19 +75,23 @@ class DOCXLoader:
             )
             section = []
 
-        for paragraph_number, paragraph in enumerate(document.paragraphs, start=1):
-            text = paragraph.text.strip()
-            if not text:
+        paragraph_number = table_number = 0
+        for item in document.iter_inner_content():
+            if isinstance(item, Paragraph):
+                paragraph_number += 1
+                text = item.text.strip()
+                if not text:
+                    continue
+                heading_level = cls._heading_level(item.style.name if item.style else "")
+                if heading_level is not None:
+                    flush_section()
+                    headings = headings[: heading_level - 1] + [text]
+                    section_heading_path = " > ".join(headings)
+                section.append((paragraph_number, text))
                 continue
-            heading_level = cls._heading_level(paragraph.style.name if paragraph.style else "")
-            if heading_level is not None:
-                flush_section()
-                headings = headings[: heading_level - 1] + [text]
-                section_heading_path = " > ".join(headings)
-            section.append((paragraph_number, text))
-        flush_section()
-
-        for table_number, table in enumerate(document.tables, start=1):
+            flush_section()
+            table_number += 1
+            table = item
             rows = [
                 " | ".join(cell.text.strip().replace("\n", " ") for cell in row.cells).strip()
                 for row in table.rows
@@ -105,6 +110,7 @@ class DOCXLoader:
                     location={"table": table_number, "rows": len(rows), "columns": columns},
                 )
             )
+        flush_section()
         return blocks
 
     @staticmethod

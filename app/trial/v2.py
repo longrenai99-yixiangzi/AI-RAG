@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 from fastapi import APIRouter, HTTPException
@@ -22,7 +22,7 @@ from app.chunker import chunk_blocks
 from app.domain import SourceBlock
 from app.knowledge_growth_v1 import candidate_for_trace
 from app.config import Settings
-from app.ingestion.atomic_search import search_atomic_evidence
+from app.ingestion.atomic_search import search_atomic_evidence, search_record_role, search_role_priority, search_match_kind
 from app.ingestion.atomic_evidence import build_atomic_evidence
 from app.ingestion.pipeline import run_document_pipeline
 from app.ingestion.loaders.pdf_loader import extract_value_creation_rows, extract_value_creation_summary
@@ -30,6 +30,8 @@ from app.retrieval.dense_provider import BGEM3DenseProvider
 from app.retrieval.hierarchical_v1 import HierarchicalIndex
 from app.retrieval.query_planner_v1 import ORGANIZATION_ALIASES, plan_query
 from app.retrieval.retrieval_trace import build_trace, persist_trace
+from app.retrieval import retrieval_trace
+from .runtime_reporting import traffic_kind as classify_traffic
 from app.verified_answer_engine_v2 import render
 from scripts.run_verified_answer_engine_v2 import _load_authorized_docx_rows, _runtime_bundle
 from .live_shadow_v25 import V25LiveShadow, run_async as run_v25_live_shadow_async
@@ -65,6 +67,8 @@ class V2QueryRequest(BaseModel):
     trial_user: str = "reviewer-001"
     conversation_id: str = ""
     node_id: str = ""
+    project_id: str = ""
+    traffic_kind: Literal["REAL", "TECHNICAL", "UNCLASSIFIED"] = "REAL"
 
 
 class V2FeedbackRequest(BaseModel):
@@ -82,6 +86,7 @@ class V2FeedbackRequest(BaseModel):
     similar_questions: list[str] = Field(default_factory=list)
     negative_questions: list[str] = Field(default_factory=list)
     applicability: str = ""
+    traffic_kind: Literal["REAL", "TECHNICAL", "UNCLASSIFIED"] = "UNCLASSIFIED"
 
 
 class GrowthReviewRequest(BaseModel):
@@ -1023,14 +1028,17 @@ def _candidate_primary_runtime() -> tuple[V25LiveShadow, BGEM3DenseProvider]:
 
 def _search_candidate_atomic_evidence(candidate: V25LiveShadow, query: str, limit: int) -> list[dict[str, Any]]:
     scores = candidate.bm25.get_scores(tokenize(query) or ["_empty_"])
-    ranked = []
+    ranked = {}
     for score, chunk in zip(scores, candidate.chunks, strict=True):
         chunk_id = str(chunk.get("chunk_id") or "")
         record = candidate.atomic.get(chunk_id)
         if score > 0 and record is not None:
-            ranked.append((float(score), chunk_id, record))
-    ranked.sort(key=lambda item: (-item[0], item[1]))
-    return [{"score": score, "record": record} for score, _, record in ranked[:limit]]
+            key = (str(record.get("source_id") or record.get("source_path") or ""), str(record.get("source_version") or ""), str(record.get("evidence_id") or chunk_id))
+            if key not in ranked or score > ranked[key][0]:
+                ranked[key] = (float(score), chunk_id, record)
+    matched = [(score, cid, record, search_match_kind(record, query)) for score, cid, record in ranked.values()]
+    ordered = sorted((row for row in matched if row[3]), key=lambda item: ({'DIRECT':0,'BODY':1,'RELATED':2}[item[3]], -item[0], search_role_priority(item[2], query), item[1]))
+    return [{"score": score, "record": record, "match_kind": kind} for score, _, record, kind in ordered[:limit]]
 
 
 def _candidate_primary_answer(question: str) -> dict[str, Any]:
@@ -1040,7 +1048,11 @@ def _candidate_primary_answer(question: str) -> dict[str, Any]:
     embedding_started = time.perf_counter()
     query_vector = dense.embed_query(question)
     embedding_ms = (time.perf_counter() - embedding_started) * 1000
-    shadow = candidate.run(question, {"answer_status": "NOT_RUN", "citations": []}, query_vector=query_vector, include_trace=True)
+    from .project_navigation import load_navigation, question_project, record_in_project
+    navigation = load_navigation(PROJECT_ROOT, candidate.candidate_hash)
+    project = question_project(question, navigation)
+    allowed = {eid for eid, record in candidate.atomic.items() if record_in_project(record, project)} if project else None
+    shadow = candidate.run(question, {"answer_status": "NOT_RUN", "citations": []}, query_vector=query_vector, include_trace=True, allowed_evidence_ids=allowed)
     citations = list(shadow.get("v2_citations") or [])
     evidence_replacements: dict[str, str] = {}
     for citation in citations:
@@ -1215,7 +1227,12 @@ def query(request: V2QueryRequest) -> dict[str, Any]:
     if CONFIG.get("V2_VERIFIED_RAG_ENABLED") is not True:
         raise HTTPException(status_code=503, detail="V2_VERIFIED_RAG_DISABLED")
     previous = KNOWLEDGE_STORE.last_query_for_conversation(request.conversation_id)
-    resolved_question = _resolve_followup(request.question, previous)
+    if request.project_id:
+        from .project_navigation import load_navigation, resolve_project_question
+        navigation = load_navigation(PROJECT_ROOT, _current_candidate_hash())
+        resolved_question = resolve_project_question(request.question, request.project_id, navigation, plan_query(request.question).to_dict())
+    else:
+        resolved_question = _resolve_followup(request.question, previous)
     result = _answer_current_runtime(resolved_question, detect_growth=True)
     result["question"] = request.question
     result["resolved_question"] = resolved_question
@@ -1236,6 +1253,8 @@ def query(request: V2QueryRequest) -> dict[str, Any]:
         except Exception:
             pass
     audit = {"timestamp": _now(), "trial_user": request.trial_user, "query_id": result["query_id"], "query_run_id": query_run_id, "conversation_id": request.conversation_id, "node_id": request.node_id, "question": request.question, "resolved_question": resolved_question, "pipeline_version": result["pipeline_version"], "answer_status": result["answer_status"], "document_ids": sorted({item.get("document_id") for item in result["debug"]["evidence_bundle"]["candidate_evidence"] if item.get("document_id")}), "evidence_ids": [item["evidence_id"] for item in result["citations"]], "citation_ids": [item["citation_id"] for item in result["citations"]], "bundle_status": result["debug"]["evidence_bundle"]["bundle_status"], "growth_candidate_ids": result["growth_candidate_ids"], "latency": result["latency"], "feedback": None, "gold_runtime_injection": 0}
+    audit["traffic_kind"] = request.traffic_kind
+    audit["project_id"] = request.project_id
     _append_jsonl(TRIAL / "trial_audit.jsonl", audit)
     KNOWLEDGE_STORE.record_query(query_run_id, audit)
     # T04：全链路 trace 落盘；失败时不影响主流程返回结果
@@ -1247,6 +1266,7 @@ def query(request: V2QueryRequest) -> dict[str, Any]:
             conversation_id=str(request.conversation_id or ""),
             result=result,
         )
+        trace["traffic_kind"] = request.traffic_kind
         persist_trace(trace)
         failure = trace.get("failure") or {}
         audit.update({
@@ -1304,6 +1324,7 @@ def feedback(request: V2FeedbackRequest) -> dict[str, Any]:
         "root_cause": root_cause,
         "system_fix_required": system_fix_required,
         "standard_answer_required": standard_answer_required,
+        "traffic_kind": classify_traffic(query_run or {}) if request.traffic_kind == "UNCLASSIFIED" else request.traffic_kind,
     }, idempotency_key)
     if not created:
         return {"saved": True, "deduplicated": True, "feedback_event": stored, "closure_status": stored.get("status", "RECORDED"), "automatic_knowledge_publish": 0}
@@ -1462,11 +1483,12 @@ def knowledge_search(q: str, limit: int = 20) -> dict[str, Any]:
         key = f"EVIDENCE:{evidence.get('evidence_id')}"
         if key in seen:
             continue
-        items.append({"type": "EVIDENCE", "score": match["score"], "evidence": {"evidence_id": evidence.get("evidence_id"), "source_id": source_id, "source_version": evidence.get("source_version"), "file_name": evidence.get("file_name"), "source_path": evidence.get("source_path"), "location": evidence.get("location") or {}, "heading_path": evidence.get("heading_path") or "", "excerpt": str(evidence.get("raw_text") or evidence.get("text") or "")[:500]}})
+        items.append({"type": "EVIDENCE", "score": match["score"], "evidence": {"evidence_id": evidence.get("evidence_id"), "source_id": source_id, "source_version": evidence.get("source_version"), "source_role": search_record_role(evidence), "file_name": evidence.get("file_name"), "source_path": evidence.get("source_path"), "location": evidence.get("location") or {}, "heading_path": evidence.get("heading_path") or "", "excerpt": str(evidence.get("raw_text") or evidence.get("text") or "")[:500]}})
         seen.add(key)
         if len(items) >= maximum:
             break
-    return {"items": sorted(items, key=lambda item: -float(item.get("score") or 0))[:maximum], "query": q}
+    ordered = items if _primary_mode() == V262_CANDIDATE_MODE else sorted(items, key=lambda item: -float(item.get("score") or 0))
+    return {"items": ordered[:maximum], "query": q}
 
 
 def _candidate_knowledge_items() -> list[dict[str, Any]]:
@@ -1493,6 +1515,8 @@ def _candidate_knowledge_items() -> list[dict[str, Any]]:
     return list(items.values())
 
 
+
+
 @router.get("/knowledge/items")
 def knowledge_items() -> dict[str, Any]:
     return {"items": _candidate_knowledge_items() if _primary_mode() == V262_CANDIDATE_MODE else KNOWLEDGE_STORE.active_knowledge()}
@@ -1503,8 +1527,13 @@ def knowledge_change_candidates() -> dict[str, Any]:
     return {"items": KNOWLEDGE_STORE.list_change_candidates()}
 
 
+@router.get("/runtime-capabilities")
+def runtime_capabilities() -> dict[str, Any]:
+    return {"service_kind": "INTERNAL_TRIAL", "display_name": "内部试用", "release_name": "内部试用", "features": {"dashboard": True, "framework": True, "topics": True, "ai_query": True, "sources": True, "search": True, "diagnostics": True, "feedback_records": True, "feedback_record": True, "batch": True, "gold_review": True, "projects": False, "favorites": False, "recent": False, "knowledge_management_write": True}}
+
+
 @router.get("/knowledge/diagnostics/overview")
-def knowledge_diagnostics_overview() -> dict[str, Any]:
+def knowledge_diagnostics_overview(traffic_filter: str = "ALL") -> dict[str, Any]:
     source = _read_json(SYSTEM_AUDIT / "t01" / "source_coverage.json")
     chunks = _read_json(SYSTEM_AUDIT / "t02" / "chunk_audit_summary.json")
     metadata = _read_json(SYSTEM_AUDIT / "t03" / "metadata_audit.json")
@@ -1512,7 +1541,8 @@ def knowledge_diagnostics_overview() -> dict[str, Any]:
     validator = _read_json(SYSTEM_AUDIT / "t06" / "validator_audit.json")
     answers = _read_json(SYSTEM_AUDIT / "t07" / "answer_audit.json")
     benchmark = _read_json(SYSTEM_AUDIT / "t09" / "manifest.json")
-    traces = _latest_traces()
+    all_traces = _latest_traces()
+    traces = _filter_trace_traffic(all_traces, traffic_filter)
     failures: dict[str, int] = {}
     for trace in traces:
         code = str((trace.get("failure") or {}).get("failure_code") or "UNKNOWN")
@@ -1524,12 +1554,16 @@ def knowledge_diagnostics_overview() -> dict[str, Any]:
     return {
         "generated_at": _now(),
         "question_runs": len(traces),
+        "traffic_filter": traffic_filter,
+        "traffic_counts": {kind: sum(row["traffic_kind"] == kind for row in all_traces) for kind in ("REAL", "TECHNICAL", "UNCLASSIFIED")},
+        "trace_scope": "CURRENT_RUNTIME_STATE",
+        "historical_evaluation_note": "下面的质量评测来自独立审计材料；没有材料时显示未测量，不作为当前业务正确率。",
         "answer_success_rate": _ratio(sum(trace.get("answer_status") == "ANSWERED" for trace in traces), len(traces)),
         "quality_funnel": [
-            {"stage": "Source Available", "rate": source.get("source_coverage_rate"), "status": "PROVISIONAL_GOLD"},
-            {"stage": "Parse Success", "rate": chunk_metrics.get("parse_success_rate"), "status": "MEASURED"},
-            {"stage": "Chunk Integrity", "rate": chunk_metrics.get("chunk_integrity_rate"), "status": "MEASURED"},
-            {"stage": "Metadata Strong Facts", "rate": metadata.get("strong_fact_avg_fill_rate"), "status": "MEASURED"},
+            {"stage": "Source Available", "rate": source.get("source_coverage_rate"), "status": "MEASURED" if source.get("source_coverage_rate") is not None else "NOT_RUN"},
+            {"stage": "Parse Success", "rate": chunk_metrics.get("parse_success_rate"), "status": "MEASURED" if chunk_metrics.get("parse_success_rate") is not None else "NOT_RUN"},
+            {"stage": "Chunk Integrity", "rate": chunk_metrics.get("chunk_integrity_rate"), "status": "MEASURED" if chunk_metrics.get("chunk_integrity_rate") is not None else "NOT_RUN"},
+            {"stage": "Metadata Strong Facts", "rate": metadata.get("strong_fact_avg_fill_rate"), "status": "MEASURED" if metadata.get("strong_fact_avg_fill_rate") is not None else "NOT_RUN"},
             {"stage": "Recall@20", "rate": retrieval_metrics.get("recall@20"), "status": retrieval_metrics.get("status", "NOT_RUN")},
             {"stage": "Rerank@5", "rate": rerank_metrics.get("rerank@5_hit_rate"), "status": rerank_metrics.get("status", "NOT_RUN")},
             {"stage": "Evidence Pass", "rate": _metric_rate(validator.get("evidence_pass_rate")), "status": validator.get("status", "NOT_RUN")},
@@ -1543,21 +1577,21 @@ def knowledge_diagnostics_overview() -> dict[str, Any]:
 
 
 @router.get("/knowledge/diagnostics/questions")
-def knowledge_diagnostic_questions(failure_code: str = "", offset: int = 0, limit: int = 50) -> dict[str, Any]:
-    rows = _latest_traces()
+def knowledge_diagnostic_questions(failure_code: str = "", offset: int = 0, limit: int = 50, traffic_filter: str = "ALL") -> dict[str, Any]:
+    rows = _filter_trace_traffic(_latest_traces(), traffic_filter)
     if failure_code:
         rows = [row for row in rows if str((row.get("failure") or {}).get("failure_code") or "") == failure_code]
     rows.sort(key=lambda row: str(row.get("timestamp") or ""), reverse=True)
     total = len(rows)
     start, size = max(0, offset), max(1, min(limit, 200))
-    return {"items": [{"query_run_id": row.get("query_run_id"), "timestamp": row.get("timestamp"), "question": row.get("question"), "answer_status": row.get("answer_status"), "failure": row.get("failure"), "counts": row.get("counts"), "latency": row.get("latency")} for row in rows[start:start + size]], "total": total, "offset": start, "limit": size}
+    return {"items": [{"query_run_id": row.get("query_run_id"), "timestamp": row.get("timestamp"), "question": row.get("question"), "answer_status": row.get("answer_status"), "failure": row.get("failure"), "counts": row.get("counts"), "latency": row.get("latency"), "traffic_kind": row["traffic_kind"]} for row in rows[start:start + size]], "total": total, "offset": start, "limit": size, "traffic_filter": traffic_filter}
 
 
 @router.get("/knowledge/diagnostics/questions/{query_run_id}")
 def knowledge_diagnostic_question(query_run_id: str) -> dict[str, Any]:
     if not re.fullmatch(r"QR_[A-Za-z0-9_\-]+", query_run_id):
         raise HTTPException(status_code=404, detail="TRACE_NOT_FOUND")
-    path = SYSTEM_AUDIT / "t04" / "traces" / f"{query_run_id}.json"
+    path = retrieval_trace.TRACE_DIR / f"{query_run_id}.json"
     trace = _read_json(path)
     if not trace:
         raise HTTPException(status_code=404, detail="TRACE_NOT_FOUND")
@@ -2028,9 +2062,15 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _latest_traces() -> list[dict[str, Any]]:
-    rows = _read_jsonl(SYSTEM_AUDIT / "t04" / "traces.jsonl")
-    latest = {str(row.get("query_run_id") or ""): row for row in rows if row.get("query_run_id") and row.get("question")}
+    rows = _read_jsonl(retrieval_trace.TRACE_FILE)
+    latest = {str(row.get("query_run_id") or ""): {**row, "traffic_kind": classify_traffic(row)} for row in rows if row.get("query_run_id") and row.get("question")}
     return list(latest.values())
+
+
+def _filter_trace_traffic(rows: list[dict[str, Any]], selected: str) -> list[dict[str, Any]]:
+    if selected not in {"ALL", "REAL", "TECHNICAL", "UNCLASSIFIED"}:
+        raise HTTPException(status_code=422, detail="INVALID_TRAFFIC_FILTER")
+    return rows if selected == "ALL" else [row for row in rows if row["traffic_kind"] == selected]
 
 
 def _ratio(numerator: int, denominator: int) -> float | None:

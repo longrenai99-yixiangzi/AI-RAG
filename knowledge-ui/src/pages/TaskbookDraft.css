@@ -1,0 +1,7 @@
+.taskbook-workbench label { display: grid; gap: 8px; margin: 16px 0; font-weight: 600; }
+.taskbook-workbench input, .taskbook-workbench select, .taskbook-workbench textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: 11px 12px; border: 1px solid #dbe4ee; border-radius: 8px; font: inherit; color: #24415b; background: white; }
+.taskbook-workbench textarea { min-height: 100px; resize: vertical; font-weight: 400; }
+.taskbook-workbench input[readonly] { background: #f4f7fb; }
+.taskbook-workbench details { margin: 18px 0; }
+.taskbook-workbench summary { cursor: pointer; font-weight: 600; }
+.taskbook-workbench .panel { margin-bottom: 20px; }

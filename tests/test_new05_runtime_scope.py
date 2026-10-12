@@ -109,6 +109,7 @@ def test_preview_never_substitutes_a_new_version_for_an_old_citation(tmp_path, m
 
 def test_candidate_table_answer_citation_and_claim_map_resolve_same_row_version(tmp_path, monkeypatch):
     candidate = V25LiveShadow.__new__(V25LiveShadow)
+    candidate.candidate_hash = "current"
     candidate.atomic = {}
     row = {"row_id": "R1", "row_number": 7, "source_id": "S1", "source_path": str(tmp_path / "assessment.xlsx"), "source_version": "sha-assessment", "file_name": "assessment.xlsx", "source_location": {"sheet_name": "Sheet1"}, "header_text": "评分规则", "values": ["未完成合成测试事项扣7分"]}
     candidate._structured_tables = {"T1": [row]}
@@ -148,7 +149,7 @@ def test_node_cards_only_expose_owner_confirmed_current_candidate_evidence(monke
 
 def test_candidate_answer_inline_citation_contains_the_same_preview_text(monkeypatch):
     record = {"evidence_id": "E1", "source_id": "S1", "source_version": "sha-current", "source_path": "source.md", "file_name": "source.md", "location": {"section_path": "知识卡CARD-1"}, "raw_text": "已确认的方法和适用条件"}
-    candidate = SimpleNamespace(atomic={"E1": record}, run=lambda *args, **kwargs: {"v2_status": "PARTIAL_ANSWER", "v2_answer": record["raw_text"], "v2_citations": [{"citation_id": "S1", "evidence_id": "E1", "display_location": "位置未定位"}], "candidate_hash": "current"})
+    candidate = SimpleNamespace(candidate_hash="current", atomic={"E1": record}, run=lambda *args, **kwargs: {"v2_status": "PARTIAL_ANSWER", "v2_answer": record["raw_text"], "v2_citations": [{"citation_id": "S1", "evidence_id": "E1", "display_location": "位置未定位"}], "candidate_hash": "current"})
     monkeypatch.setattr(v2, "_candidate_primary_runtime", lambda: (candidate, SimpleNamespace(embed_query=lambda _q: [0])))
     citation = v2._candidate_primary_answer("方法是什么")["citations"][0]
     assert (citation["source_version"], citation["source_path"], citation["excerpt"]) == ("sha-current", "source.md", record["raw_text"])

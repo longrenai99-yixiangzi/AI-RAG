@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pymupdf
 from docx import Document as WordDocument
+from app.ingestion.loaders.docx_loader import DOCXLoader
 from openpyxl import load_workbook
 from pptx import Presentation
 
@@ -163,58 +164,12 @@ def _parse_pdf(path: Path, document_id: str) -> tuple[list[SourceBlock], str]:
 
 def _parse_docx(path: Path, document_id: str) -> list[SourceBlock]:
     document = WordDocument(path)
-    blocks: list[SourceBlock] = []
-    headings: list[str] = []
-    paragraph_buffer: list[str] = []
-    paragraph_start = 1
-
-    def flush() -> None:
-        content = "\n".join(paragraph_buffer).strip()
-        if content:
-            blocks.append(
-                _block(
-                    document_id,
-                    path,
-                    content,
-                    " > ".join(headings),
-                    paragraph=paragraph_start,
-                )
-            )
-
-    for paragraph_number, paragraph in enumerate(document.paragraphs, start=1):
-        text = paragraph.text.strip()
-        if not text:
-            continue
-        style_name = (paragraph.style.name or "").lower()
-        heading_match = re.search(r"heading\s*(\d+)|标题\s*(\d+)", style_name)
-        if heading_match:
-            flush()
-            level = int(next(value for value in heading_match.groups() if value))
-            headings[level - 1 :] = [text]
-            paragraph_buffer = [text]
-            paragraph_start = paragraph_number
-        else:
-            if not paragraph_buffer:
-                paragraph_start = paragraph_number
-            paragraph_buffer.append(text)
-    flush()
-
-    for table_number, table in enumerate(document.tables, start=1):
-        rows = [
-            " | ".join(cell.text.strip().replace("\n", " ") for cell in row.cells).strip()
-            for row in table.rows
-        ]
-        rows = [row for row in rows if row.strip(" |")]
-        if rows:
-            blocks.append(
-                _block(
-                    document_id,
-                    path,
-                    "\n".join(rows),
-                    " > ".join(headings),
-                    table=table_number,
-                )
-            )
+    blocks = DOCXLoader._build_blocks(document, path, document_id)
+    for block in blocks:
+        if "paragraph_start" in block.location:
+            block.location["paragraph"] = block.location["paragraph_start"]
+        if "table" in block.location:
+            block.text = block.text.removeprefix("表格：\n")
     return blocks
 
 

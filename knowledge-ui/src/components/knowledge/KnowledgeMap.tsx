@@ -11,7 +11,7 @@ export function KnowledgeMap({ node, children, onSelect }: Props) {
     <div className="map-line" />
     <div className="map-children">
       {sample && <div className="sample-node-preview"><span className="map-node-type">待接入样例</span><b>{node.name}</b><p>本节点有人工整理样例；真实条目和来源数量以运行数据为准。</p><div>{sample.cards.map((card) => <span key={card.id}>{card.title}</span>)}</div><Link to={`/knowledge/${node.id}`}>进入知识空间</Link></div>}
-      {children.length ? children.map((child) => <button key={child.id} onClick={() => onSelect(child)}><span className="map-node-type">{child.type === 'knowledge' ? '知识点' : '知识分类'}</span><b>{child.name}</b><small>框架节点 · 运行统计待关联</small></button>) : !sample && <p className="map-empty">当前节点已是知识叶子，可进入知识节点查看已生效内容。</p>}
+      {children.length ? children.map((child) => <button key={child.id} onClick={() => onSelect(child)}><span className="map-node-type">{child.type === 'knowledge' ? '知识点' : '知识分类'}</span><b>{child.name}</b><small>分类入口 · 资料关联范围以内容页为准</small></button>) : !sample && <div className="map-empty"><p>分类名称不代表资料已全部整理。进入后可查相关项目资料和已确认摘录。</p><Link className="primary-link" to={`/node/${node.id}`}>查看此事项的资料与摘录</Link></div>}
     </div>
   </div>
 }

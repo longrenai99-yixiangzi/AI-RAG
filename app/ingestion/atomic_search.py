@@ -201,14 +201,18 @@ def scalar_fact_parts(question: str, text: str) -> dict[str, list[str]] | None:
     from app.retrieval.query_planner_v1 import fact_request
     fields = r'(?:数量|金额|月份|时间|期限|日期|比例)'
     request = re.fullmatch(r'([^，,：:？?；;和与及、]*?)的?(' + fields + r'(?:(?:和|与|及|、)' + fields + r')*)(?:分别|各)?(?:有什么要求|有何规定|是多少|是什么|为多少)[？?]?', fact_request(question))
-    if not request:
+    count_request = re.fullmatch(r'([^，,：:？?；;和与及、]+?)(?:有|共|共计|累计)?(?:多少|几)(份|项|条|个|件|次|座|家|人)[？?]?', fact_request(question)) if not request else None
+    if not request and not count_request:
         return None
-    subject = query_terms(request[1].removesuffix('的'))
+    subject = query_terms((request or count_request)[1].removesuffix('的'))
     parts = [part for part in re.split(r'[。；;|\n]', text) if all(term.casefold() in part.casefold() for term in subject)]
     result = {}
-    for field in re.split(r'和|与|及|、', request[2]):
+    for field in re.split(r'和|与|及|、', request[2] if request else '数量'):
         if field == '数量':
             result[field] = [part for part in parts if re.search(r'(?<!第)(?:\d+(?:\.\d+)?|[一二三四五六七八九十百千万]+)\s*(?:个(?!百分点)|项|份|件|条|次|座|家|人)|数量[^。；;|]{0,12}\d+', part)]
+            if count_request:
+                unit = count_request[2] + ('(?!百分点)' if count_request[2] == '个' else '')
+                result[field] = [part for part in result[field] if re.search(r'(?:\d+(?:\.\d+)?|[一二三四五六七八九十百千万]+)\s*' + unit, part)]
         elif field == '月份':
             result[field] = [part for part in parts if re.search(r'(?:\d{1,2}|[一二三四五六七八九十]+)月', part)]
         else:
@@ -220,7 +224,7 @@ def equation_lines(text: str) -> list[str]:
     return re.sub(r'([=＝+＋*/÷×])[ \t]*\n[ \t]*', r'\1', text).splitlines()
 
 
-def answer_support_gap(question: str, text: str, plan: dict[str, Any] | None = None) -> str:
+def answer_support_gap(question: str, text: str, plan: dict[str, Any] | None = None, *, subject_context: str = '') -> str:
     """Check the requested fact and answer form, using body text rather than rank."""
     from app.retrieval.query_planner_v1 import definition_target, fact_request
     from app.ingestion.normalization.markdown_normalizer import strip_markdown_links
@@ -378,7 +382,9 @@ def answer_support_gap(question: str, text: str, plan: dict[str, Any] | None = N
     aliases.update(business_term_aliases(clean))
     if kind == 'PROJECT_DESIGN_SCHEDULE':
         aliases['年度'] = ('年度', '年、季、月、周')
-    hits = [term for term in terms if any(value in body for value in aliases.get(term, (term,)))]
+    # Cited titles can identify the subject; values and answer forms still require body text.
+    subject_body = body + re.sub(r'\s+', '', subject_context).casefold()
+    hits = [term for term in terms if any(value in subject_body for value in aliases.get(term, (term,)))]
     if not terms or len(hits) * 3 < len(terms) * 2:
         return '正文没有充分覆盖问题所问的对象或事项。'
     if not re.search(r'计算|怎么算|怎么.*算|如何.*算|公式', clean) and terms[0] not in hits:

@@ -28,7 +28,7 @@ def test_approved_method_body_is_complete_and_not_used_for_project_or_numeric_fa
     question = '设计复核清单应包含哪些内容？'
     body = '## 输入核对\n核对输入版本。\n\n| 项目 | 方法 |\n|---|---|\n| 完整性 | 对照成果目录 |\n| 复核 | 对照修改记录 |\n\n例外：缺资料不得认定合格。'
     evidence = _evidence('DIRECT', text=body)
-    evidence.update(raw_text=body, source_version='sha-approved', knowledge_card={'approval_status':'OWNER_CONFIRMED','response_format':'METHOD_GUIDE','topic_terms':['设计复核'],'approved_content_sha256':hashlib.sha256(body.encode()).hexdigest()})
+    evidence.update(raw_text=body, source_version='sha-approved', knowledge_card={'title':'设计复核清单','approval_status':'OWNER_CONFIRMED','response_format':'METHOD_GUIDE','topic_terms':['设计复核'],'approved_content_sha256':hashlib.sha256(body.encode()).hexdigest()})
     plan = plan_query(question)
     bundle = _bundle('VERIFIED',[evidence],[{'subquestion_id':'SQ1','coverage_status':'COVERED'}],question=question)
     bundle['query_plan']=plan.to_dict()
@@ -80,13 +80,11 @@ def test_parallel_fact_split_preserves_named_project_entities():
     assert parallel.subquestions == ["型号分别是多少", "载重分别是多少"]
 
     joint_project = plan_query("公安玉湖及淤泥湖水生态修复项目位于哪个省、哪个县？")
-    assert joint_project.subquestions == [
-        "公安玉湖哪个省、哪个县",
-        "淤泥湖水生态修复项目位于哪个省、哪个县",
-    ]
+    assert joint_project.project == ["公安玉湖及淤泥湖水生态修复项目"]
+    assert joint_project.subquestions == []
 
     parallel_categories = plan_query("2025年公司有条件采取深度融合模式项目的新开和新承接项目是哪几个")
-    assert parallel_categories.subquestions == ["新开哪几个", "新承接项目是哪几个"]
+    assert parallel_categories.subquestions == ["新开是哪几个", "新承接项目是哪几个"]
 
     parenthetical = plan_query("城综事业部EPC项目设计价值创造统计台账（地下通道项目，靖城路下穿通道）中，结构专业共列了多少项创效策划点？")
     assert parenthetical.subquestions == []
@@ -126,6 +124,7 @@ def test_structured_grade_lookup_uses_the_matching_item_row():
         plan = plan_query(question)
         evidence = _evidence("DIRECT", text=source_text, location={"table_id": row["table_id"], "table": 1})
         evidence.update({"table_id": row["table_id"], "source_version": "sha-current"})
+        evidence['file_name'] = '工业厂房设计标准.md'
         bundle = _bundle("VERIFIED", [evidence], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], query_type=plan.query_type, question=question)
         bundle.update({"query_plan": plan.to_dict(), "structured_rows": [row], "structured_evidence_complete": "风机盘管" not in question})
 
@@ -450,7 +449,8 @@ def test_organization_structure_keeps_common_and_optional_boundaries():
         "各分公司（事业部）设计与技术支持中心均设置设计支持岗、深化设计岗、方案支持岗。"
         "区域分公司中心选择设置技术投标岗、钢筋翻样岗，专业公司中心选择设置技术投标岗。"
     )
-    answer = render(_bundle("VERIFIED", [_evidence("DIRECT", text=text)], [
+    evidence = {**_evidence("DIRECT", text=text), 'heading_path': '中建三局二公司设计与技术支持中心组织架构'}
+    answer = render(_bundle("VERIFIED", [evidence], [
         {"subquestion_id": "SQ1", "coverage_status": "COVERED"},
         {"subquestion_id": "SQ2", "coverage_status": "COVERED"},
         {"subquestion_id": "SQ3", "coverage_status": "COVERED"},
@@ -526,7 +526,7 @@ def test_narrative_project_count_uses_the_best_direct_source_sentence():
     question = "2025年度多少个项目成功打造为设计管理示范项目？"
     summary = _evidence("DIRECT", text="二是打造设计管理示范项目。通过设计赋能，成功打造4个设计增效7%以上的标杆项目。")
     exact = _evidence("DIRECT", text="发布设计管理示范项目打造方案，最终4个项目成功打造为设计管理示范项目，设计效益增量达7%以上。")
-    exact.update({"evidence_id": "E2", "candidate_rank": 2})
+    exact.update({"evidence_id": "E2", "candidate_rank": 2, "file_name": "2025年度设计管理示范项目总结.md"})
     bundle = _bundle("VERIFIED", [summary, exact], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], query_type="AGGREGATION_QUERY", question=question)
     bundle["query_plan"]["aggregation_plan"] = ["COUNT"]
     answer = render(bundle)
@@ -557,6 +557,8 @@ def test_inventory_register_multi_fact_claim_keeps_all_counts_in_one_source_wind
     first = _evidence("DIRECT", text="登记设计管理资料（共 1110 份）。")
     second = {**_evidence("DIRECT", text="设计策划：76；责任状：337"), "evidence_id": "E2", "source_id": "SAME-SOURCE"}
     first["source_id"] = "SAME-SOURCE"
+    first['file_name'] = '设计支持中心资料登记.md'
+    second['file_name'] = first['file_name']
     bundle = _bundle(
         "VERIFIED",
         [first, second],
@@ -604,7 +606,8 @@ def test_structured_max_refuses_to_rank_a_partial_row_set():
 
     answer = render(bundle)
 
-    assert answer["answer_status"] == "PARTIAL_ANSWER"
+    assert answer["answer_status"] == "INSUFFICIENT_EVIDENCE"
+    assert not any(claim["claim_type"] == "DIRECT" for claim in answer["claims"])
     assert "40.2" not in answer["answer_text"]
 
 
@@ -812,7 +815,8 @@ def test_unimplemented_table_sum_does_not_fall_back_to_group_counts():
 
     answer = render(bundle)
 
-    assert answer["answer_status"] == "PARTIAL_ANSWER"
+    assert answer["answer_status"] == "INSUFFICIENT_EVIDENCE"
+    assert not any(claim["claim_type"] == "DIRECT" for claim in answer["claims"])
     assert "不以分组条数或单行命中代替总额" in answer["answer_text"]
     assert "建筑：1条" not in answer["answer_text"]
 
@@ -828,9 +832,11 @@ def test_table_group_counts_require_complete_structured_rows():
 
     partial = render(incomplete)
 
-    assert partial["answer_status"] == "PARTIAL_ANSWER"
+    assert partial["answer_status"] == "INSUFFICIENT_EVIDENCE"
+    assert not any(claim["claim_type"] == "DIRECT" for claim in partial["claims"])
     assert "建筑1条" not in partial["answer_text"]
-    assert "完整行级明细" in partial["answer_text"]
+    assert "没有取得可验证的表格行" in partial["answer_text"]
+    assert "不代表原件或资料库中没有明细" in partial["answer_text"]
 
     complete = {**incomplete, "structured_evidence_complete": True, "structured_rows": [
         {"row_id": "R1", "row_number": 1, "professional": "建筑", "bundle_evidence_id": "E1"},
@@ -859,7 +865,8 @@ def test_table_group_counts_do_not_merge_different_tables_or_source_versions():
 
     answer = render(bundle)
 
-    assert answer["answer_status"] == "PARTIAL_ANSWER"
+    assert answer["answer_status"] == "INSUFFICIENT_EVIDENCE"
+    assert not any(claim["claim_type"] == "DIRECT" for claim in answer["claims"])
     assert "多个表格或来源版本" in answer["answer_text"]
     assert "该清单按专业类别列示，共包含2个类别" not in answer["answer_text"]
 
@@ -868,7 +875,8 @@ def test_table_group_counts_do_not_merge_different_tables_or_source_versions():
         {"row_id": "R2", "row_number": 2, "professional": "结构", "table_id": "T1", "source_path": "[LOCAL_PATH_REDACTED]", "source_version": "SHA2", "bundle_evidence_id": "E2"},
     ]
     answer = render(bundle)
-    assert answer["answer_status"] == "PARTIAL_ANSWER"
+    assert answer["answer_status"] == "INSUFFICIENT_EVIDENCE"
+    assert not any(claim["claim_type"] == "DIRECT" for claim in answer["claims"])
     assert "多个表格或来源版本" in answer["answer_text"]
 
 
@@ -887,7 +895,8 @@ def test_unsupported_structured_filter_does_not_return_unfiltered_counts():
     answer = render(bundle)
 
     assert "FILTER" in plan.aggregation_plan
-    assert answer["answer_status"] == "PARTIAL_ANSWER"
+    assert answer["answer_status"] == "INSUFFICIENT_EVIDENCE"
+    assert not any(claim["claim_type"] == "DIRECT" for claim in answer["claims"])
     assert "不返回未筛选的全表统计" in answer["answer_text"]
     assert "建筑：1条" not in answer["answer_text"]
     assert validate(answer, bundle)["valid"] is True
@@ -923,7 +932,8 @@ def test_direct_claim_must_cover_its_assigned_issue_subquestion():
 
     answer = render(bundle)
 
-    assert answer["answer_status"] == "PARTIAL_ANSWER"
+    assert answer["answer_status"] == "INSUFFICIENT_EVIDENCE"
+    assert not any(claim["claim_type"] == "DIRECT" for claim in answer["claims"])
     assert "中建三局作为上级单位" not in answer["answer_text"]
     assert "中台能力" in answer["answer_text"] or "问题是什么" in answer["answer_text"]
 
@@ -944,7 +954,7 @@ def test_explicit_six_item_question_requires_six_enumerated_items():
     assert "核心部门" in partial["answer_text"]
 
     complete_text = "职责包括：设计管理体系建设和维护；EPC项目设计支持与策划；设计评审与评估管理；设计资源库建设；设计人才培养与能力建设；制度文件编制与更新。"
-    complete = _evidence("DIRECT", text=complete_text)
+    complete = {**_evidence("DIRECT", text=complete_text), 'file_name': '二公司设计管理部职责.md'}
     full_bundle = {**bundle, "candidate_evidence": [complete], "verified_evidence": [complete]}
     answered = render(full_bundle)
 
@@ -970,9 +980,10 @@ def test_government_question_needs_a_named_government_not_a_category():
     question = "二公司设计资源库战略协议中合作的政府单位是哪一家？"
     generic = _evidence("DIRECT", text="战略合作协议是二公司与各设计院、政府签订的合作框架协议汇总。")
     partial = render(_bundle("VERIFIED", [generic], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question))
-    assert partial["answer_status"] == "PARTIAL_ANSWER"
+    assert partial["answer_status"] == "INSUFFICIENT_EVIDENCE"
+    assert not any(claim["claim_type"] == "DIRECT" for claim in partial["claims"])
 
-    named = {**generic, "evidence_id": "E2", "text": "该战略合作框架协议甲方为苏州市吴中区人民政府。"}
+    named = {**generic, "evidence_id": "E2", "text": "该战略合作框架协议甲方为苏州市吴中区人民政府。", 'file_name': '二公司设计资源库战略合作协议.md'}
     answered = render(_bundle("VERIFIED", [named], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question))
     assert answered["answer_status"] == "ANSWERED"
     assert "苏州市吴中区人民政府" in answered["answer_text"]
@@ -987,7 +998,8 @@ def test_design_efficiency_threshold_claim_keeps_all_categories_or_fails_closed(
 
     partial_text = _evidence("DIRECT", text="设计创效率门槛：新开房建EPC≥4%，方案阶段介入≥6%。")
     partial = render(_bundle("VERIFIED", [partial_text], [{"subquestion_id": "SQ1", "coverage_status": "COVERED"}], question=question))
-    assert partial["answer_status"] == "PARTIAL_ANSWER"
+    assert partial["answer_status"] == "INSUFFICIENT_EVIDENCE"
+    assert not any(claim["claim_type"] == "DIRECT" for claim in partial["claims"])
 
 
 def test_certification_list_does_not_substitute_for_green_low_carbon_metric():
@@ -1123,7 +1135,8 @@ def test_task_book_directory_link_cannot_supply_project_count_or_industries():
 
         answer = render(bundle)
 
-        assert answer["answer_status"] == "PARTIAL_ANSWER"
+        assert answer["answer_status"] == "INSUFFICIENT_EVIDENCE"
+        assert not any(claim["claim_type"] == "DIRECT" for claim in answer["claims"])
         assert "26个项目" not in answer["answer_text"]
         assert "目录链接标签不作为" in answer["answer_text"]
 
@@ -1157,14 +1170,15 @@ def test_answer_becomes_partial_when_a_required_clause_has_no_answer_claim():
     partial = _answer(bundle, "ANSWERED", [unrelated], [])
     complete = _answer(bundle, "ANSWERED", [both_clauses], [])
 
-    assert partial["answer_status"] == "PARTIAL_ANSWER"
+    assert partial["answer_status"] == "INSUFFICIENT_EVIDENCE"
+    assert not any(claim["claim_type"] == "DIRECT" for claim in partial["claims"])
     assert "SQ2" in partial["uncovered_subquestions"]
     assert "设计评估主要包括整体结论经过量化评估" not in partial["answer_text"]
     assert partial["answer_text"].count("未在本次回答中完整回应") == 2
     assert complete["answer_status"] == "ANSWERED"
 
 
-def _bundle(status, evidence, coverage, query_type="SOURCE_LOOKUP", question="测试问题"):
+def _bundle(status, evidence, coverage, query_type="SOURCE_LOOKUP", question="直接事实"):
     return {"query_id": "Q", "question": question, "query_plan": {"query_type": query_type, "aggregation_plan": []}, "bundle_status": status, "candidate_evidence": evidence, "verified_evidence": evidence if status != "CONFLICTING_EVIDENCE" else [], "supporting_evidence": [], "conflicting_evidence": evidence if status == "CONFLICTING_EVIDENCE" else [], "excluded_evidence": [], "coverage_map": coverage, "conflict_map": {}, "structured_fact_map": {}}
 
 

@@ -2689,6 +2689,14 @@ def _uncovered_answer_subquestions(bundle: dict[str, Any], claims: list[dict[str
     subquestions = list(bundle.get("subquestions") or (bundle.get("query_plan") or {}).get("subquestions") or [])
     question = str(bundle.get("question") or "")
     direct_text = '\n'.join(str(claim.get('rendered_claim_text') or claim.get('claim_text') or '') for claim in claims if claim.get('claim_type') == 'DIRECT')
+    cited_ids = {eid for claim in claims if claim.get('claim_type') == 'DIRECT' for eid in claim.get('evidence_ids') or []}
+    subject_context = '\n'.join(
+        str(value) for evidence in bundle.get('verified_evidence') or []
+        if evidence.get('evidence_id') in cited_ids and 'MISMATCH' not in (evidence.get('scope') or {}).values()
+        for value in (evidence.get('file_name'), evidence.get('heading_path'),
+                      (evidence.get('knowledge_card') or {}).get('title') if reviewed_method_card_matches(evidence, question, bundle.get('query_plan') or {}) else '')
+        if value
+    )
     if not subquestions and re.search(r"(?:哪|哪些)\s*[0-9一二三四五六七八九十]+\s*(?:个|项|条|步|维度|方面)", question):
         subquestions = [question]
     for evidence in bundle.get("verified_evidence") or []:
@@ -2696,10 +2704,11 @@ def _uncovered_answer_subquestions(bundle: dict[str, Any], claims: list[dict[str
             missing = reviewed_fact_missing(evidence, question, bundle.get("query_plan") or {})
             return [(f"SQ{subquestions.index(text) + 1}" if text in subquestions else f"SQ{len(subquestions) + index + 1}", text) for index, text in enumerate(missing)]
     if len(subquestions) < 2:
-        gap = answer_support_gap(question, direct_text, bundle.get('query_plan') or {})
-        return [('SQ1', question)] if gap else []
-    if len(subquestions) < 2 and not any(re.search(r"(?:哪|哪些)\s*[0-9一二三四五六七八九十]+\s*(?:个|项|条|步|维度|方面)", value) for value in subquestions):
-        return []
+        gap = answer_support_gap(question, direct_text, bundle.get('query_plan') or {}, subject_context=subject_context)
+        if gap:
+            return [('SQ1', question)]
+        if not subquestions or not re.search(r"(?:哪|哪些)\s*[0-9一二三四五六七八九十]+\s*(?:个|项|条|步|维度|方面)", question):
+            return []
     direct_claims = [claim for claim in claims if claim.get("claim_type") == "DIRECT"]
     limited_ids = {str(claim.get("subquestion_id")) for claim in claims if claim.get("claim_type") in {"LIMITATION", "INSUFFICIENT"}}
     direct_text = "\n".join(str(claim.get("rendered_claim_text") or claim.get("claim_text") or "") for claim in direct_claims)

@@ -443,6 +443,9 @@ def task_list_request(question: str, operations: list[str] | None = None) -> boo
 def _parallel_fact_subquestions(question: str) -> list[str]:
     """Split a shared-predicate question when it explicitly asks about joined targets."""
     question = fact_request(question)
+    # Comma-separated project/topic framing is scope, not another requested value.
+    question = re.sub(r'^[^，,？?；;]+项目[，,]\s*', '', question)
+    question = re.sub(r'^[^，,？?；;]+方面[，,]\s*', '', question)
     fields = r'(?:数量|金额|月份|时间|期限|日期|比例|完整度|深度)'
     scalar = re.fullmatch(r'(.*?)的?(' + fields + r'(?:(?:和|与|及|、)' + fields + r')+)((?:分别|各)?(?:有什么要求|有何规定|是多少|是什么|为多少))[？?]?', question)
     if scalar:

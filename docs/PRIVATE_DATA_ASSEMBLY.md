@@ -57,3 +57,11 @@ python -m scripts.run_knowledge_growth_v1 --runtime-state <STATE_JSON> --trace-d
 历史记录不借当前版本补来源；技术、未分类以及范围外问题不自动产生业务候选。重复执行保留审核与事件，去重按提问编号、问题范围和来源版本处理；不支持会丢审核上下文的旧 `--rebuild` 用法。不要让离线脚本与服务同时写同一个候选目录。
 
 X版新增合成测试在 `tests/public_release/test_controlled_growth.py`；通用自生长、试用反馈与存储测试亦须运行。当前286项公开回归、本机498项回归与各项限制见[X版说明](CONTROLLED_GROWTH_20261012.md)。
+
+## Y批解析与来源差异
+
+重新读取新增表格后，需核对表头、物理行范围、序号明细、合计和填写示例，再生成内容块与向量；不得只修改显示答案。原件同版校验、项目归属、观察日期和发布授权分别记录。
+
+受控 `source_review_notes.json` 可在每条 `statements` 中分别保存 `source_version`、`location`、`required_text`、`location_label` 与原文对应陈述。Word原表使用 `table` 和 `row`；工作表使用 `sheet_name` 和 `row_start`；旧PDF `page` 格式继续支持。版本、位置、所需原文和范围都必须匹配；不能把生成的答案当原文。实例只保留在受控本机，不提交仓库。
+
+私有解析检查应确认导入的是实际待运行副本。版本与核验边界见[Y批说明](SOURCE_COVERAGE_LEDGER_20261013.md)。

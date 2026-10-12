@@ -175,6 +175,12 @@ def business_term_aliases(question: str) -> dict[str, tuple[str, ...]]:
         aliases['质量'] = ('质量', '成果审查', '文件审查', '图纸审查')
         aliases['检查'] = ('检查', '审查', '复查', '复核')
     aliases['数量'] = ('数量', '个', '项', '份', '件', '条', '次', '座', '家', '人')
+    aliases['规模'] = ('规模', '总建筑面积', '占地面积')
+    aliases['建设规模'] = aliases['规模']
+    if '建设规模' in question:
+        aliases['建设'] = aliases['规模']
+    aliases['座位数'] = ('座位数', '座位', '座体育场', '座体育馆', '座游泳馆')
+    aliases['座位'] = aliases['座位数']
     aliases['总体'] = ('总体', '整体', '合计')
     aliases['月份'] = ('月份', '月')
     aliases['几月份'] = ('月份', '月')
@@ -235,6 +241,8 @@ def answer_support_gap(question: str, text: str, plan: dict[str, Any] | None = N
     for project in (plan or {}).get('project') or []:
         clean = clean.replace(str(project), '')
     clean = fact_request(clean)
+    if '座位数' in clean and not re.search(r'\d+(?:\.\d+)?(?:万)?(?:座(?:体育场|体育馆|游泳馆|位)|席|个座位)|座位数(?:为|是|共|[:：])?\d+', body):
+        return '正文没有可核验的座位数量，不能用座椅安装或场馆数量代替。'
     clean = re.sub(r'^(?:的)?(?:原报告|报告|原文|原件|原表)(?:中(?:记载|记录)?|所述|记载|记录|的)?(?:的)?[，,：:]?', '', clean)
     if re.search(r'未评估|未评范围|没有评分|没评分',clean):
         objects=[p for p in ('电气','风电场','升压站','集电线路') if p in clean]
@@ -435,7 +443,14 @@ def source_statement_reviews(question: str) -> tuple[dict[str, Any], ...]:
     if not path.is_file():
         return ()
     issues = json.loads(path.read_text(encoding='utf-8'))['issues']
-    return tuple(issue for issue in issues if any(term in question for term in issue['topic_terms']) and any(term in question for term in issue['property_terms']))
+    return tuple(issue for issue in issues if any(term in question for term in issue['topic_terms']) and any(term in question for term in issue['property_terms']) and all(term in question for term in issue.get('required_terms') or []))
+
+
+def source_statement_matches(record: dict[str, Any], issue: dict[str, Any], statement: dict[str, Any]) -> bool:
+    version = statement.get('source_version') or issue.get('source_version')
+    location = statement.get('location') or {'page':statement.get('page')}
+    body = str(record.get('raw_text') or record.get('text') or '')
+    return bool(version and record.get('source_version') == version and not any(value == 'MISMATCH' for value in (record.get('scope') or {}).values()) and location and all(value is not None and (record.get('location') or {}).get(key) == value for key,value in location.items()) and all(term in body for term in statement.get('required_text') or []))
 
 
 COMMON_TERMS = {

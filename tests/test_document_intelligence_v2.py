@@ -84,6 +84,28 @@ def test_pptx_slide_title_and_content_block(tmp_path: Path):
     assert any("关键要求" in item["text"] for item in result["paragraphs"])
 
 
+def test_merged_totals_and_row_formulas_do_not_turn_ledger_details_into_summaries(tmp_path):
+    path=tmp_path/'synthetic-ledger.xlsx'
+    wb=Workbook();ws=wb.active
+    ws.append(['序号','专业类别','创效策划点','备注','金额'])
+    ws.append([1,'演示甲','图纸汇总','合计2项','=SUM(1,2)'])
+    ws.append([2,'演示乙','核对图纸'])
+    ws.merge_cells('D2:D3')
+    ws.append(['合计',None,None,None,'=SUM(E2:E3)'])
+    wb.save(path);wb.close()
+    parsed=DocumentIntelligenceV2Builder(tmp_path)._parse_xlsx(path,document_id(path))
+    assert [r['is_summary'] for r in parsed['table_rows']]==[False,False,False,True]
+
+
+def test_assessment_header_is_not_a_later_detail_mentioning_professional(tmp_path):
+    path=tmp_path/'synthetic-assessment.xlsx';wb=Workbook();ws=wb.active
+    ws.append(['演示专业评估表']);ws.append(['阶段','文件类型','评估要点','完整度（%）','深度（%）'])
+    ws.append(['初步设计','设计说明','各专业的说明',80,90]);wb.save(path);wb.close()
+    parsed=DocumentIntelligenceV2Builder(tmp_path)._parse_xlsx(path,document_id(path))
+    assert parsed['tables'][0]['source_location']['row_start']==2
+    assert parsed['tables'][0]['header'][3]=='完整度（%）'
+
+
 def test_registration_query_role_and_metadata_conflict(tmp_path: Path):
     builder = DocumentIntelligenceV2Builder(tmp_path)
     assert builder._build_profile

@@ -250,10 +250,11 @@ def _direct_candidate(candidate: dict[str, Any], plan: dict[str, Any]) -> bool:
     if "任务书" in question and not plan.get("project") and candidate.get("document_role") in {"项目案例", "项目复盘"}:
         return False
     rank = int(candidate.get("candidate_rank") or 10**6)
+    requests = plan.get('subquestions') if plan.get('query_type') == 'MULTI_FACT' else []
     strong_scope_relevance = rank <= 20 and all(
         not plan.get(field) or candidate["scope"].get(field) == "MATCH"
         for field in ("organization", "project", "year", "specialty")
-    ) and not answer_support_gap(question,str(candidate.get('text') or ''),plan)
+    ) and any(not answer_support_gap(request,str(candidate.get('text') or ''),plan) for request in (requests or [question]))
     return (
         rank <= 10
         or strong_scope_relevance

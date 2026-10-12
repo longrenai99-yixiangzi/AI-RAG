@@ -992,7 +992,8 @@ class V25LiveShadow:
                 rescue_specs.append(('DOCUMENT_OUTLINE_RESCUE', outlines[0][1]))
         for issue in source_statement_reviews(question):
             for statement in issue['statements']:
-                matches = [record for eid, record in self.atomic.items() if record.get('source_version') == issue['source_version'] and (record.get('location') or {}).get('page') == statement['page'] and (allowed_evidence_ids is None or eid in allowed_evidence_ids)]
+                from app.ingestion.atomic_search import source_statement_matches
+                matches = [record for eid, record in self.atomic.items() if source_statement_matches(record, issue, statement) and (allowed_evidence_ids is None or eid in allowed_evidence_ids)]
                 if matches:
                     matches.sort(key=lambda record: (-sum(term in str(record.get('text') or '') for term in issue['topic_terms']), -len(str(record.get('text') or ''))))
                     rescue_specs.append(('SOURCE_STATEMENT_REVIEW', matches[0]))
@@ -1069,7 +1070,7 @@ class V25LiveShadow:
             "owner_answer_gold_source_rescue": {"invoked": bool(owner_gold_rescued), "rescued_evidence_ids": [row["evidence_id"] for row in rescue_rows if row["candidate_origin"] == "OWNER_ANSWER_GOLD_SOURCE_RESCUE"]},
         }
         if include_trace:
-            trace_fields = ("evidence_id", "document_id", "source_id", "file_name", "source_path", "display_location", "candidate_rank", "rank", "score", "role", "candidate_origin", "scope", "scope_reason", "verification_status", "status", "why_excluded", "why_context_only", "why_conflicting")
+            trace_fields = ("evidence_id", "document_id", "source_id", "source_version", "file_name", "source_path", "location", "display_location", "candidate_rank", "rank", "score", "role", "candidate_origin", "scope", "scope_reason", "verification_status", "status", "why_excluded", "why_context_only", "why_conflicting")
             result["trace_context"] = {
                 "query_plan": plan.to_dict(),
                 "evidence_bundle": {

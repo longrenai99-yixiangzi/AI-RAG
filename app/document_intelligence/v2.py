@@ -968,7 +968,7 @@ def _cell_with_merge(formula_sheet: Any, value_sheet: Any, row: int, column: int
 
 
 def _find_xlsx_header(rows: list[tuple[int, list[dict[str, Any]]]]) -> tuple[int, list[dict[str, Any]]]:
-    preferred_terms = ("专业", "序号", "项目名称", "工作任务", "审查内容", "字段", "名称", "类别")
+    preferred_terms = ("专业", "序号", "项目名称", "工作任务", "审查内容", "字段", "名称", "类别", "阶段", "文件类型", "评估要点", "权重系数")
     for row_number, cells in rows[:20]:
         values = [clean_text(cell["display"]) for cell in cells]
         nonempty = [value for value in values if value]
@@ -978,8 +978,12 @@ def _find_xlsx_header(rows: list[tuple[int, list[dict[str, Any]]]]) -> tuple[int
 
 
 def _is_summary_row(values: list[Any], cells: list[dict[str, Any]]) -> bool:
-    text = " ".join(clean_text(value) for value in values)
-    return any(term in text for term in ("合计", "总计", "汇总")) or any(isinstance(cell.get("formula"), str) and "SUM" in cell["formula"].upper() for cell in cells)
+    labels = [clean_text(value) for value, cell in zip(values, cells) if value not in (None, '') and not cell.get('inherited_from_merged')]
+    if labels and re.fullmatch(r'\d+', labels[0]):
+        return False
+    if any(re.fullmatch(r'(?:.{0,12})?(?:合计|总计|汇总|小计)[:：]?', label) for label in labels[:3]):
+        return True
+    return any(isinstance(cell.get('formula'), str) and 'SUM' in cell['formula'].upper() and not cell.get('inherited_from_merged') for cell in cells)
 
 
 def _pdf_heading_candidate(value: str) -> bool:

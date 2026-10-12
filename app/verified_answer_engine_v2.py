@@ -81,9 +81,6 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
     gap = historical_case_scope_gap(bundle['question'], bundle.get('query_plan') or {}) if historical else ''
     if gap and not bundle.get('verified_evidence'):
         return _refusal(bundle, 'INSUFFICIENT_EVIDENCE', gap)
-    report_claims = _historical_report_claims(bundle)
-    if report_claims:
-        return _answered(bundle, report_claims) if status == 'VERIFIED' and all(c['claim_type']=='DIRECT' for c in report_claims) else _partial_answer(bundle, report_claims)
     from app.ingestion.atomic_search import actual_execution_request
     if actual_execution_request(bundle['question']) and any(c.get('source_content_role') == 'NORMATIVE_REQUIREMENTS' for c in bundle.get('candidate_evidence') or []) and not any(c.get('source_content_role') != 'NORMATIVE_REQUIREMENTS' for c in bundle.get('verified_evidence') or []):
         return _refusal(bundle, 'INSUFFICIENT_EVIDENCE', '指南、评分标准和报告示范文本只能说明要求，不能证明检查、整改或计划已经实际完成；还需对应检查记录、佐证和复核材料。')
@@ -102,13 +99,19 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
     if status == "CONFLICTING_EVIDENCE":
         return _conflict_answer(bundle)
     for issue in source_statement_reviews(str(bundle.get('question') or '')):
-        evidence = [record for record in bundle.get('candidate_evidence') or [] if record.get('source_version') == issue['source_version'] and (record.get('location') or {}).get('page') in {statement['page'] for statement in issue['statements']}]
-        if len({(record.get('location') or {}).get('page') for record in evidence}) >= 2:
-            claims = [_claim('C1', 'CONFLICT', 'SQ1', '资料存在不同表述，当前不能自行裁定。'+issue['review_reason'], [record['evidence_id'] for record in evidence])]
-            for index, statement in enumerate(issue['statements'], 2):
-                matching = next(record for record in evidence if (record.get('location') or {}).get('page') == statement['page'])
-                claims.append(_claim('C'+str(index), 'CONFLICT', 'SQ1', '第'+str(statement['page'])+'页：'+statement['text'], [matching['evidence_id']], raw_evidence_text=str(matching.get('raw_text') or matching.get('text') or '')))
+        from app.ingestion.atomic_search import source_statement_matches
+        located = [(statement, next((record for record in bundle.get('candidate_evidence') or [] if source_statement_matches(record, issue, statement)), None)) for statement in issue['statements']]
+        if len(located) >= 2 and all(record is not None for _,record in located):
+            claims = [_claim('C1', 'CONFLICT', 'SQ1', '资料存在不同表述，当前不能自行裁定。'+issue['review_reason'], [record['evidence_id'] for _,record in located])]
+            for index, (statement, matching) in enumerate(located, 2):
+                label = statement.get('location_label') or '第'+str(statement.get('page'))+'页'
+                claims.append(_claim('C'+str(index), 'CONFLICT', 'SQ1', label+'：'+statement['text'], [matching['evidence_id']], raw_evidence_text=str(matching.get('raw_text') or matching.get('text') or '')))
             return _answer(bundle, 'CONFLICTING_ANSWER', claims, limitations=[])
+        if any(record is not None for _,record in located):
+            return _refusal(bundle, 'INSUFFICIENT_EVIDENCE', '已登记的来源差异尚未裁定，本次没有取齐可核查的两份原文，不能只采用其中一份作唯一结论。')
+    report_claims = _historical_report_claims(bundle)
+    if report_claims:
+        return _answered(bundle, report_claims) if status == 'VERIFIED' and all(c['claim_type']=='DIRECT' for c in report_claims) else _partial_answer(bundle, report_claims)
     target = definition_target(str(bundle.get("question") or ""))
     if target:
         for evidence in bundle.get("verified_evidence") or []:
@@ -225,7 +228,12 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
             return _refusal(bundle, "INSUFFICIENT_EVIDENCE", "已取得表格行，但无法唯一识别问题要求比较的数值列。")
         if any(claim.get("claim_type") != "DIRECT" for claim in claims):
             return _partial_answer(bundle, claims)
-        return _answered(bundle, claims) if status == "VERIFIED" else _partial_answer(bundle, claims)
+        # Verified row calculations can cover facts that lexical coverage could not infer.
+        covered = {claim['subquestion_id'] for claim in claims}
+        coverage = [{**item, 'coverage_status':'COVERED'} if item['subquestion_id'] in covered else item for item in bundle['coverage_map']]
+        bundle = {**bundle, 'coverage_map':coverage}
+        status = 'VERIFIED' if all(item['coverage_status']=='COVERED' for item in coverage) else status
+        return _answer(bundle, 'ANSWERED', claims, limitations=[]) if status == "VERIFIED" else _partial_answer(bundle, claims)
     grade_item_claims = _structured_grade_item_claims(bundle, bundle.get("structured_rows") or [])
     if grade_item_claims:
         if any(claim.get("claim_type") != "DIRECT" for claim in grade_item_claims):
@@ -2341,6 +2349,38 @@ def _structured_extreme_claims(bundle: dict[str, Any], rows: list[dict[str, Any]
     if module_claims is not None:
         return module_claims
 
+    # Counting ledger items by category is not a numeric extreme of the category label.
+    if '专业' in question and re.search(r'(?:条数|条目数|记录数|策划点|项数|数量).{0,8}(?:最多|最少)', question):
+        detail = [row for row in rows if not row.get('is_header') and not row.get('is_summary')]
+        serial_column = next((header(cell) for row in detail for cell in row.get('cells') or [] if header(cell) in {'序号', '序 号'}), None)
+        if serial_column:
+            detail = [row for row in detail if any(header(cell) == serial_column and re.fullmatch(r'\d+', value(cell)) for cell in row.get('cells') or [])]
+        columns = {header(cell) for row in detail for cell in row.get('cells') or []}
+        item_columns = {name for name in columns if len(stem({'header': name})) >= 2 and (stem({'header': name}) in question or any(name.endswith(noun) and noun in question for noun in ('策划点', '优化点', '条目', '事项'))) and not re.search(r'专业|类别|序号|编号|条数|数量', name)}
+        groups: dict[str, list[dict[str, Any]]] = {}
+        for row in detail:
+            group = str(row.get('professional') or '').strip()
+            item = any(value(cell) for cell in row.get('cells') or [] if header(cell) in item_columns)
+            if not group or not item:
+                return [_claim('C1', 'LIMITATION', 'SQ1', '表格未提供逐条对应的专业和所问条目，不能按类别名称中的数字统计条数。', evidence_ids[:1], raw_evidence_text=f'rows={len(detail)}')]
+            groups.setdefault(group, []).append(row)
+        if not groups:
+            return []
+        extreme = (max if operation == 'MAX' else min)(len(group) for group in groups.values())
+        winners = [name for name, group in groups.items() if len(group) == extreme]
+        row_numbers = [int(row['row_number']) for row in detail]
+        row_ids = [str(row.get('row_id') or row.get('table_row_id') or '') for row in detail]
+        proof = '；'.join(f'{name}：{len(group)}条' for name, group in groups.items())
+        claims = []
+        if re.search(r'多少个专业|几[个种类]+专业|专业类别', question):
+            claims.append(_claim('C1', 'DIRECT', 'SQ1', f'该台账共涉及{len(groups)}个专业类别，共{len(detail)}条明细。', evidence_ids[:1], raw_evidence_text=proof, source_rows=row_numbers, source_row_ids=row_ids))
+        subquestions = bundle.get('subquestions') or plan.get('subquestions') or [question]
+        question_id = next((f'SQ{i}' for i, text in enumerate(subquestions, 1) if any(marker in str(text) for marker in markers)), 'SQ1')
+        label = '最多' if operation == 'MAX' else '最少'
+        item_label = min(item_columns, key=len)
+        claims.append(_claim(f'C{len(claims)+1}', 'DIRECT', question_id, f'{item_label}条数{label}的专业为{"、".join(winners)}，各{extreme}条。', evidence_ids[:1], raw_evidence_text=proof, source_rows=row_numbers, source_row_ids=row_ids))
+        return claims
+
     cells = list(rows[0].get("cells") or [])
     prefix = question[:marker_position]
     metric_cells = sorted((cell for cell in cells if stem(cell) and stem(cell) in prefix), key=lambda cell: len(stem(cell)), reverse=True)
@@ -2348,12 +2388,19 @@ def _structured_extreme_claims(bundle: dict[str, Any], rows: list[dict[str, Any]
         suffix = question[marker_position:]
         metric_cells = sorted((cell for cell in cells if stem(cell) and stem(cell) in suffix), key=lambda cell: len(stem(cell)), reverse=True)
     metric_cell = None
+    def numeric_value(cell: dict[str, Any], text: str) -> re.Match[str] | None:
+        if re.search(r'类别|名称|序号|编号|日期|时间|代码|专业$', stem(cell)):
+            return None
+        unit_match = re.search(r'[（(]([^）)]+)[）)]', header(cell))
+        unit = re.escape(unit_match.group(1)) if unit_match else r'%|％|万?元|万?平方米|万?㎡|m[²2³3]?|吨|t|天|日|月|年|个|项|条|张|分'
+        return re.fullmatch(r'\s*([-+]?\d+(?:,\d{3})*(?:\.\d+)?)(?:\s*(?:' + unit + r'))?\s*', text)
+
     for cell in metric_cells:
         for row in rows:
             if row.get("is_header") or row.get("is_summary"):
                 continue
             text = next((value(item) for item in row.get("cells") or [] if header(item) == header(cell)), "")
-            number = re.search(r"-?\d[\d,]*(?:\.\d+)?", text.replace(",", ""))
+            number = numeric_value(cell, text)
             if number:
                 metric_cell = cell
                 break
@@ -2367,11 +2414,11 @@ def _structured_extreme_claims(bundle: dict[str, Any], rows: list[dict[str, Any]
         if row.get("is_header") or row.get("is_summary"):
             continue
         text = next((value(cell) for cell in row.get("cells") or [] if header(cell) == header(metric_cell)), "")
-        match = re.search(r"-?\d[\d,]*(?:\.\d+)?", text.replace(",", ""))
+        match = numeric_value(metric_cell, text)
         if not match:
-            continue
+            return [_claim('C1', 'LIMITATION', 'SQ1', f'表格中“{stem(metric_cell)}”列存在缺值或非数值记录，尚不能确认全表极值。', evidence_ids[:1], raw_evidence_text=f'row={row.get("row_number")}')]
         try:
-            numeric_rows.append((Decimal(match.group(0)), row, text))
+            numeric_rows.append((Decimal(match.group(1).replace(',', '')), row, text))
         except InvalidOperation:
             continue
     if not numeric_rows:

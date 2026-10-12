@@ -3,12 +3,16 @@
 最新代码与全部后续成果在[rag-v1-refactor分支](https://github.com/longrenai99-yixiangzi/AI-RAG/tree/rag-v1-refactor)。本默认分支保留历史V0.2源码；查看当前状态与操作请使用下面的新成果入口。
 
 - [当前发布及真实验收结果](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/CURRENT_RELEASE_STATE.md)
-- [NEW-01～12和部署任务台账](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/NEXT_WORK_STATUS.md)
-- [详细操作指导手册](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/KNOWLEDGE_BASE_OPERATIONS_HANDBOOK.md)
+- [下一步工作与待办](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/NEXT_WORK_STATUS.md)
+- [最新逐步使用手册](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/OPERATIONS_GUIDE_20261012.md)
 - [已完成成果与验证范围](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/COMPLETED_RESULTS.md)
 - [使用、启动、引用、反馈及恢复](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/LOCAL_OPERATION_GUIDE.md)
+- [2026-10-12发布记录与检查结果](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/PUBLISH_20261012.md)
+- [公开代码的私有数据装配说明](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/PRIVATE_DATA_ASSEMBLY.md)
 
-本机正式8000已按Owner确认采用复合题修复包5bb15a33并完成技术验收。实际运行资料、原件、知识卡正文、模型、向量、审计和恢复状态不上传公开仓库。真实使用观察与独立备份待办如实保留，源码发布不代表全库业务验收完成。
+截至2026-10-12，累计通用成果已整理至V版：包括文件/正文搜索、项目与期间查阅、Word及检索修复、原文阅读、任务书草稿、评估交接和方案比选准备。本机正式8000仍为已获准C包 `2cd04d6c`；最新V包 `84df6b7f` 在8022试用，本次上传没有切换正式服务。
+
+公开专项检查96项通过、网页构建通过；旧引擎补查83项通过、18项未通过，差异与下一步如实列在发布记录。实际运行资料、原件、知识卡正文、模型、向量、审计和恢复状态留在本机。源码发布不代表全库业务验收完成；新页面实际业务验收、自然使用观察及独立外部备份继续。
 
 ## 历史V0.2开发资料
 

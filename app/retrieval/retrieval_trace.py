@@ -151,6 +151,8 @@ def _evidence_validation(bundle: dict[str, Any]) -> list[dict[str, Any]]:
                 "chunk_id": item.get("evidence_id"),
                 "document_id": item.get("document_id"),
                 "source_id": item.get("source_id"),
+                "source_version": item.get('source_version'),
+                "source_path": item.get('source_path'),
                 "file_name": item.get("file_name"),
                 "display_location": item.get("display_location"),
                 "rank": item.get("candidate_rank") or item.get("rank"),
@@ -180,8 +182,10 @@ def _final_evidence(answer: dict[str, Any], citations: list[dict[str, Any]]) -> 
                 {
                     "claim_id": claim.get("claim_id"),
                     "claim_text": claim.get("claim_text"),
+                    "claim_type": claim.get('claim_type'),
                     "evidence_id": citation.get("evidence_id"),
                     "source_id": citation.get("source_id"),
+                    "source_version": citation.get('source_version'),
                     "citation": cid,
                     "source_path": citation.get("source_path"),
                     "file_name": citation.get("file_name"),
@@ -233,6 +237,7 @@ def build_trace(
     )
 
     stages = {
+        'coverage_map': bundle.get('coverage_map') or [],
         "query_understanding": _query_understanding(plan, question, resolved_question),
         "retrieval_plan": _retrieval_plan(plan),
         "lexical_retrieval": _lexical(document_candidates),

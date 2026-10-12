@@ -20,6 +20,7 @@ import { SourceReader } from './pages/SourceReader'
 import { TaskbookDraft } from './pages/TaskbookDraft'
 import { AssessmentHandoff } from './pages/AssessmentHandoff'
 import { SchemeComparison } from './pages/SchemeComparison'
+import { GrowthQueue } from './pages/GrowthQueue'
 import { RuntimeCapabilitiesProvider, RuntimeFeature } from './components/layout/RuntimeCapabilities'
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
       <Route path="/knowledge-os/diagnostics" element={<Diagnostics />} />
       <Route path="/knowledge-os/gold-review" element={<RuntimeFeature feature="gold_review" title="来源审核"><GoldReview /></RuntimeFeature>} />
       <Route path="/feedback" element={<RuntimeFeature feature="feedback_records" title="反馈记录"><FeedbackRecords /></RuntimeFeature>} />
+      <Route path="/growth" element={<RuntimeFeature feature="growth_queue" title="知识补充与改进"><GrowthQueue /></RuntimeFeature>} />
       <Route path="/favorites" element={<RuntimeFeature feature="favorites" title="我的收藏"><PlaceholderPage title="我的收藏" description="收藏入口尚待接入。" /></RuntimeFeature>} />
       <Route path="/recent" element={<RuntimeFeature feature="recent" title="最近浏览"><PlaceholderPage title="最近浏览" description="最近浏览入口尚待接入。" /></RuntimeFeature>} />
       <Route path="*" element={<Navigate to="/" replace />} />

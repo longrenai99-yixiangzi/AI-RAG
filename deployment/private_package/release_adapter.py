@@ -249,7 +249,7 @@ def create_app(state_root=None):
         return {
             **release_identity(), "candidate_hash": EXPECTED_HASH,
             "display_name": "本批修复试用 · 待采用" if service_kind == "PREVIEW" else "正式使用 · 已采用版本",
-            "features": {"dashboard": True, "framework": True, "topics": True, "ai_query": True, "taskbook_draft": True, "sources": True, "search": True, "diagnostics": True, "feedback_records": True, "feedback_record": True, "batch": False, "gold_review": False, "projects": True, "periods": True, "favorites": False, "recent": False, "knowledge_management_write": False},
+            "features": {"dashboard": True, "framework": True, "topics": True, "ai_query": True, "taskbook_draft": True, "sources": True, "search": True, "diagnostics": True, "feedback_records": True, "feedback_record": True, "batch": False, "gold_review": False, "projects": True, "periods": True, "favorites": False, "recent": False, "growth_queue": True, "knowledge_management_write": False},
         }
 
     def current_feedback():

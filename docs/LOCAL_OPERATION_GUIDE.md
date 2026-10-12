@@ -1,6 +1,6 @@
 # 本地使用、启动与恢复
 
-> 2026-10-12：本页保留既有启动、恢复流程。当前正式8000为C包 `2cd04d6c`，最新W包 `3ab96f4d` 在8022试用；身份及验收以[当前状态](CURRENT_RELEASE_STATE.md)为准。新增工作台的日常操作见[逐步使用手册](OPERATIONS_GUIDE_20261012.md)，公开副本装配见[装配说明](PRIVATE_DATA_ASSEMBLY.md)。
+> 2026-10-12：本页保留既有启动、恢复流程。当前正式8000为C包 `2cd04d6c`，最新X包 `2a9e3c62` 在8022试用；身份及验收以[当前状态](CURRENT_RELEASE_STATE.md)为准。新增工作台的日常操作见[逐步使用手册](OPERATIONS_GUIDE_20261012.md)，公开副本装配见[装配说明](PRIVATE_DATA_ASSEMBLY.md)。
 
 ## 使用
 

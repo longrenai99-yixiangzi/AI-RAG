@@ -45,3 +45,15 @@ npm run build
 10. 新副本先在隔离环境测试，核查原件下载、拒绝越界、同版引用、导出、状态保留与回退。浏览器实际操作和用户业务确认单独做完，再决定是否采用。
 
 本次公开版对私有映射作了外置处理，并保留远端可编辑试用的反馈审核功能；因此它与本机冻结V包不是同一批字节，必须生成新包身份。真实资料和派生文本的公开边界见[数据政策](PUBLIC_REPOSITORY_DATA_POLICY.md)。
+
+## X版候选整理
+
+实际问题的候选、审核和事件写入独立运行状态的 `growth` 目录；不写冻结来源、知识卡、向量或正式索引。先复制运行状态快照，在另一个输出目录整理：
+
+```powershell
+python -m scripts.run_knowledge_growth_v1 --runtime-state <STATE_JSON> --trace-dir <TRACE_DIR> --source-manifest <CANDIDATE_MANIFEST_JSON> --candidate-hash <完整64位数据候选指纹> --output <独立输出目录>
+```
+
+历史记录不借当前版本补来源；技术、未分类以及范围外问题不自动产生业务候选。重复执行保留审核与事件，去重按提问编号、问题范围和来源版本处理；不支持会丢审核上下文的旧 `--rebuild` 用法。不要让离线脚本与服务同时写同一个候选目录。
+
+X版新增合成测试在 `tests/public_release/test_controlled_growth.py`；通用自生长、试用反馈与存储测试亦须运行。当前286项公开回归、本机498项回归与各项限制见[X版说明](CONTROLLED_GROWTH_20261012.md)。

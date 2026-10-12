@@ -45,7 +45,8 @@ def test_candidate_primary_shadows_when_primary_hash_differs_from_current_candid
     assert _should_emit_live_shadow("V2_6_2_CANDIDATE", "f972", "f972") is False
 
 
-def test_candidate_primary_trace_keeps_candidate_hash_claims_and_real_evidence(monkeypatch):
+def test_candidate_primary_trace_keeps_candidate_hash_claims_and_real_evidence(monkeypatch, tmp_path):
+    monkeypatch.setattr(v2, 'PROJECT_ROOT', tmp_path)
     query_plan = {"query_type": "AGGREGATION_QUERY", "normalized_question": "无锡山姆结构策划点数量", "project": ["无锡山姆"], "scope_constraints": {"project": ["无锡山姆"]}}
     citation = {"citation_id": "S1", "evidence_id": "E1", "source_id": "SRC1", "file_name": "无锡山姆.xlsx", "source_path": "[LOCAL_PATH_REDACTED]", "location": {"sheet_name": "无锡山姆", "row_start": 2}}
     trace_context = {
@@ -65,7 +66,7 @@ def test_candidate_primary_trace_keeps_candidate_hash_claims_and_real_evidence(m
         candidate_hash = "candidate-sha"
         atomic = {"E1": {"source_version": "source-sha"}}
 
-        def run(self, _question, _primary, *, query_vector, include_trace):
+        def run(self, _question, _primary, *, query_vector, include_trace, allowed_evidence_ids):
             assert query_vector == [0.0]
             assert include_trace is True
             return {"v2_status": "ANSWERED", "v2_bundle_status": "VERIFIED", "v2_answer": "结构专业共 7 条。", "v2_citations": [citation], "candidate_hash": self.candidate_hash, "candidate_revision": "test", "validation": {"valid": True, "validation_errors": []}, "latency_ms": 12.0, "trace_context": trace_context}
@@ -97,6 +98,9 @@ def test_candidate_search_reuses_bm25_and_filters_zero_score():
             "other": {"evidence_id": "E3", "file_name": "混凝土方案.docx"},
         },
     )
+
+    for record, text in zip(candidate.atomic.values(), corpus):
+        record['raw_text'] = text
 
     hits = v2._search_candidate_atomic_evidence(candidate, "无锡山姆设计管理策划", 10)
     no_hits = v2._search_candidate_atomic_evidence(candidate, "qzxvkm749183aqwp", 10)
@@ -149,14 +153,14 @@ def test_explicit_counted_list_retrieval_requires_a_full_list_chunk():
     plan = plan_query(question).to_dict()
     base = {"source_path": "[LOCAL_PATH_REDACTED]", "file_name": "二公司设计管理部.md", "scope": {}}
     summary = {**base, "text": "中建三局第二建设公司设计管理部是公司设计管理工作的核心部门，负责体系建设和EPC项目设计全过程管理。"}
-    list_chunk = {**base, "text": "- 设计管理体系建设和维护\n- EPC项目设计支持与策划\n- 设计评审与评估管理\n- 设计资源库建设\n- 设计人才培养与能力建设\n- 设计管理制度文件的编制与更新"}
+    list_chunk = {**base, "text": "二公司设计管理部主要职责：\n- 设计管理体系建设和维护\n- EPC项目设计支持与策划\n- 设计评审与评估管理\n- 设计资源库建设\n- 设计人才培养与能力建设\n- 设计管理制度文件的编制与更新"}
 
     assert _answer_relevant(summary, question, plan) is False
     assert _answer_relevant(list_chunk, question, plan) is True
 
     course_question = "《EPC项目设计管理方法与实务》课程分为哪5个章节？"
     course_plan = plan_query(course_question).to_dict()
-    course_text = "课程结构（5章）：背景介绍 / 设计管理基本动作与要素 / 关键动作实施要点 / 全专业设计技术管控要点 / 问题与建议"
+    course_text = "《EPC项目设计管理方法与实务》课程结构（5章）：背景介绍 / 设计管理基本动作与要素 / 关键动作实施要点 / 全专业设计技术管控要点 / 问题与建议"
     course_candidate = {**base, "file_name": "EPC项目设计管理方法与实务.pptx", "text": course_text}
     assert _answer_relevant(course_candidate, course_question, course_plan) is True
 
@@ -178,7 +182,7 @@ def test_task_book_link_chunk_is_context_only_for_count_and_coverage_question():
         assert bundle["bundle_status"] == "INSUFFICIENT_EVIDENCE"
         assert bundle["verified_evidence"] == []
         answer = render(bundle)
-        assert answer["answer_status"] == "PARTIAL_ANSWER"
+        assert answer["answer_status"] == "INSUFFICIENT_EVIDENCE"
         assert "26个项目" not in answer["answer_text"]
 
 
@@ -200,7 +204,7 @@ def test_registration_pointer_label_cannot_supply_inventory_count():
 def test_period_scoped_source_body_supports_quantity_difference_rate():
     question = "2024 年上半年二公司钢筋量差率是多少？"
     path = "[LOCAL_PATH_REDACTED]"
-    text = "2024年上半年开展钢筋管理，钢筋量差率达8.45%，同比提升0.25个百分点。"
+    text = "2024年上半年二公司开展钢筋管理，钢筋量差率达8.45%，同比提升0.25个百分点。"
     row = {"evidence_id": "E1", "document_id": "D1", "source_path": path, "file_name": "2024年半年总结.md", "heading_path": "2024年半年总结 > 正文", "text": text, "location": {"line_start": 7, "line_end": 7}, "rank": 1, "candidate_origin": "PERIOD_SCOPE_RESCUE", "lineage_status": "LINEAGE_CONFIRMED"}
     document = {"document_id": "D1", "source_path": path, "file_name": "2024年半年总结.md", "document_type": "REVIEW_RECORD"}
     plan = plan_query(question)
@@ -364,6 +368,7 @@ def test_feedback_regression_requires_source_and_terms_and_never_uses_owner_answ
 
 
 def test_feedback_to_review_to_shadow_regression_closes_without_formal_publish(tmp_path, monkeypatch):
+    monkeypatch.setattr(v2, '_primary_mode', lambda:v2.V1_PRIMARY_MODE)
     growth = tmp_path / "growth"
     trial = tmp_path / "trial"
     monkeypatch.setattr(v2, "GROWTH", growth)
@@ -374,7 +379,7 @@ def test_feedback_to_review_to_shadow_regression_closes_without_formal_publish(t
     monkeypatch.setattr(v2, "KNOWLEDGE_STORE", TrialKnowledgeStore(tmp_path / "knowledge-store.json"))
     monkeypatch.setattr(v2, "_source_runtime_status", lambda _: "INDEXED_SHADOW")
     v2._append_jsonl(trial / "trial_audit.jsonl", {"query_id": "Q-1", "question": "二级设计进度计划包含哪些节点？", "answer_status": "ANSWERED", "document_ids": [], "evidence_ids": []})
-    feedback = v2.feedback(v2.V2FeedbackRequest(query_id="Q-1", feedback_type="回答不完整", source_path="[LOCAL_PATH_REDACTED]", source_location="第19页", required_terms=["初步设计完成"], expected_answer="仅供审核"))
+    feedback = v2.feedback(v2.V2FeedbackRequest(query_id="Q-1", feedback_type="回答不完整", source_path="[LOCAL_PATH_REDACTED]", source_location="第19页", required_terms=["初步设计完成"], expected_answer="仅供审核", traffic_kind='REAL'))
     candidate_id = feedback["feedback_event"]["growth_candidate_id"]
     review = v2.growth_review(v2.GrowthReviewRequest(candidate_id=candidate_id, decision="APPROVE", confirmed_source_path="[LOCAL_PATH_REDACTED]", confirmed_source_location="第19页", required_terms=["初步设计完成"]))
     assert review["regression_case"]["ready"] is True

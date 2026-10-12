@@ -13,6 +13,7 @@ const primary = [
   ['/sources', '知识资产', 'sources'],
   ['/knowledge-os/diagnostics', '问答诊断', 'diagnostics'],
   ['/feedback', '反馈记录', 'feedback_records'],
+  ['/growth', '知识补充与改进', 'growth_queue'],
   ['/knowledge-os/gold-review', '来源审核', 'gold_review'],
 ]
 

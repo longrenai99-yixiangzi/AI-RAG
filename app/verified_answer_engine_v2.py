@@ -2827,6 +2827,11 @@ def _explicit_list_item_count(text: str, claims: list[dict[str, Any]] | None = N
         if dimension_rows:
             return dimension_rows
     if "职责" in question:
+        heading = re.search(r'(?:主要职责|职责包括|职责有)[：:]?', text)
+        if heading:
+            block = re.match(r'(?:[ \t]*(?:[-*•]|[0-9一二三四五六七八九十]+[、.)])[^\n]*(?:\n|$))+', text[heading.end():].lstrip())
+            if block:
+                return len(re.findall(r'(?m)^[ \t]*(?:[-*•]|[0-9一二三四五六七八九十]+[、.)])', block[0]))
         match = re.search(r"(?:主要职责|职责包括|职责有)[：:]?\s*(.+?)(?:[。\n]|$)", text, re.S)
         if match:
             return len([part for part in re.split(r"[；;、]", match.group(1)) if part.strip()])

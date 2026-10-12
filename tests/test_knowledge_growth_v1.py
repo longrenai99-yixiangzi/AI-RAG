@@ -27,11 +27,11 @@ def test_partial_candidate_retains_only_insufficient_subquestion_gap():
     assert candidate["knowledge_gap"] == "条件统计"
 
 
-def test_duplicate_candidate_merges_occurrence_count():
+def test_replaying_same_query_does_not_inflate_occurrence_count():
     candidate = candidate_for_trace(_trace("SOURCE_SCOPE_MISSING", "SOURCE_SCOPE_MISSING"))
     merged = merge_candidate(candidate, candidate)
-    assert merged["occurrence_count"] == 2
+    assert merged["occurrence_count"] == 1
 
 
 def _trace(answer_status, bundle_status):
-    return {"question_id": "Q-1", "question": "测试问题", "answer": {"answer_status": answer_status}, "bundle": {"bundle_status": bundle_status, "coverage_map": [], "candidate_evidence": [], "verified_evidence": [], "conflicting_evidence": []}}
+    return {"question_id": "Q-1", "question": "测试问题", "traffic_kind":"REAL", "candidate_hash":"synthetic", "answer": {"answer_status": answer_status}, "bundle": {"bundle_status": bundle_status, "coverage_map": [], "candidate_evidence": [], "verified_evidence": [], "conflicting_evidence": []}}

@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from app.bm25 import tokenize
 from app.chunker import chunk_blocks
 from app.domain import SourceBlock
-from app.knowledge_growth_v1 import candidate_for_trace
+from app.knowledge_growth_v1 import candidate_for_trace, save_candidate, within_growth_scope
 from app.config import Settings
 from app.ingestion.atomic_search import search_atomic_evidence, search_record_role, search_role_priority, search_match_kind
 from app.ingestion.atomic_evidence import build_atomic_evidence
@@ -1254,6 +1254,8 @@ def query(request: V2QueryRequest) -> dict[str, Any]:
             pass
     audit = {"timestamp": _now(), "trial_user": request.trial_user, "query_id": result["query_id"], "query_run_id": query_run_id, "conversation_id": request.conversation_id, "node_id": request.node_id, "question": request.question, "resolved_question": resolved_question, "pipeline_version": result["pipeline_version"], "answer_status": result["answer_status"], "document_ids": sorted({item.get("document_id") for item in result["debug"]["evidence_bundle"]["candidate_evidence"] if item.get("document_id")}), "evidence_ids": [item["evidence_id"] for item in result["citations"]], "citation_ids": [item["citation_id"] for item in result["citations"]], "bundle_status": result["debug"]["evidence_bundle"]["bundle_status"], "growth_candidate_ids": result["growth_candidate_ids"], "latency": result["latency"], "feedback": None, "gold_runtime_injection": 0}
     audit["traffic_kind"] = request.traffic_kind
+    audit['candidate_hash'] = primary_hash
+    audit['source_versions'] = result.get('source_versions') or []
     audit["project_id"] = request.project_id
     _append_jsonl(TRIAL / "trial_audit.jsonl", audit)
     KNOWLEDGE_STORE.record_query(query_run_id, audit)
@@ -1268,6 +1270,20 @@ def query(request: V2QueryRequest) -> dict[str, Any]:
         )
         trace["traffic_kind"] = request.traffic_kind
         persist_trace(trace)
+        try:
+            proposal = candidate_for_trace({
+                'question_id': query_run_id, 'question': request.question, 'resolved_question': resolved_question,
+                'traffic_kind': request.traffic_kind, 'candidate_hash': primary_hash,
+                'bundle': result['debug']['evidence_bundle'], 'answer': {'answer_status': result['answer_status'], 'claims': result.get('claims') or []},
+                'failure': trace.get('failure') or {},
+            })
+            if proposal:
+                saved = save_candidate(GROWTH/'growth_candidates.jsonl', proposal)
+                result['growth_candidate_ids'] = [saved['candidate_id']]
+                audit['growth_candidate_ids'] = result['growth_candidate_ids']
+        except (OSError, ValueError, KeyError):
+            result['growth_recording_status'] = 'FAILED'
+            audit['growth_recording_status'] = 'FAILED'
         failure = trace.get("failure") or {}
         audit.update({
             "failure_stage": failure.get("failure_stage") or "",
@@ -1293,6 +1309,10 @@ def query(request: V2QueryRequest) -> dict[str, Any]:
 def feedback(request: V2FeedbackRequest) -> dict[str, Any]:
     _ensure_user(request.trial_user)
     query_run = KNOWLEDGE_STORE.query_run(request.query_run_id) if request.query_run_id else None
+    if request.query_run_id and query_run is None:
+        raise HTTPException(404, 'QUERY_RUN_NOT_FOUND')
+    if query_run and request.query_id != query_run.get('query_id'):
+        raise HTTPException(409, 'FEEDBACK_QUERY_ID_MISMATCH')
     source_path = _normalize_source_path(request.source_path)
     source_id = source_id_for_path(source_path) if source_path else ""
     idempotency_key = request.idempotency_key or uuid.uuid4().hex
@@ -1329,6 +1349,7 @@ def feedback(request: V2FeedbackRequest) -> dict[str, Any]:
     if not created:
         return {"saved": True, "deduplicated": True, "feedback_event": stored, "closure_status": stored.get("status", "RECORDED"), "automatic_knowledge_publish": 0}
     event = {"feedback_id": "v2-feedback-" + uuid.uuid4().hex, "timestamp": _now(), "trial_user": request.trial_user, "query_id": request.query_id, "feedback_type": request.feedback_type, "comment": request.comment, "source_path": request.source_path, "source_location": request.source_location, "expected_answer": request.expected_answer, "required_terms": _clean_terms(request.required_terms), "growth_candidate_id": None}
+    event.update(traffic_kind=stored['traffic_kind'], candidate_hash=(query_run or {}).get('candidate_hash') or '')
     if system_fix_required:
         defect = {
             "defect_id": "DEF_" + uuid.uuid5(uuid.NAMESPACE_URL, stored["feedback_id"]).hex[:20],
@@ -1343,13 +1364,14 @@ def feedback(request: V2FeedbackRequest) -> dict[str, Any]:
         }
         if defect["defect_id"] not in {row.get("defect_id") for row in _read_jsonl(RAG_DEFECTS)}:
             _append_jsonl(RAG_DEFECTS, defect)
-    elif (knowledge_gap or failure_code == "UNKNOWN") and _feedback_profile(request.feedback_type)["creates_candidate"]:
+    elif (knowledge_gap or failure_code == "UNKNOWN") and _feedback_profile(request.feedback_type)["creates_candidate"] and classify_traffic(stored) == 'REAL':
         candidate = _feedback_growth_candidate(event)
-        event["growth_candidate_id"] = candidate["candidate_id"]
-        existing = {row.get("candidate_id") for row in _read_jsonl(FEEDBACK_CANDIDATES)}
-        if candidate["candidate_id"] not in existing:
-            _append_jsonl(FEEDBACK_CANDIDATES, candidate)
-        _register_trial_question(event, candidate)
+        if candidate is not None:
+            event["growth_candidate_id"] = candidate["candidate_id"]
+            existing = {row.get("candidate_id") for row in _read_jsonl(FEEDBACK_CANDIDATES)}
+            if candidate["candidate_id"] not in existing:
+                _append_jsonl(FEEDBACK_CANDIDATES, candidate)
+            _register_trial_question(event, candidate)
     _append_jsonl(TRIAL / "feedback_events.jsonl", event)
     return {"saved": True, "feedback_event": {**stored, "growth_candidate_id": event["growth_candidate_id"]}, "closure_status": stored["status"], "automatic_knowledge_publish": 0}
 
@@ -1529,7 +1551,7 @@ def knowledge_change_candidates() -> dict[str, Any]:
 
 @router.get("/runtime-capabilities")
 def runtime_capabilities() -> dict[str, Any]:
-    return {"service_kind": "INTERNAL_TRIAL", "display_name": "内部试用", "release_name": "内部试用", "features": {"dashboard": True, "framework": True, "topics": True, "ai_query": True, "sources": True, "search": True, "diagnostics": True, "feedback_records": True, "feedback_record": True, "batch": True, "gold_review": True, "projects": False, "favorites": False, "recent": False, "knowledge_management_write": True}}
+    return {"service_kind": "INTERNAL_TRIAL", "display_name": "内部试用", "release_name": "内部试用", "features": {"dashboard": True, "framework": True, "topics": True, "ai_query": True, "sources": True, "search": True, "diagnostics": True, "feedback_records": True, "feedback_record": True, "batch": True, "gold_review": True, "projects": False, "favorites": False, "recent": False, "growth_queue": True, "knowledge_management_write": True}}
 
 
 @router.get("/knowledge/diagnostics/overview")
@@ -1735,16 +1757,20 @@ def rollback_knowledge(knowledge_id: str, request: RollbackKnowledgeRequest) -> 
 
 
 @router.get("/growth-candidates")
-def growth_candidates() -> dict[str, Any]:
+def growth_candidates(include_reviewed: bool = False) -> dict[str, Any]:
     rows = _read_jsonl(GROWTH / "growth_candidates.jsonl") + _read_jsonl(GROWTH / "trial_runtime_candidates.jsonl") + _read_jsonl(FEEDBACK_CANDIDATES)
     reviews = {row["candidate_id"]: row for row in _read_jsonl(GROWTH / "review_records.jsonl")}
     visible = []
-    for row in rows:
+    for row in _latest_by_id(rows, 'candidate_id').values():
+        if classify_traffic(row) != 'REAL':
+            continue
+        if not within_growth_scope(str(row.get('question') or '')):
+            continue
         review = reviews.get(row["candidate_id"])
         effective = {"APPROVE": "APPROVED", "REJECT": "REJECTED", "DEFER": "DEFERRED", "MERGE": "REVIEWED"}.get((review or {}).get("decision"), row.get("review_status"))
-        if effective == "PROPOSED":
+        if include_reviewed or effective == "PROPOSED":
             visible.append({**row, "latest_review": review, "effective_review_status": effective})
-    return {"candidates": visible, "automatic_publish": 0}
+    return {"candidates": visible, "automatic_publish": 0, 'runtime_input':False, 'candidate_count':len(visible)}
 
 
 @router.get("/feedback-closures")
@@ -1767,7 +1793,12 @@ def growth_review(request: GrowthReviewRequest) -> dict[str, Any]:
     _ensure_user(request.trial_user)
     if request.decision not in {"APPROVE", "REJECT", "DEFER", "MERGE"}:
         raise HTTPException(status_code=422, detail="INVALID_REVIEW_DECISION")
+    rows = _read_jsonl(GROWTH/'growth_candidates.jsonl') + _read_jsonl(GROWTH/'trial_runtime_candidates.jsonl') + _read_jsonl(FEEDBACK_CANDIDATES)
+    candidate = _latest_by_id(rows, 'candidate_id').get(request.candidate_id)
+    if candidate is None:
+        raise HTTPException(404, 'GROWTH_CANDIDATE_NOT_FOUND')
     record = {"candidate_id": request.candidate_id, "reviewer": request.trial_user, "review_time": _now(), "decision": request.decision, "comment": request.comment, "approved_action": request.approved_action, "confirmed_source_path": request.confirmed_source_path.strip(), "confirmed_source_location": request.confirmed_source_location.strip(), "required_terms": _clean_terms(request.required_terms), "publish_triggered": False}
+    record.update(candidate_fingerprint=candidate.get('candidate_fingerprint'), candidate_hash=candidate.get('candidate_hash'))
     regression_case = None
     if request.decision == "APPROVE":
         regression_case = _create_regression_case(request, record)
@@ -1875,7 +1906,7 @@ def _closure_status(review: dict[str, Any] | None, case: dict[str, Any] | None, 
 
 
 def _create_regression_case(request: GrowthReviewRequest, review: dict[str, Any]) -> dict[str, Any]:
-    candidates = _latest_by_id(_read_jsonl(FEEDBACK_CANDIDATES), "candidate_id")
+    candidates = _latest_by_id(_read_jsonl(GROWTH/'growth_candidates.jsonl') + _read_jsonl(GROWTH/'trial_runtime_candidates.jsonl') + _read_jsonl(FEEDBACK_CANDIDATES), "candidate_id")
     candidate = candidates.get(request.candidate_id, {})
     events = _latest_by_id((row for row in _read_jsonl(TRIAL / "feedback_events.jsonl") if row.get("growth_candidate_id")), "growth_candidate_id")
     event = events.get(request.candidate_id, {})
@@ -2003,10 +2034,13 @@ def _case_with_readiness(case: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
-def _feedback_growth_candidate(event: dict[str, Any]) -> dict[str, Any]:
+def _feedback_growth_candidate(event: dict[str, Any]) -> dict[str, Any] | None:
     audit = next((row for row in reversed(_read_jsonl(TRIAL / "trial_audit.jsonl")) if row.get("query_id") == event["query_id"]), {})
+    if not audit.get('question') or not within_growth_scope(str(audit['question'])):
+        return None
     profile = _feedback_profile(event["feedback_type"])
-    return {"candidate_id": "FG_" + uuid.uuid5(uuid.NAMESPACE_URL, f"{event['query_id']}:{event['feedback_type']}").hex[:16], "candidate_fingerprint": f"feedback:{event['query_id']}:{event['feedback_type']}", "created_at": event["timestamp"], "source_query_id": event["query_id"], "question": audit.get("question", ""), "feedback_type": event["feedback_type"], "failure_type": profile["failure_type"], "growth_type": profile["growth_type"], "priority": profile["priority"], "reason": f"试用用户反馈：{event['feedback_type']}", "current_answer_status": audit.get("answer_status"), "affected_document_ids": audit.get("document_ids", []), "affected_section_ids": [], "affected_evidence_ids": audit.get("evidence_ids", []), "knowledge_gap": "待业务审核确认", "retrieval_gap": None, "answer_gap": event.get("comment") or None, "owner_asserted_source": {"source_path": event.get("source_path"), "source_location": event.get("source_location")}, "owner_asserted_answer": event.get("expected_answer"), "owner_required_terms": event.get("required_terms", []), "recommended_action": "人工确认来源文件、位置和关键事实后，建立只用于Shadow回归的业务验收用例。", "suggested_source": None, "suggested_metadata_fix": None, "suggested_qa": None, "evidence_snapshot": {"trial_audit": audit}, "governance_status": profile["governance_status"], "review_status": "PROPOSED", "reviewer": None, "review_comment": None, "closure_status": "PENDING_BUSINESS_REVIEW", "repair_status": "PENDING_TRIAGE", "regression_status": "NOT_READY", "created_by": "AI_PROPOSED", "knowledge_origin": "AI_PROPOSED", "schema_version": "knowledge_growth.v1", "occurrence_count": 1, "latest_seen_at": event["timestamp"], "related_query_ids": [event["query_id"]], "regression_question_ids": [], "feedback_event_id": event["feedback_id"]}
+    fingerprint = hashlib.sha256(json.dumps([event.get("candidate_hash"), event["query_id"], event["feedback_type"], event.get("source_path"), event.get("source_location"), event.get("expected_answer"), event.get("required_terms")], ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+    return {"traffic_kind":event.get("traffic_kind", "UNCLASSIFIED"), "candidate_hash":event.get("candidate_hash", ""), "runtime_input":False, "automatic_knowledge_publish":0, "candidate_id":"FG_"+fingerprint[:16], "candidate_fingerprint":fingerprint, "created_at": event["timestamp"], "source_query_id": event["query_id"], "question": audit.get("question", ""), "feedback_type": event["feedback_type"], "failure_type": profile["failure_type"], "growth_type": profile["growth_type"], "priority": profile["priority"], "reason": f"试用用户反馈：{event['feedback_type']}", "current_answer_status": audit.get("answer_status"), "affected_document_ids": audit.get("document_ids", []), "affected_section_ids": [], "affected_evidence_ids": audit.get("evidence_ids", []), "knowledge_gap": "待业务审核确认", "retrieval_gap": None, "answer_gap": event.get("comment") or None, "owner_asserted_source": {"source_path": event.get("source_path"), "source_location": event.get("source_location")}, "owner_asserted_answer": event.get("expected_answer"), "owner_required_terms": event.get("required_terms", []), "recommended_action": "人工确认来源文件、位置和关键事实后，建立只用于Shadow回归的业务验收用例。", "suggested_source": None, "suggested_metadata_fix": None, "suggested_qa": None, "evidence_snapshot": {"trial_audit": audit}, "governance_status": profile["governance_status"], "review_status": "PROPOSED", "reviewer": None, "review_comment": None, "closure_status": "PENDING_BUSINESS_REVIEW", "repair_status": "PENDING_TRIAGE", "regression_status": "NOT_READY", "created_by": "AI_PROPOSED", "knowledge_origin": "AI_PROPOSED", "schema_version": "knowledge_growth.v1", "occurrence_count": 1, "latest_seen_at": event["timestamp"], "related_query_ids": [event["query_id"]], "regression_question_ids": [], "feedback_event_id": event["feedback_id"]}
 
 
 def _register_trial_question(event: dict[str, Any], candidate: dict[str, Any]) -> None:

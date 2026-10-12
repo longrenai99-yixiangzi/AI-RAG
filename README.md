@@ -9,11 +9,12 @@
 - [使用、启动、引用、反馈及恢复](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/LOCAL_OPERATION_GUIDE.md)
 - [2026-10-12发布记录与检查结果](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/PUBLISH_20261012.md)
 - [W版共用判断修复与当前核验结果](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/SHARED_JUDGMENT_REPAIR_20261012.md)
+- [X版受控自生长候选工作台](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/CONTROLLED_GROWTH_20261012.md)
 - [公开代码的私有数据装配说明](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/PRIVATE_DATA_ASSEMBLY.md)
 
-截至2026-10-12，累计通用成果包括文件/正文搜索、项目与期间查阅、Word及检索修复、原文阅读、任务书草稿、评估交接和方案比选准备，以及W版资料背景与回答覆盖共用判断修复。本机正式8000仍为已获准C包 `2cd04d6c`；最新W包 `3ab96f4d` 在8022试用，本次上传没有切换正式服务。
+截至2026-10-12，累计通用成果包括文件/正文搜索、项目与期间查阅、Word及检索修复、原文阅读、任务书草稿、评估交接、方案比选、W版共用判断修复及X版受控候选工作台。本机正式8000仍为已获准C包 `2cd04d6c`；最新X包 `2a9e3c62` 在8022试用，本次上传没有切换正式服务。
 
-原18项未通过检查已分类处理，当前公开回归213项、本机回归425项、在线核验17项通过；两套程序回归有重叠，不相加为独立问题数。原网页保持，未新增浏览器业务验收。实际运行资料、原件、知识卡正文、模型、向量、审计和恢复状态留在本机；源码发布不代表全库业务验收完成，自然使用观察及独立外部备份继续。
+原18项检查后续处理保留，最新X版公开回归286项、本机回归498项、在线21项、实际浏览器7项及收尾21项通过；两套程序回归有重叠，不相加为独立问题数。3条待核线索和1份资料草稿未自动成为知识。实际运行资料、原件、问答、草稿、截图、模型、向量与审查状态留在本机；源码发布不代表全库业务验收，自然使用观察及独立外部备份继续。
 
 ## 历史V0.2开发资料
 

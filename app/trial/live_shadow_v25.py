@@ -780,6 +780,8 @@ class V25LiveShadow:
             for chunk in self.chunks
             if chunk.get("chunk_id")
         }
+        from app.quoted_source_v1 import source_reading_records
+        self.source_reading_atomic = source_reading_records(parsed_atomic, self.atomic)
         self.structured_rows = []
         for stage in structured_stages:
             stage_docs = {str(row.get("document_id")): _restore_source_origin(row) for row in _read_jsonl(stage / "documents.jsonl")}
@@ -827,6 +829,9 @@ class V25LiveShadow:
         self.bm25 = BM25Okapi([tokenize(text) or ["_empty_"] for text in weighted])
 
     def evidence_record(self, evidence_id: str, source_id: str = '', source_version: str = '') -> dict[str, Any] | None:
+        if evidence_id not in self.atomic and evidence_id in getattr(self, 'source_reading_atomic', {}):
+            record = self.source_reading_atomic[evidence_id]
+            return record if (not source_id or record.get('source_id')==source_id) and (not source_version or record.get('source_version')==source_version) else None
         if evidence_id in self.atomic:
             record=self.atomic[evidence_id]
             return record if (not source_id or record.get('source_id')==source_id) and (not source_version or record.get('source_version')==source_version) else None
@@ -1025,6 +1030,14 @@ class V25LiveShadow:
             from app.document_overview_v1 import overview_records
             selected = overview_records(self.atomic, matching_documents, allowed_evidence_ids)
             candidate_rows = [_candidate_row(record, rank, 'DOCUMENT_OVERVIEW') for rank, record in enumerate(selected, 1)]
+        if plan.query_type == 'QUOTED_SOURCE_LOOKUP':
+            from app.quoted_source_v1 import quoted_source_records
+            reading = getattr(self, 'source_reading_atomic', {})
+            allowed_versions = {_source_version_key(r) for eid,r in self.atomic.items() if allowed_evidence_ids is not None and eid in allowed_evidence_ids}
+            reading_allowed = None if allowed_evidence_ids is None else allowed_evidence_ids | {eid for eid,r in reading.items() if _source_version_key(r) in allowed_versions}
+            selected = quoted_source_records({**self.atomic, **reading}, plan.scope_constraints['quoted_statement'][0], reading_allowed)
+            candidate_rows = [_candidate_row(record, rank, 'QUOTED_SOURCE_LOOKUP') for rank, record in enumerate(selected, 1)]
+            scoped_atomic = {**scoped_atomic, **{record['evidence_id']:record for record in selected}}
         documents = {str(key): dict(value) for key, value in self.docs.items()}
         for document in documents.values():
             document.setdefault("scope", {})

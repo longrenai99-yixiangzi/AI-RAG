@@ -237,6 +237,10 @@ def answer_support_gap(question: str, text: str, plan: dict[str, Any] | None = N
     body = re.sub(r'\s+', '', strip_markdown_links(text)).casefold()
     if not body:
         return '未取得可用于回答的正文。'
+    if (plan or {}).get('query_type') == 'QUOTED_SOURCE_LOOKUP':
+        from app.quoted_source_v1 import compact_excerpt, quoted_statement
+        quote = quoted_statement(question)
+        return '' if quote and compact_excerpt(quote) in compact_excerpt(text) else '未找到完整摘录，不能只凭相同数字认定出处。'
     if (plan or {}).get('query_type') == 'DOCUMENT_OVERVIEW':
         from app.document_overview_v1 import file_key
         title = ((plan or {}).get('scope_constraints') or {}).get('source_reference') or []

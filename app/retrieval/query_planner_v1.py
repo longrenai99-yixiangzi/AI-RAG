@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, field
 
 from app.bm25 import tokenize
 from app.document_overview_v1 import overview_title
+from app.quoted_source_v1 import quoted_statement
 
 
 SPECIALTIES = ("总图", "建筑", "结构", "机电", "电气", "暖通", "给排水", "BIM", "EPC", "消防", "幕墙", "景观", "室内")
@@ -61,6 +62,7 @@ class QueryPlan:
 def plan_query(question: str) -> QueryPlan:
     normalized = " ".join(question.split())
     overview = overview_title(normalized)
+    quotation = quoted_statement(normalized)
     years = list(dict.fromkeys(re.findall(r"20\d{2}", normalized)))
     period = _period_scope(normalized)
     projects = _projects(normalized)
@@ -97,6 +99,12 @@ def plan_query(question: str) -> QueryPlan:
         aggregation, comparison, document_types, roles = [], [], [], []
         period, authority = '', 'ANY'
         scope = {'source_reference':[overview]}
+    if quotation:
+        years, projects, entities, specialties, metrics, organizations = [], [], [], [], [], []
+        aggregation, comparison, document_types, roles = [], [], [], []
+        period, authority = '', 'ANY'
+        scope = {'quoted_statement': [quotation]}
+        transfer = []
     if transfer:
         scope["project_fact_transfer"] = transfer
     if not projects and re.search(r'我的(?:项目|工程|办公楼|建筑)|本项目|本工程|该项目', normalized) and re.search(r'是多少|有多少|金额|面积', normalized):
@@ -283,6 +291,8 @@ def _project_fact_transfer(question: str) -> list[str]:
 
 
 def _query_type(question: str, aggregation: list[str], comparison: list[str]) -> str:
+    if quoted_statement(question):
+        return 'QUOTED_SOURCE_LOOKUP'
     if overview_title(question):
         return 'DOCUMENT_OVERVIEW'
     stages = design_depth_stages(question) or design_deliverable_stages(question)
@@ -364,6 +374,8 @@ def _response_constraints(question: str) -> list[str]:
 
 
 def _subquestions(question: str, aggregation: list[str], entities: list[str]) -> list[str]:
+    if quoted_statement(question):
+        return [question]
     if overview_title(question):
         return [question]
     depths = design_depth_stages(question)

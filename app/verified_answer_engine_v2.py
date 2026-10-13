@@ -109,6 +109,16 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
             return _answer(bundle, 'CONFLICTING_ANSWER', claims, limitations=[])
         if any(record is not None for _,record in located):
             return _refusal(bundle, 'INSUFFICIENT_EVIDENCE', '已登记的来源差异尚未裁定，本次没有取齐可核查的两份原文，不能只采用其中一份作唯一结论。')
+    if (bundle.get('query_plan') or {}).get('query_type') == 'QUOTED_SOURCE_LOOKUP':
+        from app.quoted_source_v1 import compact_excerpt, quoted_statement
+        statement = quoted_statement(bundle['question'])
+        direct = [c for c in bundle.get('verified_evidence') or [] if c.get('candidate_origin') == 'QUOTED_SOURCE_LOOKUP' and compact_excerpt(statement) in compact_excerpt(str(c.get('text') or ''))]
+        if not statement or not direct:
+            return _refusal(bundle, 'INSUFFICIENT_EVIDENCE', '当前可用同版正文中未找到完整摘录，不能仅凭相同数字认定出处；这不表示原件不存在。')
+        from app.ingestion.atomic_search import search_record_role
+        claims = [_claim('C'+str(i), 'DIRECT', 'SQ1', '匹配出处《'+str(c.get('file_name') or '')+'》'+('（导航或编库记录，不能当业务原件）' if search_record_role(c)=='NAVIGATION' else '')+'，同版原文：'+str(c['text']), [c['evidence_id']], raw_evidence_text=c['text']) for i,c in enumerate(direct,1)]
+        claims.append(_claim('C'+str(len(claims)+1), 'LIMITATION', 'SQ1', '以上仅核对摘录出处与原文数字；多个匹配来源不代表唯一或最初出处。历史案例、编库日志和笔记不自动成为现行要求、当前状态或已核实业绩；原文缺少单位或条件时不补算。', [direct[0]['evidence_id']]))
+        return _answer(bundle, 'PARTIAL_ANSWER', claims, limitations=[])
     if (bundle.get('query_plan') or {}).get('query_type') == 'DOCUMENT_OVERVIEW':
         pool = [c for c in bundle.get('candidate_evidence') or [] if c.get('candidate_origin') == 'DOCUMENT_OVERVIEW']
         if any((c.get('overview_context') or {}).get('ambiguous') for c in pool):

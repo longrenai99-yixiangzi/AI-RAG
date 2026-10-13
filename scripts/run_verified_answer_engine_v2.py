@@ -105,6 +105,8 @@ def _runtime_bundle(question: str, plan: dict[str, Any], result: dict[str, Any],
         if candidate["evidence_id"] in conflicts:
             candidate["role"] = "CONFLICTING"
             candidate["why_conflicting"] = conflicts[candidate["evidence_id"]]
+        elif candidate.get('candidate_origin') == 'QUOTED_SOURCE_LOOKUP' and not any(candidate.get(key) for key in ('link_only','registration_page_flag','query_page_flag')) and _answer_relevant(candidate, question, plan):
+            candidate['role'] = 'DIRECT'
         elif candidate.get('candidate_origin') == 'DOCUMENT_OVERVIEW' and not any(candidate.get(key) for key in ('link_only','registration_page_flag','query_page_flag')):
             candidate['role'] = 'SUPPORTING' if (candidate.get('overview_context') or {}).get('ambiguous') else 'DIRECT'
         elif candidate.get("link_only"):
@@ -285,6 +287,8 @@ def _answer_relevant(candidate: dict[str, Any], question: str, plan: dict[str, A
         return False
     if plan.get('query_type') == 'DOCUMENT_OVERVIEW':
         return bool(candidate.get('overview_context'))
+    if plan.get('query_type') == 'QUOTED_SOURCE_LOOKUP':
+        return candidate.get('candidate_origin') == 'QUOTED_SOURCE_LOOKUP'
     if candidate.get('source_content_role') == 'HISTORICAL_PROJECT_REPORT' and re.search(r'完整度|深度|未评估|截止日期|截至日期|多少张|几张|什么阶段|哪个阶段|投标图纸|初步设计图纸',question):
         return True
     if reviewed_fact_rows(candidate, question, plan):

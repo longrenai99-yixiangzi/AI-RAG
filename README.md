@@ -1,5 +1,7 @@
 # AI设计管理知识库 · 最新成果入口
 
+> [2026-10-13完整工作交接](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/HANDOFF_20261013.md)已更新：AA修订f8c835af在8024试用，12条摘录出处已核对；正式8000仍C，原8022/8023保留。原文部分回答不等于事实已核准。
+
 最新代码与全部后续成果在[rag-v1-refactor分支](https://github.com/longrenai99-yixiangzi/AI-RAG/tree/rag-v1-refactor)。本默认分支保留历史V0.2源码；查看当前状态与操作请使用下面的新成果入口。
 
 - [当前发布及真实验收结果](https://github.com/longrenai99-yixiangzi/AI-RAG/blob/rag-v1-refactor/docs/CURRENT_RELEASE_STATE.md)

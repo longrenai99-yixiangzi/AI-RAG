@@ -237,6 +237,12 @@ def answer_support_gap(question: str, text: str, plan: dict[str, Any] | None = N
     body = re.sub(r'\s+', '', strip_markdown_links(text)).casefold()
     if not body:
         return '未取得可用于回答的正文。'
+    if (plan or {}).get('query_type') == 'DOCUMENT_OVERVIEW':
+        from app.document_overview_v1 import file_key
+        title = ((plan or {}).get('scope_constraints') or {}).get('source_reference') or []
+        names = [str((plan or {}).get('evidence_file_name') or ''), *subject_context.splitlines()]
+        title = [name.replace('\\','/').rsplit('/',1)[-1] for name in title]
+        return '' if title and any(file_key(name) == file_key(title[0]) for name in names if name) else '概述必须绑定所问文件的同版正文。'
     clean = question
     for project in (plan or {}).get('project') or []:
         clean = clean.replace(str(project), '')

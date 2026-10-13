@@ -96,6 +96,8 @@ def main() -> int:
 
 def _runtime_bundle(question: str, plan: dict[str, Any], result: dict[str, Any], documents: dict[str, dict[str, Any]], atomic: dict[str, dict[str, Any]], structured_rows: list[dict[str, Any]]) -> dict[str, Any]:
     candidates = [_candidate(row, plan, documents, atomic) for row in result["atomic_candidates"]]
+    for candidate, row in zip(candidates, result['atomic_candidates']):
+        candidate['overview_context'] = row.get('overview_context')
     trusted_rescue = any(candidate.get("candidate_origin") in {"APPROVED_GOLD_SOURCE_RESCUE", "OWNER_ANSWER_GOLD_SOURCE_RESCUE"} for candidate in candidates)
     reference_ids = _prefer_confirmed_current_sources(candidates, plan)
     conflicts = {} if trusted_rescue else _same_scope_conflicts([c for c in candidates if c["evidence_id"] not in reference_ids], plan)
@@ -103,6 +105,8 @@ def _runtime_bundle(question: str, plan: dict[str, Any], result: dict[str, Any],
         if candidate["evidence_id"] in conflicts:
             candidate["role"] = "CONFLICTING"
             candidate["why_conflicting"] = conflicts[candidate["evidence_id"]]
+        elif candidate.get('candidate_origin') == 'DOCUMENT_OVERVIEW' and not any(candidate.get(key) for key in ('link_only','registration_page_flag','query_page_flag')):
+            candidate['role'] = 'SUPPORTING' if (candidate.get('overview_context') or {}).get('ambiguous') else 'DIRECT'
         elif candidate.get("link_only"):
             candidate["role"] = "CONTEXT_ONLY"
             candidate["why_context_only"] = "Link-only registration text is not source body evidence."
@@ -279,6 +283,8 @@ def _answer_relevant(candidate: dict[str, Any], question: str, plan: dict[str, A
     text = strip_markdown_links(str(candidate["text"]))
     if answer_support_gap(question, text, {**plan, 'evidence_file_name':candidate.get('file_name','')}):
         return False
+    if plan.get('query_type') == 'DOCUMENT_OVERVIEW':
+        return bool(candidate.get('overview_context'))
     if candidate.get('source_content_role') == 'HISTORICAL_PROJECT_REPORT' and re.search(r'完整度|深度|未评估|截止日期|截至日期|多少张|几张|什么阶段|哪个阶段|投标图纸|初步设计图纸',question):
         return True
     if reviewed_fact_rows(candidate, question, plan):

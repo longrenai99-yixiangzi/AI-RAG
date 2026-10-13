@@ -5,6 +5,7 @@ import uuid
 from dataclasses import asdict, dataclass, field
 
 from app.bm25 import tokenize
+from app.document_overview_v1 import overview_title
 
 
 SPECIALTIES = ("总图", "建筑", "结构", "机电", "电气", "暖通", "给排水", "BIM", "EPC", "消防", "幕墙", "景观", "室内")
@@ -59,6 +60,7 @@ class QueryPlan:
 
 def plan_query(question: str) -> QueryPlan:
     normalized = " ".join(question.split())
+    overview = overview_title(normalized)
     years = list(dict.fromkeys(re.findall(r"20\d{2}", normalized)))
     period = _period_scope(normalized)
     projects = _projects(normalized)
@@ -90,6 +92,11 @@ def plan_query(question: str) -> QueryPlan:
             reference = None
     if reference:
         scope['source_reference'] = [re.sub(r'20\d{2}年(?:\d{1,2}月)?(?:版)?', '', reference[1])]
+    if overview:
+        years, projects, entities, specialties, metrics, organizations = [], [], [], [], [], []
+        aggregation, comparison, document_types, roles = [], [], [], []
+        period, authority = '', 'ANY'
+        scope = {'source_reference':[overview]}
     if transfer:
         scope["project_fact_transfer"] = transfer
     if not projects and re.search(r'我的(?:项目|工程|办公楼|建筑)|本项目|本工程|该项目', normalized) and re.search(r'是多少|有多少|金额|面积', normalized):
@@ -244,7 +251,8 @@ def _aggregation_plan(question: str) -> list[str]:
         operations.append("COUNT")
     numeric_filter = bool(re.search(r'(?:大于|小于|超过|高于|低于|不低于|不超过|至少|至多|>=|<=|>|<)\s*-?\d', question))
     subset_count_lookup = bool(re.search(r"其中[^？?；;]{1,40}(?:多少|几)(?:件|项|次|个)", question)) and not numeric_filter and not any(term in question for term in ("利润>0", "利润大于0", "满足条件", "增加效益", "筛选", "哪些"))
-    if any(term in question for term in ("利润>0", "利润大于0", "满足条件", "增加效益")) or ("其中" in question and not subset_count_lookup) or (numeric_filter and any(op in operations for op in ('COUNT', 'LIST_DISTINCT'))):
+    aggregate_target = bool(operations) or sum_request or any(term in question for term in ('最大','最多','最高','最小','最少','最低'))
+    if any(term in question for term in ("利润>0", "利润大于0", "满足条件", "增加效益")) or ("其中" in question and aggregate_target and not subset_count_lookup) or (numeric_filter and any(op in operations for op in ('COUNT', 'LIST_DISTINCT'))):
         operations.append("FILTER")
     if sum_request:
         operations.append("SUM")
@@ -275,6 +283,8 @@ def _project_fact_transfer(question: str) -> list[str]:
 
 
 def _query_type(question: str, aggregation: list[str], comparison: list[str]) -> str:
+    if overview_title(question):
+        return 'DOCUMENT_OVERVIEW'
     stages = design_depth_stages(question) or design_deliverable_stages(question)
     if stages:
         return 'MULTI_FACT' if len(stages) > 1 else 'POLICY_QUERY'
@@ -354,6 +364,8 @@ def _response_constraints(question: str) -> list[str]:
 
 
 def _subquestions(question: str, aggregation: list[str], entities: list[str]) -> list[str]:
+    if overview_title(question):
+        return [question]
     depths = design_depth_stages(question)
     if depths:
         if re.search(r'按什么文件|依据什么|依据哪|执行什么文件', question):

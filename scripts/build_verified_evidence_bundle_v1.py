@@ -213,6 +213,8 @@ def _link_only(text: str) -> bool:
 
 
 def _deliverable_source_in_scope(candidate: dict[str, Any], plan: dict[str, Any]) -> bool:
+    if candidate.get('source_content_role') == 'REFERENCE_ONLY_ORIGINAL':
+        return plan.get('query_type') == 'DOCUMENT_OVERVIEW'
     from app.retrieval.query_planner_v1 import design_deliverable_stages, design_depth_stages
     question = str(plan.get('original_question') or '')
     if plan.get('project') or not (design_deliverable_stages(question) or design_depth_stages(question)):

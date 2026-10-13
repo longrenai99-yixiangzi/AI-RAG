@@ -109,6 +109,19 @@ def render(bundle: dict[str, Any]) -> dict[str, Any]:
             return _answer(bundle, 'CONFLICTING_ANSWER', claims, limitations=[])
         if any(record is not None for _,record in located):
             return _refusal(bundle, 'INSUFFICIENT_EVIDENCE', '已登记的来源差异尚未裁定，本次没有取齐可核查的两份原文，不能只采用其中一份作唯一结论。')
+    if (bundle.get('query_plan') or {}).get('query_type') == 'DOCUMENT_OVERVIEW':
+        pool = [c for c in bundle.get('candidate_evidence') or [] if c.get('candidate_origin') == 'DOCUMENT_OVERVIEW']
+        if any((c.get('overview_context') or {}).get('ambiguous') for c in pool):
+            choices = '；'.join(dict.fromkeys(str(c.get('file_name'))+'，所在目录：'+str(c.get('source_path') or '').replace('\\','/').rsplit('/',1)[0] for c in pool))
+            return _refusal(bundle, 'SOURCE_SCOPE_MISSING', '找到多个同名文件或版本，尚不能作为同一份资料概述。请写全含扩展名的文件名；仍同名时，从资料来源复制完整路径，用《完整路径》提问：'+choices)
+        direct = [c for c in bundle.get('verified_evidence') or [] if c.get('candidate_origin') == 'DOCUMENT_OVERVIEW']
+        if not direct:
+            return _refusal(bundle, 'INSUFFICIENT_EVIDENCE', '当前可用范围没有取得这份文件的正文，不能借用其他资料概述；这不代表原件不存在。')
+        claims = [_claim('C'+str(i), 'DIRECT', 'SQ1', ('原文表头字段：' if (c.get('overview_context') or {}).get('form_headers_only') else '原文要点：')+str(c['text']), [c['evidence_id']], raw_evidence_text=c['text']) for i,c in enumerate(direct,1)]
+        if any(c.get('source_content_role') == 'REFERENCE_ONLY_ORIGINAL' for c in direct):
+            claims.append(_claim('C'+str(len(claims)+1), 'LIMITATION', 'SQ1', '本文件的用途为原文查阅；项目适用性、时间与版本尚待核对。', [direct[0]['evidence_id']]))
+        claims.append(_claim('C'+str(len(claims)+1), 'LIMITATION', 'SQ1', '以上为同版资料的原文选读，尚不是经人工核对的完整概述；图表、附件和完整上下文请查看原文件。', [direct[0]['evidence_id']]))
+        return _answer(bundle, 'PARTIAL_ANSWER', claims, limitations=[])
     report_claims = _historical_report_claims(bundle)
     if report_claims:
         return _answered(bundle, report_claims) if status == 'VERIFIED' and all(c['claim_type']=='DIRECT' for c in report_claims) else _partial_answer(bundle, report_claims)
@@ -2938,7 +2951,7 @@ def _citation(citation_id: str, evidence: dict[str, Any], source_rows: list[int]
     location = dict(evidence.get("location") or {})
     if source_rows:
         location.update({"row_start": min(source_rows), "row_end": max(source_rows), "source_row_numbers": source_rows, "source_row_ids": source_row_ids or []})
-    return {"citation_id": citation_id, "evidence_id": evidence["evidence_id"], "source_id": evidence.get("source_id"), "document_id": evidence.get("document_id"), "source_path": evidence.get("source_path"), "file_name": evidence.get("file_name"), "location": location, "page": location.get("page"), "heading_path": evidence.get("heading_path"), "sheet": location.get("sheet_name"), "table": location.get("table"), "row": location.get("row_start") or location.get("row"), "column": location.get("column")}
+    return {"citation_id": citation_id, "evidence_id": evidence["evidence_id"], "source_id": evidence.get("source_id"), "source_version": evidence.get('source_version'), "document_id": evidence.get("document_id"), "source_path": evidence.get("source_path"), "file_name": evidence.get("file_name"), "location": location, "page": location.get("page"), "heading_path": evidence.get("heading_path"), "sheet": location.get("sheet_name"), "table": location.get("table"), "row": location.get("row_start") or location.get("row"), "column": location.get("column")}
 
 
 def _short_text(text: str) -> str:

@@ -438,6 +438,7 @@ def _candidate_row(record: dict[str, Any], rank: int, origin: str) -> dict[str, 
         "text_override": record.get("text_override"),
         "raw_text_override": record.get("raw_text_override"),
         "focus_markers": record.get("focus_markers") or [],
+        "overview_context": record.get('overview_context'),
         "rank": rank,
         "candidate_origin": origin,
         "lineage_status": "LINEAGE_CONFIRMED",
@@ -906,6 +907,9 @@ class V25LiveShadow:
         if reference:
             terms = [term for term in query_terms(reference[0]) if term not in {'课件', '资料', '文件'}]
             matching_documents = {did for did, document in self.docs.items() if terms and all(term.casefold() in (str(document.get('file_name') or '')+' '+str(document.get('source_path') or '')).casefold() for term in terms)}
+            if plan.query_type == 'DOCUMENT_OVERVIEW':
+                from app.document_overview_v1 import named_document_ids
+                matching_documents = named_document_ids(self.docs, reference[0])
             source_ids = {eid for eid, record in self.atomic.items() if record.get('document_id') in matching_documents}
             allowed_evidence_ids = source_ids if allowed_evidence_ids is None else allowed_evidence_ids & source_ids
         vector = np.asarray(query_vector if query_vector is not None else primary.get("query_vector") or [], dtype=np.float32)
@@ -1017,6 +1021,10 @@ class V25LiveShadow:
             scoped_rows = [row for row in self.structured_rows if (row.get('source_id'), row.get('source_version')) in source_versions]
         for rank, row in enumerate(candidate_rows, start=1):
             row["rank"] = rank
+        if plan.query_type == 'DOCUMENT_OVERVIEW':
+            from app.document_overview_v1 import overview_records
+            selected = overview_records(self.atomic, matching_documents, allowed_evidence_ids)
+            candidate_rows = [_candidate_row(record, rank, 'DOCUMENT_OVERVIEW') for rank, record in enumerate(selected, 1)]
         documents = {str(key): dict(value) for key, value in self.docs.items()}
         for document in documents.values():
             document.setdefault("scope", {})

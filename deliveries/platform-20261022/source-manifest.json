@@ -88,6 +88,12 @@
       "privacy_transformed": false
     },
     {
+      "path": "app/answer_engine/llm/grounded_concise.py",
+      "source_sha256": "e8cc6fc99decf047deaa03173b4119c2c776e953d2ce57726436ecb9aee5c31b",
+      "published_sha256": "e8cc6fc99decf047deaa03173b4119c2c776e953d2ce57726436ecb9aee5c31b",
+      "privacy_transformed": false
+    },
+    {
       "path": "app/answer_engine/llm/llm_provider.py",
       "source_sha256": "3372e2cb4f043ab9ba74378bd4531962d392badacdaabc780d8be14cc4ed48d8",
       "published_sha256": "3372e2cb4f043ab9ba74378bd4531962d392badacdaabc780d8be14cc4ed48d8",
@@ -283,6 +289,12 @@
       "path": "app/ingestion/metadata/governance.py",
       "source_sha256": "55280e066a3063fbe7f93bc624040b65aa8e086f77d78da5bd224847d7264ec3",
       "published_sha256": "55280e066a3063fbe7f93bc624040b65aa8e086f77d78da5bd224847d7264ec3",
+      "privacy_transformed": false
+    },
+    {
+      "path": "app/ingestion/metadata/rules.yaml",
+      "source_sha256": "464a2261a7f3fd1f8129a7025843ff4babea9318c082c11f64f243937661817f",
+      "published_sha256": "464a2261a7f3fd1f8129a7025843ff4babea9318c082c11f64f243937661817f",
       "privacy_transformed": false
     },
     {
@@ -665,8 +677,8 @@
     },
     {
       "path": "app/trial/platform_app.py",
-      "source_sha256": "1338454e319384672cf050075b506eda97413415d2f285c0e47da06a33ce9311",
-      "published_sha256": "fc50c4ab2113ab88d76766ef2e901f7bdac47d66d943a73e37fa807949eaaffc",
+      "source_sha256": "740206b69b59d6c8f260fdaa2d4987378f0a03992a14dc24fc34339fdc61437a",
+      "published_sha256": "7506c6dca6371c31fbcea10c8a2cd85b4525fff4afd0f715d06bfe7a3c392de3",
       "privacy_transformed": true
     },
     {
@@ -683,8 +695,8 @@
     },
     {
       "path": "app/trial/platform_generation.py",
-      "source_sha256": "b1d37098fead9efbcc6619797e0239af0b43f3fcb0b23299bf2395002bd11b7e",
-      "published_sha256": "b1d37098fead9efbcc6619797e0239af0b43f3fcb0b23299bf2395002bd11b7e",
+      "source_sha256": "59a9ae7d092fb3100d49ae378ff0f43f5040ff274a2559ab5a365b034bbb45b1",
+      "published_sha256": "59a9ae7d092fb3100d49ae378ff0f43f5040ff274a2559ab5a365b034bbb45b1",
       "privacy_transformed": false
     },
     {
@@ -763,6 +775,30 @@
       "path": "app/verified_answer_engine_v2.py",
       "source_sha256": "14b4b1bf86db1ac78830d5f34bace3428def96097aea89460bcf18630e9406b6",
       "published_sha256": "c0407952e168e48b5f6c89435c1b894f248511a15f1aba2d89fa01c411141b4d",
+      "privacy_transformed": true
+    },
+    {
+      "path": "config/internal_trial.yaml",
+      "source_sha256": "a09ec730071d9b77909bdfbf2db73eb90682e63e2cede4d2f522a9384188f680",
+      "published_sha256": "687ff4260914326903e8f7c15b29aa8aafb6a55ae36b224176cf8ce6c4bc371b",
+      "privacy_transformed": true
+    },
+    {
+      "path": "config/knowledge_governance_rules.yaml",
+      "source_sha256": "2118c7d615f31e832211486f435297f7adfddfabb4104356f36ddec21b3a30b2",
+      "published_sha256": "2118c7d615f31e832211486f435297f7adfddfabb4104356f36ddec21b3a30b2",
+      "privacy_transformed": false
+    },
+    {
+      "path": "config/structured_v2_staging.yaml",
+      "source_sha256": "50e9edf73a5036d9894a11347ba8c3906e5edf5e8b4c581a6ae0fa29e1e335dd",
+      "published_sha256": "50e9edf73a5036d9894a11347ba8c3906e5edf5e8b4c581a6ae0fa29e1e335dd",
+      "privacy_transformed": false
+    },
+    {
+      "path": "config/trial_users.yaml",
+      "source_sha256": "231e7f969d7b6b6523dd8bd73534256f536c715cfd55f83353162d0868325593",
+      "published_sha256": "e50e85680d82ea3472e97710c74750b608a9c7fc72da479a2a9d891eb6eb22d5",
       "privacy_transformed": true
     },
     {
@@ -1012,21 +1048,15 @@
       "privacy_transformed": false
     },
     {
-      "path": "knowledge-ui/src/pages/platformApi.ts",
-      "source_sha256": "44fe6ac0c49e49c86748e58b5d43cea28feb811cfb348527c4540a4e90166d11",
-      "published_sha256": "44fe6ac0c49e49c86748e58b5d43cea28feb811cfb348527c4540a4e90166d11",
-      "privacy_transformed": false
-    },
-    {
       "path": "knowledge-ui/src/pages/PlatformContent.tsx",
-      "source_sha256": "dfdc4b3c0fa7ec6aafc7b075f596684e2698fcd7bc01d8b2e1fcd7649ff8ba23",
-      "published_sha256": "8d17cbdfff00f781ffbc8677504055af24fa9c7bd3d404c0d52148ef045ad4c7",
+      "source_sha256": "190f9e371a5d6efe0bbfcb687d127f90a98f21673e00fbfa7169eebdf23f1a2c",
+      "published_sha256": "51cc76d2bebbbb5d24b4ce1ea4a7eadd0006e9854d6d9d1a280957fddf79ecec",
       "privacy_transformed": true
     },
     {
       "path": "knowledge-ui/src/pages/PlatformOperations.tsx",
-      "source_sha256": "e65e4eed6b4089bc8a49684a619e43d2cffac397e214f935776165313b40e488",
-      "published_sha256": "548c0e21e7027f2e0088da1716d08d548597d1e4fe7cc41a510869e7d6261882",
+      "source_sha256": "ba8186c8b255c34594ee85302dd0430df767eedf9b9130ef78ee33bf93a119d6",
+      "published_sha256": "3b1e9c7e51bf58c4050e24ca9f7a693f32d634db1462323442518f846dbe64f9",
       "privacy_transformed": true
     },
     {
@@ -1043,8 +1073,8 @@
     },
     {
       "path": "knowledge-ui/src/pages/PlatformWorkbench.tsx",
-      "source_sha256": "62a08fd679593c52ac8d8e5708ece91c481adcd14b3916bbfd8470ffb26f36c8",
-      "published_sha256": "ef1bff528473c747e2990c42fbddba32f64e6c6644b13e7b29da61fbfe2371e0",
+      "source_sha256": "b943ce4ca781532cc0211d907366a1f351a06b418d5e401f963da48bb20ff43c",
+      "published_sha256": "807aa793cdc665b8442f0e35386d58a0c408705104d543601b0dd7d832e05c33",
       "privacy_transformed": true
     },
     {
@@ -1057,6 +1087,12 @@
       "path": "knowledge-ui/src/pages/TopicKnowledge.tsx",
       "source_sha256": "d21eb71c71d73ef1ac6be3535c6735486e47c643ccc82bf75ed8216720d02e87",
       "published_sha256": "d21eb71c71d73ef1ac6be3535c6735486e47c643ccc82bf75ed8216720d02e87",
+      "privacy_transformed": false
+    },
+    {
+      "path": "knowledge-ui/src/pages/platformApi.ts",
+      "source_sha256": "44fe6ac0c49e49c86748e58b5d43cea28feb811cfb348527c4540a4e90166d11",
+      "published_sha256": "44fe6ac0c49e49c86748e58b5d43cea28feb811cfb348527c4540a4e90166d11",
       "privacy_transformed": false
     },
     {
@@ -1306,6 +1342,12 @@
       "privacy_transformed": false
     },
     {
+      "path": "tests/test_grounded_concise.py",
+      "source_sha256": "a99bb94c642cea4d919c6f2ab79cf845546ac05a0bd5dcd536823e63c1997510",
+      "published_sha256": "a99bb94c642cea4d919c6f2ab79cf845546ac05a0bd5dcd536823e63c1997510",
+      "privacy_transformed": false
+    },
+    {
       "path": "tests/test_knowledge_contract.py",
       "source_sha256": "84faeba43e7e4daa9f3bf3b0c39e0d7a889da0305d4d63bef7e06161b5da28f1",
       "published_sha256": "84faeba43e7e4daa9f3bf3b0c39e0d7a889da0305d4d63bef7e06161b5da28f1",
@@ -1459,36 +1501,6 @@
       "path": "检查知识库.cmd",
       "source_sha256": "02568363561f265f322af66ff855f258f48e65d32a2d92e78e1a3294384bb4ca",
       "published_sha256": "02568363561f265f322af66ff855f258f48e65d32a2d92e78e1a3294384bb4ca",
-      "privacy_transformed": false
-    },
-    {
-      "path": "config/internal_trial.yaml",
-      "source_sha256": "a09ec730071d9b77909bdfbf2db73eb90682e63e2cede4d2f522a9384188f680",
-      "published_sha256": "687ff4260914326903e8f7c15b29aa8aafb6a55ae36b224176cf8ce6c4bc371b",
-      "privacy_transformed": true
-    },
-    {
-      "path": "config/knowledge_governance_rules.yaml",
-      "source_sha256": "2118c7d615f31e832211486f435297f7adfddfabb4104356f36ddec21b3a30b2",
-      "published_sha256": "2118c7d615f31e832211486f435297f7adfddfabb4104356f36ddec21b3a30b2",
-      "privacy_transformed": false
-    },
-    {
-      "path": "config/structured_v2_staging.yaml",
-      "source_sha256": "50e9edf73a5036d9894a11347ba8c3906e5edf5e8b4c581a6ae0fa29e1e335dd",
-      "published_sha256": "50e9edf73a5036d9894a11347ba8c3906e5edf5e8b4c581a6ae0fa29e1e335dd",
-      "privacy_transformed": false
-    },
-    {
-      "path": "config/trial_users.yaml",
-      "source_sha256": "231e7f969d7b6b6523dd8bd73534256f536c715cfd55f83353162d0868325593",
-      "published_sha256": "e50e85680d82ea3472e97710c74750b608a9c7fc72da479a2a9d891eb6eb22d5",
-      "privacy_transformed": true
-    },
-    {
-      "path": "app/ingestion/metadata/rules.yaml",
-      "source_sha256": "464a2261a7f3fd1f8129a7025843ff4babea9318c082c11f64f243937661817f",
-      "published_sha256": "464a2261a7f3fd1f8129a7025843ff4babea9318c082c11f64f243937661817f",
       "privacy_transformed": false
     }
   ],

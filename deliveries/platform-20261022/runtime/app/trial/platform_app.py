@@ -111,6 +111,7 @@ class RestoreInput(Input):
 
 class PrepareGeneration(Input):
     query_run_id: str = Field(pattern=r'^QR_[a-f0-9]{32}$')
+    protocol: Literal['SOURCE_UNITS','CONCISE_V1'] = 'SOURCE_UNITS'
 
 
 class RunGeneration(Input):
@@ -413,7 +414,7 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
         def import_action(job_id:str,value:JobAction):return lifecycle.job_action(job_id,value.action,value.actor)
 
         @app.post('/api/platform/generation-preview')
-        def prepare_generation(value:PrepareGeneration):return generation.prepare(value.query_run_id)
+        def prepare_generation(value:PrepareGeneration):return generation.prepare(value.query_run_id,value.protocol)
 
         @app.get('/api/platform/generation-pricing')
         def generation_pricing():return generation.pricing()

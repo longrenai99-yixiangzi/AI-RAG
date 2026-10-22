@@ -18304,6 +18304,67 @@
         }
       ],
       "historical_test_summaries": []
+    },
+    {
+      "phase": "grounded_concise_20261022",
+      "artifacts": [
+        {
+          "artifact_id": "5da5195e7025d6f66ee76e0cd9e4a5ff5b854c0631e1beeb9a463d2357cfd7b1",
+          "sha256": "f2af65a56615536992701e8858048f7d9dd67f9a08bc5c56026e3cda69b37ae5",
+          "bytes": 65776,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "813c68287f7a74afd96109c05c1ddf622a292b839770f5c56f70d49513ed8e1a",
+          "sha256": "ef3b42c4389ee97fb65a1940ecad3a32d1e6edd91633ae1d598a53d1086668de",
+          "bytes": 8609,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "44994f5a60a133e1f58c544ee88c259c31fda054496c61715d2a502c7104f9c5",
+          "sha256": "581b445efe73a18cd5b52f3e181b80408fe53f1221ee91a67dac81ca9fee60a0",
+          "bytes": 64995,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "cbb30a54b616e3cd231a7d8d2a418d34ad1f31702ab56375be58cfb1e0e9a689",
+          "sha256": "9a0175252d0cf945812ea845d831f2ea27e29dde3ed450c38911b78c838d71d0",
+          "bytes": 1017,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "00df8336ac03d76b854ab09335e9bac42df97eb648f7c3b8eecdb446c44b82b9",
+          "sha256": "07fe68d86cb0a283748cc1337b30380929dbad151a16a9d000c0519260cfeced",
+          "bytes": 3560,
+          "extension": ".md"
+        }
+      ],
+      "historical_test_summaries": [
+        {
+          "artifact_id": "5da5195e7025d6f66ee76e0cd9e4a5ff5b854c0631e1beeb9a463d2357cfd7b1",
+          "tests": 384,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical suites; not independent business questions."
+        },
+        {
+          "artifact_id": "813c68287f7a74afd96109c05c1ddf622a292b839770f5c56f70d49513ed8e1a",
+          "tests": 52,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical suites; not independent business questions."
+        },
+        {
+          "artifact_id": "44994f5a60a133e1f58c544ee88c259c31fda054496c61715d2a502c7104f9c5",
+          "tests": 380,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical suites; not independent business questions."
+        }
+      ]
     }
   ]
 }

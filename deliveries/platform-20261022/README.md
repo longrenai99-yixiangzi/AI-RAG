@@ -11,6 +11,7 @@
 - [完成内容与使用边界](COMPLETED_WORK.md)
 - [分阶段处理台账](PROCESSING_RECORD.md)
 - [受证据约束的大模型答复方案](EVIDENCE_CONSTRAINED_ANSWER_PLAN.md)
+- [简短答复协议实现与验证](CONCISE_IMPLEMENTATION.md)
 - [公开源码清单及校验值](source-manifest.json)
 - [本机处理产物的脱敏索引](processing-ledger.json)
 - [本次交付验证](VALIDATION.md)

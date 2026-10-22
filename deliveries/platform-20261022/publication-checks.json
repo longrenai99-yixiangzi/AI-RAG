@@ -1,8 +1,8 @@
 {
   "date": "2026-10-22",
-  "source_files": 248,
+  "source_files": 250,
   "backend_tests": {
-    "passed": 345,
+    "passed": 384,
     "failed": 0,
     "warnings": 3
   },
@@ -26,5 +26,6 @@
   },
   "new_model_http_calls": 0,
   "active_services_changed": false,
-  "private_content_uploaded": false
+  "private_content_uploaded": false,
+  "concise_protocol": "OFFLINE_IMPLEMENTED_NOT_DEPLOYED"
 }

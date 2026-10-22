@@ -141,19 +141,25 @@ def money_answer(result, question):
 
 
 def area_answer(result,question):
-    wanted=re.search(METRIC,question)
+    name=subject(question)
+    question_task=question.replace(name,'') if name else question
+    wanted=re.search(METRIC,question_task)
     if not wanted:return None
-    tail=question[wanted.end():].strip(' ，,。？?：:')
+    tail=question_task[wanted.end():].strip(' ，,。？?：:')
     if not re.search(r'多少|多大|几|换算',question) and tail:return None
     cards=result.get('citations',[])
-    if len({m[0] for m in re.finditer(METRIC,question)})!=1:return blocked(cards,'MULTIPLE_REQUESTED_AREA_FIELDS')
-    if wanted[0]=='建筑面积' and re.search(r'地上|地下|计容|单体',question):return blocked(cards,'UNBOUND_AREA_SUBSCOPE')
-    if re.search(r'比较|对比|合计|总和|相差|差额|平均|占比|不含|扣除|增加|减少|变化|增量|上限|下限|调整前|调整后|(?:19|20)\d{2}年',question):
+    if len({m[0] for m in re.finditer(METRIC,question_task)})!=1:return blocked(cards,'MULTIPLE_REQUESTED_AREA_FIELDS')
+    if wanted[0]=='建筑面积' and re.search(r'地上|地下|计容|单体',question_task):return blocked(cards,'UNBOUND_AREA_SUBSCOPE')
+    if re.search(r'比较|对比|合计|总和|相差|差额|平均|占比|不含|扣除|增加|减少|变化|增量|上限|下限|调整前|调整后|(?:19|20)\d{2}年',question_task):
         return blocked(cards,'UNSUPPORTED_COMPARISON_OR_EXTRA_CONDITION')
-    name=subject(question)
     if not name:return blocked(cards,'PROJECT_NAME_NOT_UNIQUE_OR_MISSING')
+    task=re.sub(METRIC,'',question_task)
+    task=re.sub(UNITS,'',task)
+    task=re.sub(r'[一二三四五六七八九十]+期|请问|请告诉我|请说明|请给出|查询一下|查询|多少|多大|换算|折合|大约|大概|大致|总共|一共|是|为|的|有|成|呢|啊|呀','',task)
+    # shortcut: only explicit project-wide fields are supported; add subarea binding before accepting extra scopes.
+    if re.sub(r'[\W_]+','',task):return blocked(cards,'UNVERIFIED_CONDITION_OR_SUBSCOPE')
     phases=set(re.findall(r'[一二三四五六七八九十]+期',question))
-    requested=list(re.finditer(UNITS,question))
+    requested=list(re.finditer(UNITS,question_task))
     if len(requested)>1:return blocked(cards,'MULTIPLE_REQUESTED_UNITS')
     facts=[]
     for c in cards:
@@ -163,6 +169,9 @@ def area_answer(result,question):
                 for match in AREA.finditer(texts[i]):
                     allowed={wanted[0]} if wanted[0]!='建筑面积' else {'建筑面积','总建筑面积'}
                     if match['metric'] not in allowed:continue
+                    prefix=re.split(r'[，,。；;]',texts[i][:match.start()])[-1].replace(name,'')
+                    prefix=re.sub(r'[一二三四五六七八九十]+期|本项目|该项目|此项目|本工程|该工程|其中|项目|工程|的','',prefix)
+                    if re.sub(r'[\W_]+','',prefix):continue
                     names=re.findall(r'([^，,。；;：:！？?\s《》()（）]{1,100}?项目)',texts[i])
                     named=[n for n in names if n not in {'本项目','该项目','此项目','建设项目','施工项目','设计项目','EPC项目'}
                            and not re.fullmatch(r'(?:其中|该|本|其)?[一二三四五六七八九十]+期项目',n)]

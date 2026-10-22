@@ -2,7 +2,7 @@
   "date": "2026-10-22",
   "source_files": 258,
   "backend_tests": {
-    "passed": 450,
+    "passed": 459,
     "failed": 0,
     "warnings": 3
   },
@@ -51,5 +51,23 @@
     "index_unchanged": true,
     "frontend_changed": false,
     "independent_new_topic_acceptance": false
+  },
+  "trial_coverage": {
+    "frozen_cases": 12,
+    "initial_literal_checks_passed": 9,
+    "format_false_alarms": 2,
+    "confirmed_scope_defects": 1,
+    "final_technical_checks_passed": 12,
+    "answer_cases": 9,
+    "abstention_cases": 3,
+    "current_source_and_original_link_checks": 6,
+    "browser_overlap_http_failure_retained": true,
+    "concurrency_acceptance": false,
+    "independent_new_topic_acceptance": false,
+    "new_model_http_calls": 0,
+    "restarted_ports": [
+      8897
+    ],
+    "generation_execution_enabled": false
   }
 }

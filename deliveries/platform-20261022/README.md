@@ -16,6 +16,7 @@
 - [两题真实结果与离线修复](REAL_VALIDATION_RESULT.md)
 - [两题业务确认与独立试用](OWNER_CONFIRMED_TRIAL.md)
 - [项目金额字段与引用修复](PROJECT_MONEY_PRECISION.md)
+- [试用覆盖检查与面积范围保护](TRIAL_COVERAGE_REVIEW.md)
 - [公开源码清单及校验值](source-manifest.json)
 - [本机处理产物的脱敏索引](processing-ledger.json)
 - [本次交付验证](VALIDATION.md)

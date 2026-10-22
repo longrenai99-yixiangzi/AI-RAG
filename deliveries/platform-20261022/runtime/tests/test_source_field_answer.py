@@ -93,3 +93,31 @@ def test_unhandled_project_numeric_field_is_not_presented_as_an_answer(tmp_path)
 def test_field_name_only_question_can_use_the_same_explicit_fact(tmp_path):
     result=source_extract(source(tmp_path,'甲项目，建筑面积约4万㎡。'),'甲项目建筑面积？')
     assert result['answer']=='甲项目，建筑面积约4万平方米。 [S1]'
+
+
+@pytest.mark.parametrize('question',[
+    '甲项目，住宅地块与商业地块各自的建筑面积是多少？',
+    '甲项目商业地块建筑面积是多少？',
+    '甲项目1号楼建筑面积多少？',
+    '甲项目建筑面积按业态分别是多少？'])
+def test_area_subscope_cannot_borrow_the_whole_project_total(tmp_path,question):
+    result=source_extract(source(tmp_path,'甲项目，包含住宅地块和商业地块，总建筑面积21.6万㎡。'),question)
+    assert result['answer_status']=='EVIDENCE_INSUFFICIENT'
+    assert '21.6' not in result['answer']
+    assert all(c['answer_usage']=='BACKGROUND' for c in result['citations'])
+
+
+@pytest.mark.parametrize('prefix',['商业地块','住宅部分','1号楼'])
+def test_component_area_is_not_the_whole_project_area(tmp_path,prefix):
+    result=source_extract(source(tmp_path,f'甲项目，{prefix}建筑面积3万㎡。'),'甲项目建筑面积多少？')
+    assert result['answer_status']=='EVIDENCE_INSUFFICIENT'
+    assert '3万' not in result['answer']
+
+
+@pytest.mark.parametrize('question',[
+    '请问甲地下空间项目的总建筑面积大概有多少万平方米呢？',
+    '甲地下空间项目建筑面积换算为平方米是多少？'])
+def test_area_scope_check_preserves_project_name_and_common_wording(tmp_path,question):
+    result=source_extract(source(tmp_path,'甲地下空间项目，总建筑面积约4万㎡。'),question)
+    assert result['answer_status']=='SOURCE_EXTRACT'
+    assert '甲地下空间项目' in result['answer'] and '约' in result['answer']

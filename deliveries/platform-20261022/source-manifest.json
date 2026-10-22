@@ -725,8 +725,8 @@
     },
     {
       "path": "app/trial/source_field_answer.py",
-      "source_sha256": "b52587cf9bfc02338acc24d226c4e203ade5f80dbbae1a70dae3131247278674",
-      "published_sha256": "d0ed601c8bdbc0355540e521ebbe3136644ac462125a91564f382a85c4b7d28c",
+      "source_sha256": "8431448196f17eb4bf0b52c14d6df6f4d5a07a218020de1ad5569534f8a6633b",
+      "published_sha256": "d81fbd7bc92be5129132dbdc7688b39966391aefcb0289d1c5402f15b76f4243",
       "privacy_transformed": true
     },
     {
@@ -1499,8 +1499,8 @@
     },
     {
       "path": "tests/test_source_field_answer.py",
-      "source_sha256": "5d1ec040d40c6e3c2d023ccbfc3a3635d4586d839deccee96658233c41084e42",
-      "published_sha256": "5d1ec040d40c6e3c2d023ccbfc3a3635d4586d839deccee96658233c41084e42",
+      "source_sha256": "774dce71cd291fb80662882aaf8871e9dbbeca2f180a06c024f749efd26f7421",
+      "published_sha256": "774dce71cd291fb80662882aaf8871e9dbbeca2f180a06c024f749efd26f7421",
       "privacy_transformed": false
     },
     {

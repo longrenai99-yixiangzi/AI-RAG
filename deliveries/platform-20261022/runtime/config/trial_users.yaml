@@ -1,0 +1,4 @@
+users:
+  - user_id: reviewer-001
+    display_name: 合成演示审核者
+    role: BUSINESS_REVIEWER

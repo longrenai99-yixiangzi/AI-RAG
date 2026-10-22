@@ -1,0 +1,122 @@
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import './PlatformWorkbench.css'
+import { PlatformProjects, PlatformSearch } from './PlatformTools'
+import { ExistingLibrary, ExistingAsk, ExistingFeedback } from './PlatformContent'
+import { platformApi as api } from './platformApi'
+import { PlatformImports, PlatformBackups, PlatformGeneration } from './PlatformOperations'
+
+type Source = { source_id: string; name: string; reference: string; version_label: string; product_line: string; revision: number; status: string }
+type Candidate = { candidate_id: string; question: string; answer: string; source_id: string; source_revision: number; location: string; excerpt: string; applicability: string; required_terms: string[]; status: string; revision: number; reviewer: string; review_note: string; checks: { name: string; passed: boolean }[]; action_id?: string; project_id?: string }
+export type Knowledge = Candidate & { knowledge_id: string; title: string; content: string; version: number; source_name: string; source_version_label: string; versions: { version: number; status: string; content: string }[] }
+type Event = { event_id: string; type: string; target: string; actor: string; note: string; at: string }
+type SnapshotBase = { sources: Source[]; candidates: Candidate[]; knowledge: Knowledge[]; events: Event[]; notice: string; mode: string; runtime?: { ready: boolean; sources?: number; records?: number; candidate_hash?: string; error?: string }; runs?: { query_run_id: string; question: string; status: string; recorded_at: string }[]; feedback?: { feedback_id: string; question: string; kind: string; status: string; comment: string; actor: string; created_at: string; candidate_id?: string }[]; capabilities: Record<string, boolean>; projects: { project_id: string; revision: number; name: string; product_line: string; stage: string; description: string; status: string }[]; favorites: string[]; recent: { knowledge_id: string; at: string }[]; definitions: { actions: { id: string; name: string }[]; products: { id: string; name: string }[]; taxonomy: { id: string; name: string }[]; version: string } }
+export type Snapshot = SnapshotBase & { jobs?: {job_id:string;file_name:string;sha256:string;status:string;method:string;chunk_count?:number;attempts:number;error?:string}[];generations?:{preview_id:string;question:string;status:string}[] }
+const labels: Record<string, string> = { DRAFT: '草稿', IN_REVIEW: '待审核', APPROVED: '审核通过·待发布', REJECTED: '已退回', PUBLISHED: '已发布', ACTIVE: '已发布', WITHDRAWN: '已撤回 / 停用', REGISTERED: '已登记·未接入检索', REVIEW_REQUIRED: '来源变更·已暂停' }
+const sections = [['overview', '工作总览'], ['sources', '来源登记'], ['projects', '项目管理'], ['candidates', '候选审核'], ['knowledge', '已发布知识'], ['search', '知识检索'], ['favorites', '我的收藏'], ['recent', '最近浏览'], ['activity', '操作记录'], ['readiness', '功能状态']]
+
+export function PlatformWorkbench() {
+  const [params, setParams] = useSearchParams()
+  const section = params.get('tab') || 'overview'
+  const [data, setData] = useState<Snapshot | null>(null)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [actor, setActor] = useState('本机负责人')
+  const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('')
+  const [candidateId, setCandidateId] = useState('')
+  const [sourceId, setSourceId] = useState('')
+  const [editKey, setEditKey] = useState(0)
+  const [note, setNote] = useState('')
+  const [confirmed, setConfirmed] = useState(false)
+  const [dirty, setDirty] = useState(false)
+  const [version, setVersion] = useState<Record<string, number>>({})
+  const [projectFilter, setProjectFilter] = useState('')
+  const [actionFilter, setActionFilter] = useState('')
+  const [knowledgeFilter, setKnowledgeFilter] = useState('')
+  const [questionSeed, setQuestionSeed] = useState('')
+  const [generationSeed, setGenerationSeed] = useState('')
+  async function load() { const snapshot = await api<Snapshot>('state'); setData(snapshot); setError('') }
+  useEffect(() => { load().catch(e => setError(e.message)) }, [])
+  useEffect(() => {
+    if (!dirty) return
+    const guard = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+    window.addEventListener('beforeunload', guard)
+    return () => window.removeEventListener('beforeunload', guard)
+  }, [dirty])
+  async function execute(action: () => Promise<unknown>, message: string) {
+    if (busy) return
+    if (!actor.trim()) { setError('请填写操作人。'); return }
+    setBusy(true); setError(''); setNotice('')
+    try { await action(); await load(); setNotice(message); setNote(''); setConfirmed(false); setDirty(false); setEditKey(k => k + 1) }
+    catch (e) { setError(e instanceof Error ? e.message : '操作失败，未确认保存。') }
+    finally { setBusy(false) }
+  }
+  function discardEdits() { if (dirty && !window.confirm('有尚未保存的修改，确定离开并放弃修改吗？')) return false; setDirty(false); return true }
+  function navigate(tab: string) { if (!discardEdits()) return; setParams({ tab }); setSearch(''); setStatus(''); setNotice(''); setError(''); setProjectFilter(''); setActionFilter(''); setKnowledgeFilter('') }
+  const candidates = data?.candidates || []
+  const selected = candidates.find(c => c.candidate_id === candidateId)
+  const source = data?.sources.find(s => s.source_id === sourceId)
+  const products = ['通用', ...(data?.definitions.products || []).map(p => p.name)]
+  const library = (data?.knowledge || []).filter(k => (!projectFilter || k.project_id === projectFilter) && (!actionFilter || k.action_id === actionFilter) && (!knowledgeFilter || k.knowledge_id === knowledgeFilter) && (section !== 'favorites' || data?.favorites.includes(k.knowledge_id)) && (section !== 'recent' || data?.recent.some(r => r.knowledge_id === k.knowledge_id)))
+  if (section === 'recent') library.sort((a, b) => (data?.recent.findIndex(r => r.knowledge_id === a.knowledge_id) ?? 0) - (data?.recent.findIndex(r => r.knowledge_id === b.knowledge_id) ?? 0))
+  const personal = (id: string, body: { favorite?: boolean; visit?: boolean }) => execute(() => api(`knowledge/${id}/personal`, 'POST', body), body.visit ? '阅读记录已保存。' : '收藏状态已保存。')
+  const filtered = <T extends { status: string }>(rows: T[]) => rows.filter(r => (!status || r.status === status) && JSON.stringify(r).includes(search))
+  const operation = (row: Candidate, action: string) => execute(() => api(`candidates/${row.candidate_id}/actions`, 'POST', { actor, revision: row.revision, action, note, confirmed }), '操作已保存。发布进入本地审核知识层，未改动原索引；绑定同版原件的审核知识可供相关问题检索，同题可直接复用有效答案。')
+  const live = data?.mode === 'EXISTING_CONTENT_TRIAL'
+  const navigation = live ? [sections[0], ['library', '现有资料'], ['query', '问答'], ['imports','入库任务'], ['generation','模型审查'], ['backups','备份恢复'], ['feedback', '问答反馈'], ...sections.slice(1)] : sections
+  const openCandidate = (id: string) => { navigate('candidates'); setCandidateId(id); setEditKey(k => k + 1) }
+
+  return <div className="platform-workbench">
+    <header className="pw-header"><div><span className="eyebrow">DESIGN MANAGEMENT</span><h1>知识库管理工作台</h1><p>{live ? '设计管理 V1 · 现有资料工作版' : '设计管理 V1 · 平台功能建设'}</p></div><label>操作人<input aria-label="操作人" maxLength={80} value={actor} onChange={e => setActor(e.target.value)} /></label></header>
+    <div className="pw-boundary">{data?.notice || '隔离功能工作台：不读取现有资料，不调用外部模型。'}</div>
+    <nav className="pw-nav" aria-label="平台管理"><div>{navigation.map(([id, name]) => <button disabled={busy} key={id} aria-current={section === id ? 'page' : undefined} onClick={() => navigate(id)}>{name}</button>)}</div><button disabled={busy} onClick={() => { if (discardEdits()) void execute(async () => {}, '已刷新。') }}>刷新状态</button></nav>
+    <main>
+      {error && <div role="alert" className="pw-error">{error}</div>}
+      {notice && <div role="status" className="pw-success">{notice}</div>}
+      {!data && !error && <p role="status">正在读取管理状态…</p>}
+      {data && <>
+        {live && data.runtime && <section className="pw-runtime" aria-label="现有知识库连接状态"><span>{data.runtime.ready ? `现有索引已连接 · ${data.runtime.sources} 个来源 · ${data.runtime.records} 条片段` : data.runtime.error}</span><small>索引版本 {data.runtime.candidate_hash?.slice(0, 12) || '不可用'} · 模型整理需逐次审批</small></section>}
+        {live && section === 'imports' && <PlatformImports data={data} actor={actor} refresh={load} />}
+        {live && section === 'backups' && <PlatformBackups actor={actor} refresh={load} />}
+        {live && section === 'generation' && <PlatformGeneration data={data} actor={actor} previewId={generationSeed} refresh={load} />}
+        {live && section === 'library' && <ExistingLibrary ask={question => { setQuestionSeed(question); navigate('query') }} stage={id=>void execute(async()=>{await api('imports/from-existing','POST',{actor,source_id:id});navigate('imports')},'已有片段入库任务已建立，不重新解析原件。')} />}
+        {live && section === 'query' && <ExistingAsk data={data} actor={actor} seed={questionSeed} refresh={load} openCandidate={openCandidate} prepareGeneration={id=>void execute(async()=>{const result=await api<{preview_id:string}>('generation-preview','POST',{actor,query_run_id:id});setGenerationSeed(result.preview_id);navigate('generation')},'外发预览已建立，尚未调用模型。')} />}
+        {live && section === 'feedback' && <ExistingFeedback data={data} openCandidate={openCandidate} />}
+        {section === 'overview' && <>
+          <section className="pw-metrics">{[[live ? '现有来源（含登记卡）' : '已登记来源', live ? data.runtime?.sources ?? '未连接' : data.sources.length], ['待审核候选', candidates.filter(c => c.status === 'IN_REVIEW').length], ['待发布', candidates.filter(c => c.status === 'APPROVED').length], ['已发布知识', data.knowledge.filter(k => k.status === 'ACTIVE').length]].map(([name, count]) => <article key={name}><b>{count}</b><span>{name}</span></article>)}</section>
+          <section className="pw-panel"><h2>{live ? '用现有资料贯通使用流程' : '先把管理流程跑通'}</h2><p>{live ? '现有资料浏览、检索、引用和反馈共用同一索引。更正草稿必须经过审核、单独发布后，才进入审核知识检索；撤回后停止使用。演示管理记录与此工作版分开保存。' : '这里保存的登记、审核和版本记录会持久保留。演示内容均标有“演示”，不会成为现有知识库的回答依据。'}</p><ol className="pw-steps"><li><b>{live ? '查资料与提问' : '登记来源'}</b><span>{live ? '复用现有索引与同版原件' : '填写名称、版本与引用位置'}</span></li><li><b>{live ? '核对引用并反馈' : '建立候选'}</b><span>填写问答、原文摘录和适用范围</span></li><li><b>核对并审核</b><span>结构检查通过后，人工审核</span></li><li><b>发布与管理</b><span>单独发布，可撤回、恢复历史版本</span></li></ol><div className="pw-actions"><button className="primary-button" onClick={() => navigate(live ? 'library' : 'sources')}>{live ? '浏览现有资料' : '开始登记'}</button><button onClick={() => navigate(live ? 'query' : 'candidates')}>{live ? '开始问答' : '查看演示候选'}</button><a href="/api/platform/export" download>导出当前管理快照</a></div></section>
+          <section className="pw-panel"><h2>当前范围</h2><p>以设计管理为当前业务范围，已从共用定义只读加载 {data.definitions.products.length} 条产品线、{data.definitions.actions.length} 个管理动作。候选可关联项目与管理动作；不修改现有资料的分类。</p><p>{live ? '已有混合检索与同版引用已接入。日常使用原文摘录和人工审核答案；批准的单次模型验证单独留痕，未启用连续生成。新增资料可通过入库任务逐份解析并核对后加入；正式平台尚未切换。' : '资料解析、真实检索、模型生成和正式发布暂未接入本工作台；这些能力不以演示流程通过作为验收。'}</p><small>分类定义版本：{data.definitions.version.slice(0, 16)} · 启动时读取</small></section>
+        </>}
+
+        {section === 'projects' && <PlatformProjects data={data} busy={busy} save={(id, body) => void execute(() => api(id ? `projects/${id}` : 'projects', id ? 'PUT' : 'POST', { ...body, actor }), '项目登记已保存。')} openKnowledge={id => { navigate('knowledge'); setProjectFilter(id) }} />}
+        {section === 'search' && <PlatformSearch data={data} search={query => api(`search?${query}`)} openKnowledge={id => { navigate('knowledge'); setKnowledgeFilter(id); void personal(id, { visit: true }) }} />}
+        {section === 'sources' && <div className="pw-columns"><section className="pw-panel"><div className="pw-title"><h2>来源清单</h2><button disabled={busy} onClick={() => { setSourceId(''); setEditKey(k => k + 1) }}>新增登记</button></div><label className="pw-search">筛选来源<input value={search} onChange={e => setSearch(e.target.value)} placeholder="按名称、产品线检索" /></label>{filtered(data.sources).map(s => <button className={`pw-row ${sourceId === s.source_id ? 'selected' : ''}`} key={s.source_id} onClick={() => { setSourceId(s.source_id); setEditKey(k => k + 1); setNote('') }}><b>{s.name}</b><span>{s.product_line} · {s.version_label}</span><small>{labels[s.status]} · 修订 {s.revision}</small></button>)}{!filtered(data.sources).length && <p>没有匹配的来源。</p>}</section>
+          <section className="pw-panel"><h2>{source ? '编辑来源登记' : '新增来源登记'}</h2><p>只登记元数据。引用位置不会被读取、上传或解析。</p><form key={`${sourceId}-${editKey}`} onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); void execute(() => api(source ? `sources/${source.source_id}` : 'sources', source ? 'PUT' : 'POST', { actor, revision: source?.revision || 0, name: f.get('name'), reference: f.get('reference'), version_label: f.get('version_label'), product_line: f.get('product_line') }), '来源登记已保存；关联知识会在来源修订后暂停，等待重新审核。') }}>
+            <label>来源名称<input name="name" defaultValue={source?.name} required maxLength={300} /></label><label>版本说明<input name="version_label" defaultValue={source?.version_label} required maxLength={120} placeholder="例如：2026版；仅为人工登记的版本说明" /></label><label>产品线<select name="product_line" defaultValue={source?.product_line || '通用'}>{products.map(p => <option key={p}>{p}</option>)}</select></label><label>引用位置 / 路径说明<input name="reference" defaultValue={source?.reference} maxLength={2000} /></label><button className="primary-button" disabled={busy}>保存登记</button>
+          </form>{source && source.status !== 'WITHDRAWN' && <div className="pw-danger"><label>停用原因<input value={note} onChange={e => setNote(e.target.value)} /></label><button disabled={busy || !note.trim()} onClick={() => execute(() => api(`sources/${source.source_id}/withdraw`, 'POST', { actor, revision: source.revision, action: 'withdraw', note }), '来源已停用，关联知识已暂停。')}>停用来源</button></div>}</section></div>}
+
+        {section === 'candidates' && <div className="pw-columns"><section className="pw-panel"><div className="pw-title"><h2>候选清单</h2><button disabled={busy} onClick={() => { setCandidateId(''); setEditKey(k => k + 1); setDirty(false); setNote(''); setConfirmed(false) }}>新增候选</button></div><div className="pw-filters"><label>检索候选<input value={search} onChange={e => setSearch(e.target.value)} /></label><label>状态<select value={status} onChange={e => setStatus(e.target.value)}><option value="">全部状态</option>{['DRAFT', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'PUBLISHED'].map(s => <option value={s} key={s}>{labels[s]}</option>)}</select></label></div>{filtered(candidates).map(c => <button className={`pw-row ${candidateId === c.candidate_id ? 'selected' : ''}`} key={c.candidate_id} onClick={() => { setCandidateId(c.candidate_id); setEditKey(k => k + 1); setDirty(false); setNote(''); setConfirmed(false) }}><b>{c.question}</b><span>{labels[c.status]}</span><small>修订 {c.revision} · {data.sources.find(s => s.source_id === c.source_id)?.name || '来源不可用'}</small></button>)}{!filtered(candidates).length && <p>没有匹配的候选。</p>}</section>
+          <section className="pw-panel"><h2>{selected ? '候选详情' : '新增候选'}</h2><p>结构检查只检查字段、版本和关键词，不能证明业务答案正确。</p><form key={`${candidateId}-${editKey}`} onChange={() => setDirty(true)} onSubmit={e => { e.preventDefault(); const f = new FormData(e.currentTarget); void execute(() => api(selected ? `candidates/${selected.candidate_id}` : 'candidates', selected ? 'PUT' : 'POST', { actor, revision: selected?.revision || 0, question: f.get('question'), answer: f.get('answer'), source_id: f.get('source_id'), location: f.get('location'), excerpt: f.get('excerpt'), applicability: f.get('applicability'), action_id: f.get('action_id'), project_id: f.get('project_id'), required_terms: String(f.get('terms')).split('\n').map(s => s.trim()).filter(Boolean) }), '候选已保存为草稿。编辑会清除先前审核结果。') }}>
+            <fieldset disabled={busy || selected?.status === 'PUBLISHED'}><div className="pw-filters"><label>管理动作<select name="action_id" defaultValue={selected?.action_id || ''}><option value="">未关联动作</option>{data.definitions.actions.map(a => <option key={a.id} value={a.id}>{a.id} {a.name}</option>)}</select></label><label>所属项目<select name="project_id" defaultValue={selected?.project_id || ''}><option value="">通用知识 / 未关联项目</option>{data.projects.filter(p => p.status === 'ACTIVE' || p.project_id === selected?.project_id).map(p => <option key={p.project_id} value={p.project_id}>{p.name}{p.status === 'ARCHIVED' ? '（已归档）' : ''}</option>)}</select></label></div></fieldset>
+            <fieldset disabled={busy || selected?.status === 'PUBLISHED'}><label>业务问题<input name="question" required maxLength={2000} defaultValue={selected?.question} /></label><label>来源<select name="source_id" required defaultValue={selected?.source_id || ''}><option value="" disabled>选择已登记来源</option>{data.sources.filter(s => s.status === 'REGISTERED' || s.source_id === selected?.source_id).map(s => <option key={s.source_id} value={s.source_id}>{s.name} · {s.version_label} · 修订{s.revision}</option>)}</select></label><label>章节 / 页码 / 单元格<input name="location" required maxLength={300} defaultValue={selected?.location} /></label><label>原文摘录<textarea name="excerpt" required maxLength={20000} defaultValue={selected?.excerpt} rows={4} /></label><label>候选答案<textarea name="answer" required maxLength={20000} defaultValue={selected?.answer} rows={4} /></label><label>关键事实（每行一项，须同时出现在摘录和答案中）<textarea name="terms" required defaultValue={selected?.required_terms.join('\n')} rows={3} /></label><label>适用范围及限制<textarea name="applicability" required maxLength={2000} defaultValue={selected?.applicability} rows={2} /></label><button className="primary-button">保存草稿</button></fieldset>
+          </form>{selected && <div className="pw-review"><h3>{labels[selected.status]} · 修订 {selected.revision}</h3>{selected.checks?.map(c => <p key={c.name}>{c.passed ? '✓' : '✕'} {c.name}</p>)}{selected.review_note && <p>审核意见：{selected.review_note}（{selected.reviewer}）</p>}{dirty && <p role="status">有未保存修改，请先保存草稿再操作。</p>}
+            {selected.status !== 'PUBLISHED' && <><label>审核意见 / 退回原因<textarea value={note} onChange={e => setNote(e.target.value)} maxLength={2000} rows={2} /></label>{selected.status === 'IN_REVIEW' && <label className="pw-checkbox"><input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />我已核对原文、适用范围和答案</label>}<div className="pw-actions">
+              {['DRAFT', 'REJECTED'].includes(selected.status) && <button disabled={busy || dirty} onClick={() => operation(selected, 'submit')}>检查并提交审核</button>}
+              {selected.status === 'IN_REVIEW' && <button disabled={busy || dirty || !confirmed || !note.trim()} onClick={() => operation(selected, 'approve')}>审核通过</button>}
+              {['IN_REVIEW', 'APPROVED'].includes(selected.status) && <button disabled={busy || dirty || !note.trim()} onClick={() => operation(selected, 'reject')}>退回修改</button>}
+              {selected.status === 'APPROVED' && <button className="primary-button" disabled={busy || dirty} onClick={() => operation(selected, 'publish')}>{live ? '发布到本地审核知识层' : '发布到隔离管理库'}</button>}
+            </div></>}{selected.status === 'PUBLISHED' && <button onClick={() => { setCandidateId(''); setEditKey(k => k + 1) }}>新建下一条候选</button>}</div>}</section></div>}
+
+        {['knowledge', 'favorites', 'recent'].includes(section) && <section className="pw-panel"><h2>{section === 'favorites' ? '我的收藏' : section === 'recent' ? '最近浏览' : '已发布知识与版本'}</h2><p>本页管理审核知识与版本。现有资料工作版会对相同问题复用有效审核答案；收藏与最近浏览为本机个人记录。</p><div className="pw-filters"><label>检索知识<input value={search} onChange={e => setSearch(e.target.value)} /></label><label>状态<select value={status} onChange={e => setStatus(e.target.value)}><option value="">全部</option>{['ACTIVE', 'WITHDRAWN', 'REVIEW_REQUIRED'].map(s => <option value={s} key={s}>{labels[s]}</option>)}</select></label><label>管理动作<select value={actionFilter} onChange={e => setActionFilter(e.target.value)}><option value="">全部动作</option>{data.definitions.actions.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label><label>项目<select value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="">全部项目</option>{data.projects.map(p => <option key={p.project_id} value={p.project_id}>{p.name}</option>)}</select></label></div>{knowledgeFilter && <button onClick={() => setKnowledgeFilter('')}>显示全部知识</button>}<label>操作原因（撤回 / 恢复前填写）<input value={note} maxLength={2000} onChange={e => setNote(e.target.value)} /></label>
+          {filtered(library).map(k => <article className="pw-knowledge" key={k.knowledge_id}><div className="pw-title"><h3>{k.title}</h3><span>{labels[k.status]} · V{k.version}</span></div><p>{k.content}</p><small>依据：{k.source_name} · {k.source_version_label} · {k.location}</small><p>适用范围：{k.applicability}</p><small>动作：{data.definitions.actions.find(a => a.id === k.action_id)?.name || '未关联'} · 项目：{data.projects.find(p => p.project_id === k.project_id)?.name || '通用 / 未关联'}</small>{section === 'recent' && <p>最近阅读：{new Date(data.recent.find(r => r.knowledge_id === k.knowledge_id)!.at).toLocaleString('zh-CN')}</p>}<details onToggle={e => { if (e.currentTarget.open) void personal(k.knowledge_id, { visit: true }) }}><summary>阅读原文摘录与版本记录</summary><blockquote>{k.excerpt}</blockquote>{k.versions.map(v => <p key={v.version}>V{v.version} · {labels[v.status]} · {v.content}</p>)}</details><div className="pw-actions"><button disabled={busy} onClick={() => personal(k.knowledge_id, { favorite: !data.favorites.includes(k.knowledge_id) })}>{data.favorites.includes(k.knowledge_id) ? '取消收藏' : '收藏'}</button><button disabled={busy || !note.trim() || k.status === 'WITHDRAWN'} onClick={() => execute(() => api(`knowledge/${k.knowledge_id}/actions`, 'POST', { actor, revision: k.revision, action: 'withdraw', note }), '知识已撤回。')}>撤回</button><label>恢复版本<select aria-label={`${k.title}恢复版本`} value={version[k.knowledge_id] || 0} onChange={e => setVersion({ ...version, [k.knowledge_id]: Number(e.target.value) })}><option value={0}>选择历史已发布版本</option>{k.versions.filter(v => v.status === 'ACTIVE' && v.version < k.version).map(v => <option value={v.version} key={v.version}>V{v.version}</option>)}</select></label><button disabled={busy || !note.trim() || !version[k.knowledge_id]} onClick={() => execute(() => api(`knowledge/${k.knowledge_id}/actions`, 'POST', { actor, revision: k.revision, action: 'rollback', target_version: version[k.knowledge_id], note }), '已建立恢复版本，历史记录保留。')}>恢复所选版本</button></div></article>)}{!filtered(library).length && <p className="pw-empty">暂无匹配知识或个人记录。先在候选审核中完成审核与发布。</p>}</section>}
+
+        {section === 'activity' && <section className="pw-panel"><div className="pw-title"><h2>操作记录</h2><a href="/api/platform/export" download>导出管理快照</a></div><label>筛选记录<input value={search} onChange={e => setSearch(e.target.value)} /></label><div className="pw-table"><table><thead><tr><th>时间</th><th>操作</th><th>操作人</th><th>对象 / 原因</th></tr></thead><tbody>{data.events.filter(e => JSON.stringify(e).includes(search)).map(e => <tr key={e.event_id}><td>{new Date(e.at).toLocaleString('zh-CN')}</td><td>{e.type}</td><td>{e.actor}</td><td><small>{e.target}</small><div>{e.note}</div></td></tr>)}</tbody></table></div></section>}
+
+        {section === 'readiness' && <section className="pw-panel"><h2>功能状态与后续接入</h2><p>这里按实际可操作能力列出状态，不以页面入口存在作为完成。</p><table><thead><tr><th>功能</th><th>本次状态</th></tr></thead><tbody>{[['来源登记、编辑、停用', '已实现；只保存登记信息'], ['项目登记、编辑、归档、关联知识', '已实现；项目文件夹不读取'], ['候选新增、编辑、筛选', '已实现；保存后需重新审核'], ['结构检查、人工审核、退回', '已实现；不替代业务正确性验收'], ['单独发布、撤回、历史恢复', '已实现；只作用于隔离管理库'], ['冲突提示、操作记录、快照导出', '已实现；本机单进程运行'], ['13动作与产品线分类联动', '共用定义已只读接入，用于本工作台登记与筛选'], ['知识检索、收藏、最近浏览', '已实现；关键词匹配，本机个人记录'], ['原件导入、解析、索引与后台任务', live ? '增量任务、版本加入/撤回、失败重试已接入；原索引不重建' : '待接入'], ['真实检索、模型问答及引用核验', live ? '混合检索、审核知识召回、原文单元组织与逐次外发审批已接入' : '现有链路保持原状；本工作台未连接'], ['备份恢复', live ? '管理状态及增量文件校验恢复，保留恢复前安全快照；不重置模型额度' : '独立管理状态快照'], ['登录、权限、多用户协作、正式部署', '待建设；当前仅允许本机访问']].map(([feature, state]) => <tr key={feature}><td>{feature}</td><td>{state}</td></tr>)}</tbody></table><p className="pw-boundary">当前开发原则：先完成平台操作闭环，再接入已核验的数据与问答服务。</p><Link to="/manage?tab=overview">返回工作总览</Link></section>}
+      </>}
+    </main>
+    <footer>{live ? '现有资料工作版 · 本机单用户 · 8000正式服务未切换' : '隔离功能工作台 · 本机单用户 · 未连接正式知识库'}</footer>
+  </div>
+}

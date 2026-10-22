@@ -1,0 +1,10 @@
+retrieval_v2:
+  enabled: false
+  runtime: staging_only
+index:
+  name: knowledge_v2_staging
+  legacy_index: index_v1_frozen
+quality_gate:
+  minimum_score: 70
+metadata:
+  inferred_is_verified: false

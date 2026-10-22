@@ -1,0 +1,11 @@
+node_modules/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+*.tsbuildinfo
+*.xml
+*.log
+.env
+.env.*
+runtime/evaluation/**
+runtime/data/**

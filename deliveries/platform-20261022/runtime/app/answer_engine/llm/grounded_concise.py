@@ -4,7 +4,6 @@ import re
 from types import SimpleNamespace
 
 from .claim_validator import check_source_units
-from .reviewed_packet_provider import wire
 
 
 def concise_packet(question, units, body):
@@ -22,7 +21,9 @@ def concise_packet(question, units, body):
                          '引用是必要条件，不表示整题完整回答或通过业务审核。']}
     result = {**body, 'messages': [{'role': 'system', 'content': system},
                                  {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]}
-    if re.search(r'[A-Za-z]:[\\/]|file://|\\\\[^\\\s]', wire(result)):
+    # Inspect original fields; serializing nested JSON turns newlines into false UNC matches.
+    outbound = [question, *[u[k] for u in units for k in ('text', 'file_name', 'location')]]
+    if any(re.search(r'[A-Za-z]:[\\/]|file://|\\\\[^\\/\s]+[\\/][^\s]', value) for value in outbound):
         raise ValueError('外发内容含文件路径，请先缩小证据或清理路径后重新预览。')
     return result
 
@@ -31,7 +32,7 @@ def _supported(text, source):
     # Reuse the conservative source-unit checker, which reads only these two fields.
     evidence = SimpleNamespace(items=[SimpleNamespace(source_id='E1', excerpt=source)])
     return check_source_units([{'claim_id': 'C1', 'claim_text': text, 'evidence_ids': ['E1']}],
-                              evidence, allow_connector_omission=True)['valid']
+                              evidence, allow_connector_omission=True, allow_sentence_span=True)['valid']
 
 
 def render_concise(raw, units, citations, question):
@@ -78,8 +79,18 @@ def render_concise(raw, units, citations, question):
             raise ValueError('短引文未保留原文条件或完整语句。')
         if any(term not in quote for term in scope):
             raise ValueError('短引文未明确覆盖问题中的年份、阶段或专兼职范围。')
-        if project and key(project) not in key(quote) and key(project) not in key(citation['file_name']):
-            raise ValueError('短引文或文件名未绑定所问项目，不能借用其他案例。')
+        context_project = None
+        if project and key(project) not in key(quote):
+            unit_text = clean(unit['text'])
+            unit_project = subject(unit_text)
+            before_quote = unit_text.partition(clean(quote))[0]
+            explicit = unit_text.replace('本项目','').replace('该项目','').replace('此项目','')
+            if '项目' in explicit:
+                if not unit_project or key(unit_project) != key(project) or key(project) not in key(before_quote):
+                    raise ValueError('短引文或唯一前置上下文未绑定所问项目，不能借用其他案例。')
+                context_project = project
+            elif key(project) not in key(citation['file_name']):
+                raise ValueError('短引文及文件名均未绑定所问项目。')
         if metric and metric[0] not in quote:
             raise ValueError('短引文没有所问面积指标，不能借用其他数值字段。')
         if count_scope in {'TEAM_COUNT','ROLE_AND_TEAM_COUNTS'}:
@@ -90,16 +101,23 @@ def render_concise(raw, units, citations, question):
         # Literal/connector checks cannot prove free paraphrase entailment. Fall back to the verified quote.
         matched = _supported(text, clean(quote))
         rendered = text.strip() if matched else clean(quote)
+        if context_project and key(context_project) not in key(rendered):
+            rendered = context_project + '：' + rendered
         checked.append({'claim_id': f'C{i}', 'text': rendered, 'citation_id': unit['source_id'],
                         'unit_id': ids[0], 'support_quote': quote,
+                        'context_project': context_project,
                         'check': 'SOURCE_TEXT_MATCHED' if matched else 'PARAPHRASE_REPLACED_BY_SOURCE_QUOTE'})
     if len({(c['unit_id'], c['support_quote']) for c in checked}) != len(checked):
         raise ValueError('事实重复引用同一原文单元和短引文。')
     if sum(len(c['text']) for c in checked) > 1600:
         raise ValueError('答复过长，未截断可能存在的条件。')
     used = {c['citation_id'] for c in checked}
-    answer = '\n'.join(f'{i}. {c["text"]} [{c["citation_id"]}]' if len(checked) > 1
-                       else f'{c["text"]} [{c["citation_id"]}]' for i, c in enumerate(checked, 1))
+    context_ids = {mapping[c['unit_id']].get('context_unit_id') for c in checked}
+    contexts = [c for c in checked if c['unit_id'] in context_ids]
+    facts = [c for c in checked if c not in contexts]
+    answer = '\n'.join([*(f'{c["text"]} [{c["citation_id"]}]' for c in contexts),
+                        *(f'{i}. {c["text"]} [{c["citation_id"]}]' if len(facts) > 1 else f'{c["text"]} [{c["citation_id"]}]'
+                          for i, c in enumerate(facts, 1))])
     if gaps:
         answer += ('\n\n' if answer else '') + '模型报告本题仍有证据缺口，请结合引用核对；未补写缺失事实。'
     return {'answer_status': 'MODEL_CONCISE_DRAFT' if checked else 'MODEL_EVIDENCE_GAP',

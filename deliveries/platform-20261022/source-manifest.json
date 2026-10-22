@@ -83,14 +83,14 @@
     },
     {
       "path": "app/answer_engine/llm/claim_validator.py",
-      "source_sha256": "f9668331547f46dd63cc97bea56854861ddfd902a78085a7652cbbe708661b02",
-      "published_sha256": "f9668331547f46dd63cc97bea56854861ddfd902a78085a7652cbbe708661b02",
+      "source_sha256": "5ccd60951e961f3d7c4e9de218ab2e872214ccb0a039ec88c622abc805ddcfe8",
+      "published_sha256": "5ccd60951e961f3d7c4e9de218ab2e872214ccb0a039ec88c622abc805ddcfe8",
       "privacy_transformed": false
     },
     {
       "path": "app/answer_engine/llm/grounded_concise.py",
-      "source_sha256": "e8cc6fc99decf047deaa03173b4119c2c776e953d2ce57726436ecb9aee5c31b",
-      "published_sha256": "e8cc6fc99decf047deaa03173b4119c2c776e953d2ce57726436ecb9aee5c31b",
+      "source_sha256": "bf71e842fe6a06ef50a94499b7c912e89a425e2c58c8de0d1276730a28222ed1",
+      "published_sha256": "bf71e842fe6a06ef50a94499b7c912e89a425e2c58c8de0d1276730a28222ed1",
       "privacy_transformed": false
     },
     {
@@ -1210,6 +1210,12 @@
       "privacy_transformed": false
     },
     {
+      "path": "scripts/run_concise_reviewed_batch.py",
+      "source_sha256": "0a7eb604255be4dd2350f2462e23ae5ac84e0c72bc40b305177914e112dde47b",
+      "published_sha256": "0a7eb604255be4dd2350f2462e23ae5ac84e0c72bc40b305177914e112dde47b",
+      "privacy_transformed": false
+    },
+    {
       "path": "scripts/run_p0_integrated_shadow_regression.py",
       "source_sha256": "6c964bc3418473f9379406b808bc887409841f9fce0bf4dfbbb89ce8b42263bf",
       "published_sha256": "6c964bc3418473f9379406b808bc887409841f9fce0bf4dfbbb89ce8b42263bf",
@@ -1318,6 +1324,12 @@
       "privacy_transformed": false
     },
     {
+      "path": "tests/test_concise_reviewed_batch.py",
+      "source_sha256": "8c00e50a26b6ea395d280ad77ee2215e611ccc36cdb7f81ebe41b49bb5701590",
+      "published_sha256": "8c00e50a26b6ea395d280ad77ee2215e611ccc36cdb7f81ebe41b49bb5701590",
+      "privacy_transformed": false
+    },
+    {
       "path": "tests/test_docx_hybrid_overlay.py",
       "source_sha256": "2b763f2a2f31b000d6c30c35ed3af3817b1dfc85334a45d1420589cf7c1a0ac7",
       "published_sha256": "2b763f2a2f31b000d6c30c35ed3af3817b1dfc85334a45d1420589cf7c1a0ac7",
@@ -1343,8 +1355,8 @@
     },
     {
       "path": "tests/test_grounded_concise.py",
-      "source_sha256": "a99bb94c642cea4d919c6f2ab79cf845546ac05a0bd5dcd536823e63c1997510",
-      "published_sha256": "a99bb94c642cea4d919c6f2ab79cf845546ac05a0bd5dcd536823e63c1997510",
+      "source_sha256": "d326a5ae2f4a512e3597760494bd8d1cd9e128042456949976bc5e71e8432844",
+      "published_sha256": "d326a5ae2f4a512e3597760494bd8d1cd9e128042456949976bc5e71e8432844",
       "privacy_transformed": false
     },
     {

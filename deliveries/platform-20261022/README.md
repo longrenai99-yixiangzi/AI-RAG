@@ -12,6 +12,8 @@
 - [分阶段处理台账](PROCESSING_RECORD.md)
 - [受证据约束的大模型答复方案](EVIDENCE_CONSTRAINED_ANSWER_PLAN.md)
 - [简短答复协议实现与验证](CONCISE_IMPLEMENTATION.md)
+- [真实验证请求准备与执行边界](REAL_VALIDATION_PREPARATION.md)
+- [两题真实结果与离线修复](REAL_VALIDATION_RESULT.md)
 - [公开源码清单及校验值](source-manifest.json)
 - [本机处理产物的脱敏索引](processing-ledger.json)
 - [本次交付验证](VALIDATION.md)

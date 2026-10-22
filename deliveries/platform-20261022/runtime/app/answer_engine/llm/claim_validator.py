@@ -10,7 +10,7 @@ from app.answer_engine.evidence_selector import EvidenceBundle
 SOURCE_PATTERN = re.compile(r"\[(S\d+)\]")
 
 
-def check_source_units(claims, evidence, *, allow_connector_omission=False):
+def check_source_units(claims, evidence, *, allow_connector_omission=False, allow_sentence_span=False):
     """Conservative textual support, not general entailment or business verification."""
     def parts(text):return [re.sub(r'\s+','',p) for p in re.split(r'[，,。；;！？!?\n]+',text) if p.strip()]
     def without_connector(clause):return re.sub(r'^(?:因此|因而|所以)(?!说)', '', clause)
@@ -21,7 +21,9 @@ def check_source_units(claims, evidence, *, allow_connector_omission=False):
         else:
             wanted=parts(text);source=sources[ids[0]];matched=False;context_missing=False;normalized_match=False
             sentences=[s for s in re.split(r'[。；;！？!?\n]+',source) if s.strip()]
-            for index,sentence in enumerate(sentences):
+            span=max(1,len([s for s in re.split(r'[。；;！？!?\n]+',text) if s.strip()])) if allow_sentence_span else 1
+            for index in range(max(0,len(sentences)-span+1)):
+                sentence='。'.join(sentences[index:index+span])
                 clauses=parts(sentence)
                 for start in range(len(clauses)):
                     actual=clauses[start:start+len(wanted)]
@@ -31,7 +33,7 @@ def check_source_units(claims, evidence, *, allow_connector_omission=False):
                     before=clauses[:start];after=clauses[start+len(wanted):]
                     # shortcut: adjacent explicit scope labels only; implicit cross-sentence scope needs review.
                     if index and re.match(r'\s*(?:适用前提|适用条件|前提条件|仅当|只有|除非|仅在)',sentences[index-1]):before=parts(sentences[index-1])+before
-                    if index+1<len(sentences) and re.match(r'\s*(?:但|不过|除外|仅限|不适用|否则|前提|须经|需经|必须)',sentences[index+1]):after+=parts(sentences[index+1])
+                    if index+span<len(sentences) and re.match(r'\s*(?:但|不过|除外|仅限|不适用|否则|前提|须经|需经|必须)',sentences[index+span]):after+=parts(sentences[index+span])
                     omitted=any(re.search(r'^(?:适用前提|适用条件|前提条件|如果|若|当|仅在|仅当|只有|除非)|(?:条件下|前提下|审批通过后|批准后|验收后)',without_connector(p)) for p in before)
                     omitted|=any(re.search(r'^(?:但|不过|除外|仅限|不适用|不得|严禁|需经|须经|应经|必须|须|需|应当|否则|前提|如果|若|当|仅当|只有|除非)',without_connector(p)) for p in after)
                     context_missing|=omitted

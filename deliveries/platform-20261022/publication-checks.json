@@ -1,8 +1,8 @@
 {
   "date": "2026-10-22",
-  "source_files": 250,
+  "source_files": 252,
   "backend_tests": {
-    "passed": 384,
+    "passed": 403,
     "failed": 0,
     "warnings": 3
   },
@@ -24,8 +24,13 @@
       "matches": 0
     }
   },
-  "new_model_http_calls": 0,
+  "new_model_http_calls": 2,
   "active_services_changed": false,
   "private_content_uploaded": false,
-  "concise_protocol": "OFFLINE_IMPLEMENTED_NOT_DEPLOYED"
+  "concise_protocol": "REAL_RESPONSES_RECEIVED_OFFLINE_FIXED_NOT_DEPLOYED",
+  "original_online_validation_passes": 0,
+  "original_online_validation_failures": 2,
+  "offline_original_response_replay_passes": 2,
+  "extra_model_http_calls_after_fix": 0,
+  "remaining_authorized_model_requests": 0
 }

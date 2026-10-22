@@ -18825,6 +18825,251 @@
           "note": "Overlapping technical checks, not independent business questions."
         }
       ]
+    },
+    {
+      "phase": "project_money_precision_20261022",
+      "artifacts": [
+        {
+          "artifact_id": "fcaac9287438933d572a119691ebd89a3c050f6ebdd5799b043cdf53d0620d00",
+          "sha256": "b27071562c9c00030295f198fdeea79f2f7724f8fa895500628f3ecfe3927229",
+          "bytes": 6980,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "1f71a9d1a6a0935c08d702aa1de8bf1ca1685db729c2e95a624ad875c1b59687",
+          "sha256": "871eb85c18c68b02fb1edd200f9683c391fa787656d981e4954002fe58f841a6",
+          "bytes": 202,
+          "extension": ".log"
+        },
+        {
+          "artifact_id": "0bc2db2e9149a2c63bf957cab264f9b06978b5cc3de6575933a2401f60f7788c",
+          "sha256": "38b9eb6017a80b626ded2d98a6f80209cd855d94eea3c668c901da41e707a3ef",
+          "bytes": 2575,
+          "extension": ".log"
+        },
+        {
+          "artifact_id": "89bfa735ee4ccfcb1e7f64cfe8e45a58bd0a5077e7e7a9a4feff43672629a40e",
+          "sha256": "a636b7d9ea53ec21bbc9059a394198943d252ff1f324b66366b167923ebd2a89",
+          "bytes": 467,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "951ab4eb1cfbb6235d955efd8d9607069de5f1cff85a4d9cb1ceae9b6ec54cc6",
+          "sha256": "796f955c5bf1d413f2b5e841fad18e191a597abc7a7bb1d733340342bf16b788",
+          "bytes": 44205,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "b6f5cc4aa96d14cca21100e33731259d277b92c5ec27ffe1d5c60b6bcd3ef404",
+          "sha256": "2f7f2fd73ee3df1d38302ae8d5b63d89f1b35d6d551aee7f97fb82116443344f",
+          "bytes": 20396,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "4a688d99d26716f79de218e2834eb2dfd5c04e0112a4db92ae43a0c514d860c4",
+          "sha256": "912d81dca8ea63b18aa304444e21cfe078ca41e7951687b9ee73409e674b25df",
+          "bytes": 14281,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "d7c141288a44deeb11a929cd07200b457203022720aa178c8803a6970c1df68b",
+          "sha256": "9e77dc6401218f559b4b362a993de3156023065f75cfc0b17264d69cabdd42d7",
+          "bytes": 15259,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "5f82655d020178f23888d9d6aafc28a30248135f865c1bda7518e5cc0516c1bf",
+          "sha256": "9170d7ca704e80571f1e4b14d6b01d5ca75e0a3a34c5a5a83561f3735696dbb7",
+          "bytes": 13469,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "7443b891d25b7c7a83f88cc8d8cd64b2b6b39457352de188f703b089f64dd2ff",
+          "sha256": "84e73fba343ba3f470df3241eb76dc49cf336a17be4f28a0b6c3efa43981f7f6",
+          "bytes": 541,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "cb184f108e5311bd74f20a37ad24ccd85a1c532ecce72d7e4142ec1e719a496a",
+          "sha256": "53d1ab9d8be313c7e38e7830c79c163737ecd303af4214a04c957db661840a67",
+          "bytes": 78377,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "37d8bb9df049ce735947b7540beaca5e787d4ba1e5cdb962f4908db3dd3284d8",
+          "sha256": "1e7c77dd0f74c1e5c92e1bc760a9f46291e956b4fb7621e8458af3bafe90caca",
+          "bytes": 2171,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "fb57fae1213cc5923a92608fc2bec82232331038d23c5a78fb921c671916a1d4",
+          "sha256": "a48b3f3133a540fb48eac0c1eaf32904d725857a7ae9c5a29e7c41aa57668a85",
+          "bytes": 5489,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "f619b274b9bd9334a585e866cb3356666a9a949fac2a62652ebc982e7cb8bf45",
+          "sha256": "8d0c4683e156664cb7f7559e4802f438437274a42b45bce31cc292e1861eaedf",
+          "bytes": 5282,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "0c36aa35e7772e8e0435830c1ea709bf3cc2285b70fcbfbd409ac5565aca35ee",
+          "sha256": "7132d88c6eec055563995da8bf752a5e91923ed28124d974e43bd28342e79213",
+          "bytes": 363,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "0873c47ce966183e19b5669abf83f13d63ef9fe6d3d4fc61bae228cd602f89dc",
+          "sha256": "117ccf0dfe89046d067d08cffa25a92ffbf1eb794140064d0ef86814257cf6c4",
+          "bytes": 363,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "5bb0c9339405c5277523a64e25f6827276c44d0864958a699708d946e9f1eded",
+          "sha256": "5ecbc2e7e34e64462dae57b5a3859ff28e9ae229396483b92b26635d0399c832",
+          "bytes": 5347,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "510cd195afee321dbba54cd826eceb6cac524bef2121b0419f3f7ab762223452",
+          "sha256": "d3d3c0d66956cc5dfd209152ed1b4a16b00e6ee2b5812a9b83e6df819bccbe31",
+          "bytes": 21217,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "ef484228e73750b473de000491de38de6ec816a0511fe3875a4df1938b0b46c4",
+          "sha256": "ff9a689c5fd9976c6a13aa9ac06f8f22ac42d55fd6e12280e77373de89c3f5fa",
+          "bytes": 28832,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "f0e7beaf5b62dbb5ab2c630055c557ce063a61bd29543b0e66794d8b06ed5efe",
+          "sha256": "b25aa5da6c7e9003e7533134d513173f9b4c7b0137115415ea8a3a7d87298c56",
+          "bytes": 383,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "1099a7a22b8cb1ed414daa619a1b5752a72ebec795f430ce83394966437a17c1",
+          "sha256": "12587c602f9498fecd085d060a72507864326cb23dec0d440257fcb6196ceec8",
+          "bytes": 315,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "2cd59488f9391273a3bc2d135427eba0ba853e93d901b87689b7e62cdf94106b",
+          "sha256": "813cf89fd31943a028fef16124e679dc6b05c0689a823ab00771de8342e2e616",
+          "bytes": 25874,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "1b5c7159006c65696a512fe69595f22bc6d6c4fbfd392928da5b6dc10c9ae399",
+          "sha256": "98fe4d8986ff5f24eac44231f1e9f60176986fe8d43f2df377dfb803042d149e",
+          "bytes": 16156,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "f35ac2e57a5a08d68678ae0faf4e3e6c2ebf10af83f573770f2dc5a55fb1fbb7",
+          "sha256": "be3def18253ab0acbafb1f2bf94b1eed0f9d62801ef82e0ec4635a462ff99c27",
+          "bytes": 16156,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "acfee598bcd41832c72fd18908f5bd308cdaa0bee471fd208a5ede76e773b4f1",
+          "sha256": "b8f34f364b53bdea25b271a5448736457fecdf9e58ebc77e36b8ef2c2b5dc3c0",
+          "bytes": 5526,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "328550c2350f78c1d358ef924091565f6582958199c9a30e3516d188a959ee5f",
+          "sha256": "f05b0cd81371665b9fd6785372e7fc457580c33db53c2815df398d1fe5ed9249",
+          "bytes": 27117,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "48988ea5dee212186922080ba6490de799636b62b9ecd2d80f77cefb8e3dc230",
+          "sha256": "8338120b93820e51cbbcc5d4453bcb61b1e62f12f469a1d6674a2910446c1134",
+          "bytes": 22263,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "cc4c064c05f545e9e1065dd0b3b4bd6689d205c5fc16b04eba8029fac6ee7eeb",
+          "sha256": "f5a254c9d95fdbd6c97a652792fe16e40732f3f0a86add6fc5fde331b3486fe6",
+          "bytes": 73087,
+          "extension": ".png"
+        },
+        {
+          "artifact_id": "56b744038e622307afd302dfdcca194b71ce000b5a1ce56b03fc02ae98de3c7f",
+          "sha256": "34701703691e3c2abc7f26c70f57c6bdf153f6242c425be112b079f6e6856f5c",
+          "bytes": 3607,
+          "extension": ".md"
+        }
+      ],
+      "historical_test_summaries": [
+        {
+          "artifact_id": "fcaac9287438933d572a119691ebd89a3c050f6ebdd5799b043cdf53d0620d00",
+          "tests": 35,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical checks, not independent business questions."
+        },
+        {
+          "artifact_id": "b6f5cc4aa96d14cca21100e33731259d277b92c5ec27ffe1d5c60b6bcd3ef404",
+          "tests": 109,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical checks, not independent business questions."
+        },
+        {
+          "artifact_id": "4a688d99d26716f79de218e2834eb2dfd5c04e0112a4db92ae43a0c514d860c4",
+          "tests": 72,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical checks, not independent business questions."
+        },
+        {
+          "artifact_id": "d7c141288a44deeb11a929cd07200b457203022720aa178c8803a6970c1df68b",
+          "tests": 72,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical checks, not independent business questions."
+        },
+        {
+          "artifact_id": "5f82655d020178f23888d9d6aafc28a30248135f865c1bda7518e5cc0516c1bf",
+          "tests": 68,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical checks, not independent business questions."
+        },
+        {
+          "artifact_id": "cb184f108e5311bd74f20a37ad24ccd85a1c532ecce72d7e4142ec1e719a496a",
+          "tests": 450,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical checks, not independent business questions."
+        },
+        {
+          "artifact_id": "1b5c7159006c65696a512fe69595f22bc6d6c4fbfd392928da5b6dc10c9ae399",
+          "tests": 84,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical checks, not independent business questions."
+        },
+        {
+          "artifact_id": "f35ac2e57a5a08d68678ae0faf4e3e6c2ebf10af83f573770f2dc5a55fb1fbb7",
+          "tests": 84,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical checks, not independent business questions."
+        }
+      ]
     }
   ]
 }

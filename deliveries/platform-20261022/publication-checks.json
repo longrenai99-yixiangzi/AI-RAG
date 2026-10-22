@@ -1,8 +1,8 @@
 {
   "date": "2026-10-22",
-  "source_files": 256,
+  "source_files": 258,
   "backend_tests": {
-    "passed": 407,
+    "passed": 450,
     "failed": 0,
     "warnings": 3
   },
@@ -37,5 +37,19 @@
   "isolated_trial_port": 8897,
   "isolated_trial_generation_execution_enabled": false,
   "new_model_calls_during_trial_preparation": 0,
-  "original_services_changed": false
+  "original_services_changed": false,
+  "project_money_precision": {
+    "browser_reported_question": "PASS",
+    "local_api_technical_cases": 5,
+    "local_api_technical_passed": 5,
+    "source_original_http_and_hash": "PASS",
+    "new_model_http_calls": 0,
+    "restarted_ports": [
+      8897
+    ],
+    "existing_query_history_preserved": true,
+    "index_unchanged": true,
+    "frontend_changed": false,
+    "independent_new_topic_acceptance": false
+  }
 }

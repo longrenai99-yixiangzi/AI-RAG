@@ -10,7 +10,8 @@ from app.ingestion.scalar_evidence import ALIASES, VALUE, _fact
 from app.scalar_answers import render_scalars
 from app.layout_answers import render_layout, NUMBERS
 
-TEXT_ALIASES={**ALIASES,'合同造价':'合同金额','总价':'合同金额','总造价':'工程造价','中标金额':'中标金额','中标价':'中标金额','招标控制价':'招标控制价'}
+TEXT_ALIASES={**ALIASES,'合同造价':'合同金额','总价':'合同金额','总造价':'工程造价','中标金额':'中标金额','中标价':'中标金额','招标控制价':'招标控制价',
+              '工程费用':'工程费','建安工程费用':'建安工程费'}
 TEXT_LABEL='|'.join(re.escape(v) for v in sorted(TEXT_ALIASES,key=len,reverse=True))
 TEXT_MONEY=re.compile(rf'(?P<label>{TEXT_LABEL})(?:共计|合计|为|是|[：:\s|])*(?P<qualifier>暂估|暂定|预计|估算|约)?(?:为|是|[：:\s|])*(?P<value>{VALUE})\s*(?P<unit>亿元|万元|元|亿|万|W)(?![A-Za-z方㎡%])')
 

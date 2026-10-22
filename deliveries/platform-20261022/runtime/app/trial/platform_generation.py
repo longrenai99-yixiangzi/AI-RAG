@@ -165,7 +165,7 @@ class GenerationWorkflow:
             if current and row.get('protocol')=='CONCISE_V1':
                 original=self.store.query_run(row['original_run_id']).get('result',{})
                 # Never turn an old full-chapter extract into a successful fallback answer.
-                if (original.get('generation_mode') in {'LOCAL_EXTRACTIVE_SUMMARY_NO_MODEL','LOCAL_PROJECT_AREA_FIELD_NO_MODEL'}
+                if (original.get('generation_mode') in {'LOCAL_EXTRACTIVE_SUMMARY_NO_MODEL','LOCAL_PROJECT_AREA_FIELD_NO_MODEL','LOCAL_PROJECT_MONEY_FIELD_NO_MODEL'}
                         or original.get('support_check')=='EXACT_NATIVE_UNIT'):
                     result.update(answer=original['answer'],answer_status='MODEL_FAILED_LOCAL_FALLBACK',
                                   status_label='模型未通过 · 回退本地原文要点 · 待核对',generation_mode='LOCAL_FALLBACK_AFTER_MODEL_FAILURE')

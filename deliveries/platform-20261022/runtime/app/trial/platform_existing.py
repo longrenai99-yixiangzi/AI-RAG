@@ -80,6 +80,25 @@ class ExistingKnowledge:
                     result = event["result"]
         if result is None:
             raise ValueError("检索服务未返回完整结果，不能当作已经回答。")
+        # Older section expansion returns a provenance path where the platform needs a catalog ID.
+        from app.retrieval.named_source_scope import path_key
+        legacy=[c for c in result.get('citations',[]) if c.get('source_id')==c.get('source_path')
+                or re.match(r'^[A-Za-z]:[\\/]',str(c.get('source_id','')))]
+        wanted={(path_key(c['source_path']),c['source_version']) for c in legacy}
+        bound={};offset=0
+        while wanted-set(bound):
+            page=self.sources(offset=offset,limit=100)
+            for source in page['items']:
+                key=(path_key(source['source_path']),source['current_hash'])
+                if key in wanted:
+                    previous=bound.setdefault(key,source['source_id'])
+                    if previous!=source['source_id']:raise ValueError('同一原文版本存在不唯一的资料目录标识。')
+            offset+=len(page['items'])
+            if not page['items'] or offset>=page['total']:break
+        for card in legacy:
+            key=(path_key(card['source_path']),card['source_version'])
+            if key not in bound:raise ValueError('引用未与资料目录的同一路径和版本绑定。')
+            card['lineage_source_id']=card['source_id'];card['source_id']=bound[key]
         return result
 
 
@@ -92,7 +111,9 @@ def source_extract(result: dict, question: str = '') -> dict:
     primary = [c for c in cards if c.get("answer_usage") == "PRIMARY"]
     if not primary:
         return {**result, "answer_status": "SOURCES_ONLY", "answer": "本次只返回相关原文线索，尚未取得可用于本题答复的主证据。", "generation_mode": "NO_GENERATION"}
-    from .source_field_answer import area_answer,subject
+    from .source_field_answer import area_answer,money_answer,subject
+    money=money_answer(result,question or result.get('question',''))
+    if money is not None:return {**result,**money}
     field=area_answer(result,question or result.get('question',''))
     if field is not None:return {**result,**field}
     target=result.get('debug',{}).get('personnel_scope_audit',{}).get('target','')

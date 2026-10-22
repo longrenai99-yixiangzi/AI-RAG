@@ -84,7 +84,7 @@ def test_local_phase_reference_is_not_a_different_project_and_its_scope_is_kept(
 
 
 def test_unhandled_project_numeric_field_is_not_presented_as_an_answer(tmp_path):
-    result=source_extract(source(tmp_path,'甲项目，总投资2亿元。这里还有许多背景说明。'),'甲项目总投资是多少？')
+    result=source_extract(source(tmp_path,'甲项目，净利润2亿元。这里还有许多背景说明。'),'甲项目净利润是多少？')
     assert result['answer_status']=='FIELD_EXTRACTION_REQUIRED'
     assert '2亿元' not in result['answer'] and '这不表示原文没有该信息' in result['answer']
     assert all(c['answer_usage']=='BACKGROUND' for c in result['citations'])

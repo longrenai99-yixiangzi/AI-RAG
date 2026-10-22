@@ -18368,6 +18368,7 @@
     },
     {
       "phase": "concise_real_validation_20261022",
+      "inventory_at_utc": "2026-10-22T08:29:57.512879+00:00",
       "artifacts": [
         {
           "artifact_id": "0e67c7aad5b9b4ce51a1c48cbcd3c2df8c559c9b6f1a44504865fcf9749f3609",
@@ -18439,6 +18440,12 @@
           "artifact_id": "8abf6817e66af34045c2bdfb0d6e8305d7ec7007f91c5c330958c4e10a713c0a",
           "sha256": "59bc0f2e740ef4537a669c73f24c22dd48ec3af2a9f302a6874572df5eab255a",
           "bytes": 1105,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "0b40ba27c518b1f97c8bbc44a250fc69c4f5154d98f46757bd91c2a9ce0c7996",
+          "sha256": "18d8ab641de48b7e944d9b163900787bec8bbc4ec7386b25c56c3332804fb8bc",
+          "bytes": 1658,
           "extension": ".json"
         },
         {
@@ -18617,7 +18624,7 @@
           "failures": 0,
           "errors": 9,
           "skipped": 0,
-          "note": "Overlapping technical checks and retained failed rounds; not business accuracy."
+          "note": "Overlapping technical checks, not independent business questions."
         },
         {
           "artifact_id": "1ea58454bec47cb7e2c725652a0234bc588cfbdd6db979b1a6b218b0f49337a1",
@@ -18625,7 +18632,7 @@
           "failures": 0,
           "errors": 0,
           "skipped": 0,
-          "note": "Overlapping technical checks and retained failed rounds; not business accuracy."
+          "note": "Overlapping technical checks, not independent business questions."
         },
         {
           "artifact_id": "ff6618b1b76795bcb68d7feb95e63200f68dbe5e307dd91f9f7c5f9e34230079",
@@ -18633,7 +18640,7 @@
           "failures": 4,
           "errors": 0,
           "skipped": 0,
-          "note": "Overlapping technical checks and retained failed rounds; not business accuracy."
+          "note": "Overlapping technical checks, not independent business questions."
         },
         {
           "artifact_id": "c2d7e736ee6b34117d8d64bbdfb5dd9d3ce6617f2b83cb65e9f64adee4cd62fb",
@@ -18641,7 +18648,7 @@
           "failures": 0,
           "errors": 0,
           "skipped": 0,
-          "note": "Overlapping technical checks and retained failed rounds; not business accuracy."
+          "note": "Overlapping technical checks, not independent business questions."
         },
         {
           "artifact_id": "6f1cb1015150135ad06e08cc12e7ddc3d3b7c150acf11ac74c4ffa80fca3afc9",
@@ -18649,7 +18656,7 @@
           "failures": 0,
           "errors": 0,
           "skipped": 0,
-          "note": "Overlapping technical checks and retained failed rounds; not business accuracy."
+          "note": "Overlapping technical checks, not independent business questions."
         },
         {
           "artifact_id": "42d6f0b7cd1cc731c4cb0b042ae7b145f4d7fa0130fdc048c112fc01aca00bee",
@@ -18657,7 +18664,7 @@
           "failures": 0,
           "errors": 0,
           "skipped": 0,
-          "note": "Overlapping technical checks and retained failed rounds; not business accuracy."
+          "note": "Overlapping technical checks, not independent business questions."
         },
         {
           "artifact_id": "ae41fae4a4d73d4e7b348a01b1c6f23e645c0411cea555fe493eee631a5e83f6",
@@ -18665,7 +18672,157 @@
           "failures": 0,
           "errors": 0,
           "skipped": 0,
-          "note": "Overlapping technical checks and retained failed rounds; not business accuracy."
+          "note": "Overlapping technical checks, not independent business questions."
+        }
+      ]
+    },
+    {
+      "phase": "concise_trial_20261022",
+      "inventory_at_utc": "2026-10-22T08:29:57.607243+00:00",
+      "artifacts": [
+        {
+          "artifact_id": "a6542b7265e73970fe86af0b6f8813c35559ca3a87530fd6543316bdeb5b2c88",
+          "sha256": "242b63e275ac344a6ac1db15292b47fa6ad8a02c3e8a799a2f6acbc024349821",
+          "bytes": 211,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "d7fc00046dadc04d536e7f7da14c3583a3054173fe1a4bcad6a781b5ffd06386",
+          "sha256": "c5d87a0f12416fd62c6aa08a99b1e0baf2a7a027780510bbc773cfcd239607ce",
+          "bytes": 220,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "a200951b65815b57a07079c2d9d3cdf914ffdbd3c6273016a0f7d6c8c8c139c2",
+          "sha256": "91037025e1d3e4737abe78f6bab90f563eaea6fd0afdce511d15ad8aa056d7b4",
+          "bytes": 69572,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "d5c39b7610ec56e02d00590ca55d178f2be7110dc2ee4682f476818e119d6ca5",
+          "sha256": "06a02d3ca0971d1a738f746162f9cdcf03cd0e30366d61b04e49313b809bb0ed",
+          "bytes": 202,
+          "extension": ".log"
+        },
+        {
+          "artifact_id": "cb253db5a7be16bc3edcf25b36a1051db6a1f0fa1b6d2610b53fa5a63706f2b2",
+          "sha256": "dffe068a5d555da19f990d25bb5e98bb12a0e49e75b3e461a74f3bf3f3a8235c",
+          "bytes": 888,
+          "extension": ".log"
+        },
+        {
+          "artifact_id": "e16d915ab0077708a15bd1ceb56801b755571cd15a8584484aa08edc85744b65",
+          "sha256": "62f25dc1c6f255679cd8e9a8b7dbf7d8053b415b5c2d596f6ab646d3419d63bb",
+          "bytes": 3680,
+          "extension": ".xml"
+        },
+        {
+          "artifact_id": "204ce0b1baca13312c0b278c1bb2e3769e0b6f94940175b97e52c3502d34ec8f",
+          "sha256": "9aa4149e0700efec55e0a67a70a5baa967c676892d91f97bf3f57adda6811b14",
+          "bytes": 203,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "aa98d872381477512fd1892f89ac5bce8ff382159f51ca2cae56a6ef25ae8214",
+          "sha256": "47e5bf6a4ceac9da8b623a22feee6cd41eb36b015009daa2517fdd75cd6d7c4d",
+          "bytes": 571,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "910156ab204a6a4d9de415c07e6f2d6110f97fd2c91c9ded4170277562995084",
+          "sha256": "29186487a5310886ee728a884d860ac9cd3dfcb900f0907bafb72f962c04c4ac",
+          "bytes": 2428,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "59956e116a47ffed13d56d1921a0f89de0696bd70c699fbe92e365721cf1516c",
+          "sha256": "22c53c2f2679a2868ab433699221f58580c60372972c87989aa51e18ad599e7e",
+          "bytes": 504,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "c30edc8ff97752269e88ed268db664768af5353a012a8467aac76457fe89c013",
+          "sha256": "871eb85c18c68b02fb1edd200f9683c391fa787656d981e4954002fe58f841a6",
+          "bytes": 202,
+          "extension": ".log"
+        },
+        {
+          "artifact_id": "e0dbb042e189cc17396bd7284e678ba0b7ad15544827340fa3111de6059ec0fa",
+          "sha256": "660857323d0677381cb787d94a15d8936d75be226b4e032a6f39aaab969a156b",
+          "bytes": 2107,
+          "extension": ".log"
+        },
+        {
+          "artifact_id": "05c6e8365323cdb16e3bccf737b98d5bb1d2d577b9905d0901d8750e133581bb",
+          "sha256": "f27700b5b62f2ec1a056c4cf262602f65ea793484f5b677eac7ec78a7b73694b",
+          "bytes": 14423,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "6c5a61d86bd26e4fbc44dbd9824728bd15cd3ab840634bfbefec132a999c5649",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "extension": ".lock"
+        },
+        {
+          "artifact_id": "4e625bb628422b5dcc7227f4b2e0d268046d96bead17085e190f6230a18e04d7",
+          "sha256": "51095282c558045a0a38ca7bebe60fd643f98bd35e07ff08a04ca1c74e01b590",
+          "bytes": 660,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "28758a14401ae5df0a98a5c06eef4b621880116063e9995fb03f9facc6e95057",
+          "sha256": "7a3b6180acafa63b6cd2e847b3ff679dfedded1db2a298172785e5d5c9ae4966",
+          "bytes": 83814,
+          "extension": ".png"
+        },
+        {
+          "artifact_id": "85afb1c3a150261302395747d5cd3b88ae49a9852bfdd8e5c67a62af04534921",
+          "sha256": "9d9ab3f45450bd6ade929aaa57d6638f7b439f5ee161d04b4d0e89dc67747c61",
+          "bytes": 2673,
+          "extension": ".md"
+        },
+        {
+          "artifact_id": "e71bf0b5ca23e77a5c119ca11d49399bd52412ad60ff5ca39b7193500cb83a84",
+          "sha256": "9ce788d1f6053a0f5b1ce29ed3c92586b02274855727eda0e3a8c279999c87b7",
+          "bytes": 83211,
+          "extension": ".png"
+        },
+        {
+          "artifact_id": "22fc6e9b198c9dbab3702112e27d246d12f160952a493f1b00b91b660450273c",
+          "sha256": "2735bda03b324e3309f42fde0b7686bdf88a4cb59bf2237581714182a3e42a51",
+          "bytes": 954,
+          "extension": ".md"
+        },
+        {
+          "artifact_id": "0cd2cb43012a8820c0dcfac1ce8b2e77e578a34c28b010e1387a3cacc495083e",
+          "sha256": "93e926eb4ce8a9899c4d9b07422ff33c049e514f7f9dd710f5628d3fd283cb64",
+          "bytes": 363,
+          "extension": ".json"
+        },
+        {
+          "artifact_id": "623bbf61e08eac6bd91b8bf8d0978ef2ce9471b21a1a2ddd977e929e382eced6",
+          "sha256": "ae3af7e4aa818d0879831619ab80290c08d6fe7465d9dcda532db64dfae85652",
+          "bytes": 3831,
+          "extension": ".zip"
+        }
+      ],
+      "historical_test_summaries": [
+        {
+          "artifact_id": "a200951b65815b57a07079c2d9d3cdf914ffdbd3c6273016a0f7d6c8c8c139c2",
+          "tests": 407,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical checks, not independent business questions."
+        },
+        {
+          "artifact_id": "e16d915ab0077708a15bd1ceb56801b755571cd15a8584484aa08edc85744b65",
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "note": "Overlapping technical checks, not independent business questions."
         }
       ]
     }

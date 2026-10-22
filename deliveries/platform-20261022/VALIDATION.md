@@ -4,7 +4,7 @@
 
 | 检查 | 结果 |
 | --- | --- |
-| `runtime` 下 `python -m pytest tests -q` | 最新403项通过，3条依赖弃用提示。仅覆盖本交付附带的测试，不是根目录另一版本的全部测试。 |
+| `runtime` 下 `python -m pytest tests -q` | 最新407项通过，3条依赖弃用提示。仅覆盖本交付附带的测试，不是根目录另一版本的全部测试。 |
 | `knowledge-ui` 下 `node --test tests/assistedChat.test.mjs` | 3 项通过；测试中断、拆分帧和无效完成状态。 |
 | `knowledge-ui` 下 `tsc -b` | 通过；使用合成分类快照，不读取业务资料库。 |
 | `vite build --config vite.platform.config.ts` | 工作台构建通过；构建产物留本地，不上传生成包。 |

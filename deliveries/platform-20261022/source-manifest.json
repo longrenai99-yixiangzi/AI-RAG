@@ -622,6 +622,12 @@
       "privacy_transformed": false
     },
     {
+      "path": "app/trial/concise_trial.py",
+      "source_sha256": "912f6b0c4a1c2f5776e54a3a137896e4dc1ebad18acb807e42bfc6c1bb82cf3c",
+      "published_sha256": "912f6b0c4a1c2f5776e54a3a137896e4dc1ebad18acb807e42bfc6c1bb82cf3c",
+      "privacy_transformed": false
+    },
+    {
       "path": "app/trial/config.py",
       "source_sha256": "cb4a7d6b754a23e7370b83d0206940245f8b83c06918bfdd4ac947f27a07657f",
       "published_sha256": "2fa446a50155aea72e867aed1a7bc0a1d4c1c225dd4a66960d8d47b34fe88506",
@@ -677,8 +683,8 @@
     },
     {
       "path": "app/trial/platform_app.py",
-      "source_sha256": "740206b69b59d6c8f260fdaa2d4987378f0a03992a14dc24fc34339fdc61437a",
-      "published_sha256": "7506c6dca6371c31fbcea10c8a2cd85b4525fff4afd0f715d06bfe7a3c392de3",
+      "source_sha256": "9fcf83d40797cd8ce53a51d1f2a58dfcf32570fbdc04e12e356b205077afa7e6",
+      "published_sha256": "025a24aac1648b33bf02128feeeea43dd06e3d7ee775cf1804b7128a17f52ebf",
       "privacy_transformed": true
     },
     {
@@ -1055,8 +1061,8 @@
     },
     {
       "path": "knowledge-ui/src/pages/PlatformOperations.tsx",
-      "source_sha256": "ba8186c8b255c34594ee85302dd0430df767eedf9b9130ef78ee33bf93a119d6",
-      "published_sha256": "3b1e9c7e51bf58c4050e24ca9f7a693f32d634db1462323442518f846dbe64f9",
+      "source_sha256": "d544a45cd13c4ea21593e016e244ff6ea6d56337d87b983fd4bdd3a51db576f6",
+      "published_sha256": "9b5b45b060cb0d60b7063006431ebb2b34a4dd7d0ccb2d490f560717e4292b56",
       "privacy_transformed": true
     },
     {
@@ -1204,6 +1210,12 @@
       "privacy_transformed": true
     },
     {
+      "path": "scripts/prepare_concise_trial.py",
+      "source_sha256": "7172c17402c0565faaac4fa7e90e939e46e2c9f1b46feee74e11ede32d245987",
+      "published_sha256": "7172c17402c0565faaac4fa7e90e939e46e2c9f1b46feee74e11ede32d245987",
+      "privacy_transformed": false
+    },
+    {
       "path": "scripts/run_browser_native_trial.py",
       "source_sha256": "a49bbe427d5de026cdfe8b5243075bdf2627ec79ef156018ac720a9e8e85100d",
       "published_sha256": "a49bbe427d5de026cdfe8b5243075bdf2627ec79ef156018ac720a9e8e85100d",
@@ -1250,6 +1262,12 @@
       "source_sha256": "a1aca1daeaf205114c08425a4370413bd8e0d6eaf048511fad5dc64caaad1203",
       "published_sha256": "f005d7f9d6634402aa0a4d0b18ee203fdfb779a04482a87167018445b1781afd",
       "privacy_transformed": true
+    },
+    {
+      "path": "scripts/start_concise_trial.ps1",
+      "source_sha256": "d774a62d883fef1b0bab8daf418f09f53cd258c06259df68973a0ecc0b1b7c64",
+      "published_sha256": "d774a62d883fef1b0bab8daf418f09f53cd258c06259df68973a0ecc0b1b7c64",
+      "privacy_transformed": false
     },
     {
       "path": "scripts/start_native_workbench.ps1",
@@ -1327,6 +1345,12 @@
       "path": "tests/test_concise_reviewed_batch.py",
       "source_sha256": "8c00e50a26b6ea395d280ad77ee2215e611ccc36cdb7f81ebe41b49bb5701590",
       "published_sha256": "8c00e50a26b6ea395d280ad77ee2215e611ccc36cdb7f81ebe41b49bb5701590",
+      "privacy_transformed": false
+    },
+    {
+      "path": "tests/test_concise_trial.py",
+      "source_sha256": "eccfc7ec6f9eee634d39eeb5e4cb1d5a377bb427f222bf16e3c262c3cec70fb2",
+      "published_sha256": "eccfc7ec6f9eee634d39eeb5e4cb1d5a377bb427f222bf16e3c262c3cec70fb2",
       "privacy_transformed": false
     },
     {

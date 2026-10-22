@@ -142,7 +142,8 @@ def load_definitions(contract_path: Path | None) -> dict:
     return {"actions": taxonomy["actions"], "products": architecture["product_lines"], "taxonomy": taxonomy["nodes"], "version": digest}
 
 
-def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Path | None = None, existing=None, provider_factory=None) -> FastAPI:
+def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Path | None = None, existing=None, provider_factory=None,
+               generation_execution_enabled: bool = True) -> FastAPI:
     @asynccontextmanager
     async def lifespan(instance):
         try:yield
@@ -223,7 +224,10 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
                 runtime_info = {"ready": False, "error": "现有检索服务暂时不可用，管理记录仍保留。"}
         return {**store.snapshot(), "definitions": definitions, "mode": "ISOLATED_MANAGEMENT", "notice": "独立功能工作台：仅保存本工作台录入内容，共用分类定义只读；未连接现有资料、检索索引或模型。",
                 **({"mode": "EXISTING_CONTENT_TRIAL", "runtime": runtime_info, "notice": "现有资料工作版：复用已有索引，支持原文摘录、数值换算和经人工审核的知识检索。模型整理需逐次审批，未开启连续调用；发布和撤回仅作用于本地试用知识层。"} if existing else {}),
-                "capabilities": {"source_io": bool(existing), "existing_index_read": bool(existing), "incremental_index": bool(existing), "generation_requires_per_request_approval":bool(existing), "parsing": bool(existing), "real_index": False, "public_model": False, "formal_publish": False}}
+                **({'notice':'独立试用：模型执行已关闭；可检索与准备外发预览。已核对记录是历史响应的离线回放，不是本次新生成；本入口记录与原工作台分开。'} if existing and not generation_execution_enabled else {}),
+                "capabilities": {"source_io": bool(existing), "existing_index_read": bool(existing), "incremental_index": bool(existing), "generation_requires_per_request_approval":bool(existing),
+                                 "generation_execution_enabled":bool(existing) and generation_execution_enabled,
+                                 "parsing": bool(existing), "real_index": False, "public_model": False, "formal_publish": False}}
 
     @app.get("/api/platform/export")
     def export():
@@ -430,6 +434,7 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
 
         @app.post('/api/platform/generation/{preview_id}/run')
         def run_generation(preview_id:str,value:RunGeneration):
+            if not generation_execution_enabled:raise HTTPException(403,'本独立试用入口未开放模型执行，未外发资料或计次。')
             if not value.approved:raise HTTPException(403,'需明确同意本批外发范围与1元预算。')
             return generation.run(preview_id,value.packet_sha256,value.actor)
 

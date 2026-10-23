@@ -274,3 +274,72 @@ def test_retrieval_scope_only_while_approved_active_without_resetting_budget(dai
     service.pause('test');assert service.retrieval_scope() is None
     approve(daily);now[0]+=timedelta(days=8)
     assert service.retrieval_scope() is None
+
+
+def replacement(daily):
+    service,flow,store,existing,policy,_,_,now,_,_=daily
+    new=copy.deepcopy(policy);new['policy_id']='synthetic-next-period'
+    return DailyAnswers(store,flow,existing,new,clock=lambda:now[0],price_reader=lambda:b'approved-price-page')
+
+
+def test_renewal_requires_new_explicit_approval_and_inactive_previous_policy(daily):
+    old=daily[0];approve(daily);new=replacement(daily)
+    with pytest.raises(ValueError,match='上一期策略'):new.approve(new.policy_hash,'test')
+    with pytest.raises(ValueError,match='仍在启用'):new.approve(new.policy_hash,'test',previous_policy_hash=old.policy_hash)
+    assert old.status()['active'] and not new.status()['approved']
+
+
+def test_renewal_archives_usage_and_old_policy_cannot_be_reactivated(daily):
+    old,_,store,_,_,_,calls,now,_,run=daily;approve(daily);key=run();old.apply(key)
+    previous=copy.deepcopy(store._read()['daily_answer_policy']);now[0]+=timedelta(days=8);new=replacement(daily)
+    assert new.status()['previous_policy_sha256']==old.policy_hash
+    new.approve(new.policy_hash,'new-human-approval',previous_policy_hash=old.policy_hash)
+    assert store._read()['daily_answer_policy_history'][old.policy_hash]==previous
+    assert new.status()['used_requests']==0 and new.status()['history'][0]['used_requests']==1
+    new.apply(key);assert len(calls)==1
+    with pytest.raises(ValueError,match='已经结束|已结束'):old.approve(old.policy_hash,'test',previous_policy_hash=new.policy_hash)
+
+
+@pytest.mark.parametrize('pending',['reservation','generation','query'])
+def test_renewal_blocks_unsettled_requests(daily,pending):
+    old,_,store,_,_,_,_,_,_,_=daily;approve(daily);old.pause('test');new=replacement(daily)
+    def change(state):
+        if pending=='reservation':state['daily_answer_policy']['reservations']['pending']={'cents':1,'status':'RESERVED'}
+        elif pending=='generation':state['generations']['pending']={'status':'EXECUTING'}
+        else:state['query_runs']['pending']={'status':'RUNNING'}
+    store._mutate(change)
+    with pytest.raises(ValueError,match='待对账'):new.approve(new.policy_hash,'test',previous_policy_hash=old.policy_hash)
+    assert store._read()['daily_answer_policy']['policy_sha256']==old.policy_hash
+
+
+def test_restore_keeps_both_current_policy_and_archived_ledgers(daily):
+    from app.trial.platform_backup import create_backup,restore_backup
+    old,_,store,_,_,_,_,_,_,run=daily;approve(daily);old.apply(run());backup=create_backup(store);old.pause('test')
+    new=replacement(daily);new.approve(new.policy_hash,'test',previous_policy_hash=old.policy_hash)
+    new.apply(run());new.pause('test')
+    before=copy.deepcopy(store._read());restore_backup(store,backup['backup_id'],backup['sha256'],'test')
+    after=store._read()
+    for key in ['daily_answer_policy','daily_answer_policy_history']:assert after[key]==before[key]
+    assert new.status()['used_requests']==1 and new.status()['history'][0]['used_requests']==1 and not new.status()['active']
+
+
+def test_same_policy_cannot_be_renewed_with_reset_budget(daily):
+    old=daily[0];approve(daily);old.pause('test')
+    with pytest.raises(ValueError,match='新的策略'):old.approve(old.policy_hash,'test',previous_policy_hash=old.policy_hash)
+
+
+def test_api_renewal_requires_confirmation_and_exact_previous_hash(daily,monkeypatch,tmp_path):
+    old,_,store,existing,policy,_,calls,_,_,_=daily;approve(daily);old.pause('test')
+    new_policy=copy.deepcopy(policy);new_policy['policy_id']='synthetic-api-next-period'
+    monkeypatch.setattr(DailyAnswers,'_price_page',staticmethod(lambda:b'approved-price-page'))
+    app=create_app(store.path,existing=existing,generation_execution_enabled=False,daily_policy=new_policy)
+    app.state.daily_answers.clock=old.clock
+    app.state.daily_answers.generation.clock=old.clock
+    with TestClient(app) as client:
+        info=client.get('/api/platform/state').json()['daily_model']
+        body={'action':'renew','policy_sha256':info['policy_sha256'],'previous_policy_sha256':old.policy_hash}
+        assert client.post('/api/platform/daily-model-policy',headers=HEADERS,json=body).status_code==403
+        assert client.post('/api/platform/daily-model-policy',headers=HEADERS,json={**body,'confirmed':True,'previous_policy_sha256':'f'*64}).status_code!=200
+        response=client.post('/api/platform/daily-model-policy',headers=HEADERS,json={**body,'confirmed':True})
+        assert response.status_code==200 and response.json()['active']
+        assert response.json()['history'][0]['policy_sha256']==old.policy_hash and not calls

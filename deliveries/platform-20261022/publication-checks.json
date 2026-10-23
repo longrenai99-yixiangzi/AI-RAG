@@ -1,8 +1,8 @@
 {
   "date": "2026-10-23",
-  "source_files": 265,
+  "source_files": 266,
   "backend_tests": {
-    "passed": 550,
+    "passed": 566,
     "failed": 0,
     "warnings": 3
   },
@@ -24,7 +24,7 @@
       "matches": 0
     }
   },
-  "new_model_http_calls": 9,
+  "new_model_http_calls": 10,
   "private_content_uploaded": false,
   "concise_protocol": "APPROVED_DAILY_CONCISE_EVIDENCE_BOUND_TRIAL",
   "original_online_validation_passes": 0,
@@ -72,13 +72,13 @@
   },
   "daily_model_policy": {
     "status": "APPROVED_ACTIVE_BOUNDED_TRIAL",
-    "new_model_http_calls": 7,
+    "new_model_http_calls": 8,
     "synthetic_tests": 34,
     "typescript": "PASS",
     "platform_build": "PASS",
     "served_ui_bundle": true,
     "unapproved_request_blocked_403": true,
-    "used_requests": 7,
+    "used_requests": 8,
     "existing_history_preserved": true,
     "original_workbench_state_preserved": true,
     "backup_does_not_rewind_budget": true,
@@ -87,7 +87,7 @@
     "real_model_new_topic_acceptance": false,
     "implementation_new_model_http_calls": 0,
     "activation_model_http_calls": 1,
-    "real_model_probe_path_passes": 7,
+    "real_model_probe_path_passes": 8,
     "exact_quote_check": "PASS",
     "source_original_http_and_hash": "PASS",
     "local_route_probes": 2,
@@ -97,9 +97,10 @@
     "approved_scope_model_http_calls": 1,
     "new_topic_probe_model_http_calls": 1,
     "frozen_review_model_http_calls": 1,
-    "table_facets_model_http_calls": 1
+    "table_facets_model_http_calls": 1,
+    "closeout_model_http_calls": 1
   },
-  "model_http_call_count_scope": "Two historical concise-validation calls and seven daily probes through table/facet repair; excludes earlier project stages. A partial answer is not a whole-question or Owner acceptance pass.",
+  "model_http_call_count_scope": "Two historical concise-validation calls and eight approved daily probes through limited-release closeout; excludes earlier stages. Owner acceptance and browser interaction remain pending.",
   "legacy_per_request_execution_enabled": false,
   "daily_topic_checks": {
     "frozen_cases": 6,
@@ -247,5 +248,30 @@
       8897
     ],
     "legacy_generation_gap_test": true
+  },
+  "limited_release_closeout": {
+    "status": "READY_FOR_OWNER_REVIEW",
+    "new_tests": 16,
+    "source_regressions": 14,
+    "real_platform_no_model_cases": 3,
+    "new_model_http_calls": 1,
+    "new_reserved_cny": 0.06,
+    "policy_used_requests": 8,
+    "reserved_cny": 0.53,
+    "remaining_requests": 12,
+    "original_policy_not_extended": true,
+    "old_queries_preserved": 55,
+    "all_five_items_quote_checked": true,
+    "paraphrase_replaced_by_source_quote": true,
+    "model_completeness": "NOT_INDEPENDENTLY_VERIFIED",
+    "isolated_registry_restore": true,
+    "managed_file_restore_this_phase": false,
+    "frontend_build": "PASS",
+    "served_assets_match": true,
+    "browser_interaction_verified": false,
+    "owner_acceptance": false,
+    "long_duration_verified": false,
+    "source_inputs_changed": false,
+    "formal_service_changed": false
   }
 }

@@ -24,8 +24,14 @@ def explicit_topic_coverage(question,candidate):
     if len(key)<2 or key in {'设计','管理','工作','项目','本项目','该项目','设计管理'}:return {'status':'NOT_EXPLICIT_TOPIC'}
     text=unicodedata.normalize('NFKC',(candidate.get('heading_path') or '')+'\n'+candidate['text'])
     text=re.sub(r'[ \t\u3000]+','',text).replace('管控','管理').replace('设计供方','设计方').replace('的','')
-    # shortcut: a lexical necessary condition, not proof of relevance or semantic answer coverage.
-    return {'status':'TOPIC_PRESENT' if key in text else 'TOPIC_NOT_FOUND','requested_topic':topic,'normalized_topic':key}
+    status='TOPIC_PRESENT' if key in text else 'TOPIC_NOT_FOUND'
+    heading=topic_key(candidate.get('heading_path') or '').replace('设计供方','设计方').replace('的','')
+    asks_contents=bool(re.search(r'(?:哪些|什么|哪几项)(?:主要)?内容|内容(?:是|有|包括)',question))
+    # shortcut: content-list lookups need a topic heading or explicit subject statement; mentions alone cannot prove a list.
+    if status=='TOPIC_PRESENT' and asks_contents and key not in heading:
+        statement=re.escape(key)+r'(?:主要|应当|应该|需要|应|需|的)*(?:包括|包含|涵盖|明确|考虑|关注|由|内容为|内容是|内容有|内容[：:]|[：:])'
+        if not re.search(statement,text):status='RELATED_MENTION_ONLY'
+    return {'status':status,'requested_topic':topic,'normalized_topic':key}
 
 
 def compound_coverage(question,text):
@@ -119,9 +125,9 @@ class FocusedCandidate:
         while len(self.cache)>128:self.cache.popitem(last=False)
         chosen.sort(key=lambda c:(-c['reranker_score'],c['evidence_id']))
         for c in chosen:c['topic_coverage']=explicit_topic_coverage(task_question,c)
-        topical=[c for c in chosen if c['topic_coverage']['status']!='TOPIC_NOT_FOUND']
+        topical=[c for c in chosen if c['topic_coverage']['status'] not in {'TOPIC_NOT_FOUND','RELATED_MENTION_ONLY'}]
         topic_blocked=not topical
-        if topical:chosen=topical+[c for c in chosen if c['topic_coverage']['status']=='TOPIC_NOT_FOUND']
+        if topical:chosen=topical+[c for c in chosen if c['topic_coverage']['status'] in {'TOPIC_NOT_FOUND','RELATED_MENTION_ONLY'}]
         # COUNT/LIST/"方案" are weak intent hints, not proof that several sources are required.
         coverage=compound_coverage(task_question,chosen[0]['text'])
         broad=bool(re.search(r'全流程|全部资料|跨专业|跨项目|综合汇总',question) or len(source_scope.get('bindings',[]))>1)

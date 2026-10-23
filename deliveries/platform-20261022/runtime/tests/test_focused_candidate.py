@@ -142,3 +142,17 @@ def test_irrelevant_top_score_cannot_hide_a_matching_lower_candidate_or_become_p
     assert missing['bundle_status']=='SOURCE_SCOPE_MISSING'
     assert all(c['answer_usage']=='BACKGROUND' for c in missing['candidate_evidence'])
     assert missing['topic_coverage']['status']=='TOPIC_NOT_FOUND'
+
+
+@pytest.mark.parametrize('heading,text,ready',[
+    ('综合策划','综合策划包括采购界面策划、交付节点。',False),
+    ('资料提交','先做好采购界面策划，划分各方工作范围。随后编制提交计划。',False),
+    ('采购界面策划','按专业划分工作范围并明确责任。',True),
+    ('通用说明','采购界面策划包括专业范围、责任分工和节点。',True),
+    ('通用说明','采购界面策划的主要内容：专业范围、责任分工和节点。',True),
+])
+def test_content_list_requires_topic_section_or_explicit_statement(tmp_path,heading,text,ready):
+    rows=records(tmp_path)[:1];rows[0].update(heading_path=heading,text=text)
+    result=FocusedCandidate([],Titles(),Reranker()).rank('采购界面策划需要明确哪些内容？',rows)
+    assert any(r['answer_usage']=='PRIMARY' for r in result['candidate_evidence'])==ready
+    if not ready:assert result['topic_coverage']['status']=='RELATED_MENTION_ONLY'

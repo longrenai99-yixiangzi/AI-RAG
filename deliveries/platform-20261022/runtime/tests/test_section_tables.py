@@ -132,3 +132,19 @@ def test_explicit_two_questions_and_excessive_facets_are_not_silently_collapsed(
     assert result['facet_coverage']['status']=='PARTIAL'
     result=provider.rank('文件收发、版本管理、图纸会审、设计交底、材料报审、设计策划、方案比选、设计评估、质量审查有哪些要求？',[intro])
     assert result['bundle_status']=='SOURCE_SCOPE_MISSING' and result['table_association_audit']['status']=='TOO_MANY_FACETS'
+
+
+@pytest.mark.parametrize('question',[
+    '管理平台承担什么职责，重点把控哪些方面？',
+    '资料审查有哪些步骤，需要保留哪些记录？',
+])
+def test_predicate_only_ellipsis_is_not_an_independent_topic(question):
+    assert parallel_facets(question)==[]
+
+
+def test_subject_with_elliptical_predicate_keeps_matching_section(tmp_path):
+    intro,_,_,_=rows(tmp_path)
+    candidate={**intro,'text':'管理平台负责资源支持，重点保障质量、进度和风险控制。','heading_path':'平台管理职责'}
+    provider=FocusedCandidate([],Titles(),Reranker(),records=[candidate])
+    result=provider.rank('管理平台承担什么职责，重点把控哪些方面？',[candidate])
+    assert result['candidate_evidence'][0]['answer_usage']=='PRIMARY' and not result['facet_coverage']

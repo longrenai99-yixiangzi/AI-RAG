@@ -121,7 +121,8 @@ class RunGeneration(Input):
 
 
 class DailyPolicyAction(Input):
-    action: Literal['approve','pause']
+    previous_policy_sha256: str | None = Field(default=None,pattern=r'^[a-f0-9]{64}$')
+    action: Literal['approve','pause','renew']
     policy_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
     confirmed: bool = False
 
@@ -443,7 +444,8 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
                 if value.policy_sha256!=daily.policy_hash:raise ValueError('策略内容已变化，请重新阅读。')
                 if value.action=='pause':return daily.pause(value.actor)
                 if not value.confirmed:raise HTTPException(403,'需明确批准所列资料外发范围、期限、次数和预算。')
-                return daily.approve(value.policy_sha256,value.actor)
+                if value.action=='renew' and not value.previous_policy_sha256:raise HTTPException(403,'续批需确认上一期策略。')
+                return daily.approve(value.policy_sha256,value.actor,previous_policy_hash=value.previous_policy_sha256 if value.action=='renew' else None)
 
         @app.get('/api/platform/generation-pricing')
         def generation_pricing():return generation.pricing()

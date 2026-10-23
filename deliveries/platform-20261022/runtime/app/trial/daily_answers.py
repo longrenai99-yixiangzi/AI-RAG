@@ -64,8 +64,16 @@ class DailyAnswers:
         return {sid:s['source_version'] for sid,s in self.sources.items()} if self._active(self._record()) else None
 
     def status(self):
-        row=self._record();used=row.get('reservations',{})
+        state=self.store._read();row=self._record();used=row.get('reservations',{})
+        previous=state.get('daily_answer_policy',{})
+        history=list(state.get('daily_answer_policy_history',{}).values())
+        if previous and previous.get('policy_sha256')!=self.policy_hash:history.append(previous)
         return {'policy_sha256':self.policy_hash,'approved':bool(row.get('approved')),'active':self._active(row),
+                'previous_policy_sha256':previous.get('policy_sha256') if previous and not row else None,
+                'expired':bool(row.get('expires_at') and self.clock()>=datetime.fromisoformat(row['expires_at'])),
+                'history':[{'policy_sha256':h['policy_sha256'],'expires_at':h['expires_at'],
+                            'used_requests':len(h.get('reservations',{})),
+                            'reserved_cny':sum(v['cents'] for v in h.get('reservations',{}).values())/100} for h in history],
                 'expires_at':row.get('expires_at'),'valid_days':self.policy['valid_days'],
                 'max_requests':self.policy['max_requests'],'used_requests':len(used),
                 'max_budget_cny':self.policy['max_budget_cents']/100,
@@ -96,24 +104,33 @@ class DailyAnswers:
             if current['checked_on']!=day or any(current[k]!=v for k,v in expected.items()):
                 raise ValueError('核价日期或价格与批准策略不一致，未外发。')
 
-    def approve(self,policy_hash,actor):
+    def approve(self,policy_hash,actor,*,previous_policy_hash=None):
         if policy_hash!=self.policy_hash:raise ValueError('策略内容已变化，请重新阅读。')
-        # shortcut: one finite policy ledger; reconcile it manually before approving a replacement.
-        previous=self.store._read().get('daily_answer_policy',{})
-        if previous and previous.get('policy_sha256')!=self.policy_hash:raise ValueError('已有另一策略账本，请先人工对账。')
-        if previous.get('approved') and self.clock()>=datetime.fromisoformat(previous['expires_at']):raise ValueError('策略已到期，不能恢复并重置额度。')
         self._versions();self._price()
         def action(state):
             old=state.get('daily_answer_policy',{})
-            if old and old.get('policy_sha256')!=self.policy_hash:raise ValueError('已有另一策略账本，请先人工对账。')
+            history=state.get('daily_answer_policy_history',{})
+            if self.policy_hash in history:raise ValueError('该策略已结束，不能重新启用或重置额度。')
+            replacing=bool(old and old.get('policy_sha256')!=self.policy_hash)
+            if replacing:
+                if previous_policy_hash!=old.get('policy_sha256'):raise ValueError('续批需明确确认上一期策略，不能覆盖现有账本。')
+                if self._active(old):raise ValueError('上一期仍在启用，请先暂停或等待到期后再续批。')
+                if (any(r.get('status')=='RESERVED' for r in old.get('reservations',{}).values())
+                        or any(g.get('status')=='EXECUTING' for g in state.get('generations',{}).values())
+                        or any(r.get('status')=='RUNNING' for r in state.get('query_runs',{}).values())):
+                    raise ValueError('仍有请求执行中或预占待对账，不能续批。')
+                state.setdefault('daily_answer_policy_history',{})[old['policy_sha256']]=copy.deepcopy(old)
+                old={}
+            elif previous_policy_hash is not None:raise ValueError('续批须使用新的策略编号与新一期授权。')
             if old.get('approved'):
                 if self.clock()>=datetime.fromisoformat(old['expires_at']):raise ValueError('策略已到期，不能恢复并重置额度。')
                 old['paused']=False
             else:
                 old={'policy_sha256':self.policy_hash,'approved':True,'paused':False,'approved_at':self.clock().isoformat(),
-                     'expires_at':(self.clock()+timedelta(days=self.policy['valid_days'])).isoformat(),'actor':actor,'reservations':{}}
+                     'expires_at':(self.clock()+timedelta(days=self.policy['valid_days'])).isoformat(),'actor':actor,'reservations':{},
+                     'limits':{k:self.policy[k] for k in ['policy_id','max_requests','max_budget_cents','max_request_cents','valid_days']}}
             state['daily_answer_policy']=old
-            self.store._event(state,'批准或恢复限额日常模型',self.policy_hash,actor)
+            self.store._event(state,'续批限额日常模型' if replacing else '批准或恢复限额日常模型',self.policy_hash,actor)
         self.store._mutate(action)
         return self.status()
 
@@ -127,7 +144,7 @@ class DailyAnswers:
 
     def apply(self,run_id):
         run=self.store.query_run(run_id);result=run.get('result',{})
-        if run_id in self._record().get('reservations',{}):return run
+        if any(run_id in h.get('reservations',{}) for h in [self.store._read().get('daily_answer_policy',{}),*self.store._read().get('daily_answer_policy_history',{}).values()]):return run
         def local(route,notice):
             return self.store.finish_run(run_id,{**result,'daily_model':{'route':route,'notice':notice}},error=run['status']=='ERROR' or route=='OUTCOME_UNKNOWN')
         native=result.get('summary_audit',[])

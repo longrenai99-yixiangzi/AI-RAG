@@ -430,6 +430,12 @@
       "privacy_transformed": false
     },
     {
+      "path": "app/retrieval/appendix_outline.py",
+      "privacy_transformed": false,
+      "source_sha256": "42f3033b3a02b38d655176dc94e4f7993cf0baea27731cbc46df7097804fa2fa",
+      "published_sha256": "42f3033b3a02b38d655176dc94e4f7993cf0baea27731cbc46df7097804fa2fa"
+    },
+    {
       "path": "app/retrieval/candidate_fusion_v2.py",
       "source_sha256": "f486be1b5752e124dac1d2c40b2219348bfd16000150ca368de91ab35cc65e80",
       "published_sha256": "f486be1b5752e124dac1d2c40b2219348bfd16000150ca368de91ab35cc65e80",
@@ -443,8 +449,8 @@
     },
     {
       "path": "app/retrieval/complete_lists.py",
-      "source_sha256": "fc26708a2fc1c48fd245117404a6be225e76a08c4b9372ab6311cdb1465a1c75",
-      "published_sha256": "fc26708a2fc1c48fd245117404a6be225e76a08c4b9372ab6311cdb1465a1c75",
+      "source_sha256": "9bce2a45eff97809658cfb007d83b8df8851140999dac52e013568924063cf56",
+      "published_sha256": "9bce2a45eff97809658cfb007d83b8df8851140999dac52e013568924063cf56",
       "privacy_transformed": false
     },
     {
@@ -731,8 +737,8 @@
     },
     {
       "path": "app/trial/platform_generation.py",
-      "source_sha256": "e3891f5ed4bdf0ca4b9dafb01bb1cef235a67bcfb1b17c76c8a908e68aa04296",
-      "published_sha256": "e3891f5ed4bdf0ca4b9dafb01bb1cef235a67bcfb1b17c76c8a908e68aa04296",
+      "source_sha256": "24d72fef2a697a56e6a9d741070e27303af7785d59920fea953ebcd4bf629928",
+      "published_sha256": "24d72fef2a697a56e6a9d741070e27303af7785d59920fea953ebcd4bf629928",
       "privacy_transformed": false
     },
     {
@@ -1358,6 +1364,12 @@
       "source_sha256": "40b8d96ff9ca88f9f77ff36f895834f5675427730a193ba159b5b00d9baf8697",
       "published_sha256": "40b8d96ff9ca88f9f77ff36f895834f5675427730a193ba159b5b00d9baf8697",
       "privacy_transformed": false
+    },
+    {
+      "path": "tests/test_appendix_outline.py",
+      "privacy_transformed": false,
+      "source_sha256": "81740ce1119374b3dec0390c98e1fe9b7411b43db6d5f8cf02116a18adad130d",
+      "published_sha256": "81740ce1119374b3dec0390c98e1fe9b7411b43db6d5f8cf02116a18adad130d"
     },
     {
       "path": "tests/test_approved_retrieval_scope.py",

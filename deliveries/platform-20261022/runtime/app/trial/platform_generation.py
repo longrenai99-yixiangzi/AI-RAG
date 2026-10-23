@@ -111,6 +111,7 @@ class GenerationWorkflow:
         require_applicable(run['question'],citations)
         from app.retrieval.complete_lists import list_request,render_list
         audit=run.get('result',{}).get('complete_list_audit') or run.get('result',{}).get('debug',{}).get('complete_list_audit') or {}
+        if audit.get('kind')=='APPENDIX_OUTLINE':raise ValueError('附件章节仅作本地摘录，未核齐的详细内容不能交给模型补写。')
         if list_request(run['question']) and not render_list(audit,citations,run['question']):raise ValueError('完整清单尚未核齐，未建立模型请求。')
         body,units=selection_packet(run['question'],citations)
         if protocol=='CONCISE_V1':
@@ -142,6 +143,7 @@ class GenerationWorkflow:
             from app.retrieval.evidence_applicability import require_applicable
             require_applicable(row['question'],row['citations'])
             from app.retrieval.complete_lists import list_request,render_list
+            if row.get('complete_list_audit',{}).get('kind')=='APPENDIX_OUTLINE':raise ValueError('附件章节仅作本地摘录，旧预览不能执行补写。')
             if list_request(row['question']) and not render_list(row.get('complete_list_audit',{}),row['citations'],row['question']):raise ValueError('完整清单尚未核齐，旧预览不能执行模型请求。')
             row.update(status='EXECUTING',actor=actor)
             return copy.deepcopy(row)

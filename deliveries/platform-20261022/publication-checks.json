@@ -1,8 +1,8 @@
 {
   "date": "2026-10-23",
-  "source_files": 270,
+  "source_files": 272,
   "backend_tests": {
-    "passed": 615,
+    "passed": 627,
     "failed": 0,
     "warnings": 3
   },
@@ -404,5 +404,55 @@
     "business_knowledge_auto_published": false,
     "overall_owner_acceptance": false
   },
-  "latest_readiness_status": "LOCAL_LIMITED_USE_TWO_ANSWERS_OWNER_CONFIRMED"
+  "latest_readiness_status": "LOCAL_LIMITED_USE_APPENDIX_OUTLINE_DETAILS_PARTIAL",
+  "appendix_outline": {
+    "status": "APPENDIX_OUTLINE_LIVE_DETAILS_PARTIAL",
+    "backend_passed": 627,
+    "backend_warnings": 3,
+    "new_tests": 12,
+    "source_files": 272,
+    "live_question_variants": 8,
+    "final_locator_checks": 2,
+    "technical_query_records_added": 14,
+    "initial_harness_status_expectation_error_preserved": true,
+    "real_model_http_calls": 0,
+    "new_document_embeddings": 0,
+    "new_source_parsing": 0,
+    "source_originals_unchanged": true,
+    "old_queries_preserved": 86,
+    "generation_workflows_preserved": 10,
+    "policy_and_expiry_unchanged": true,
+    "used_requests": 9,
+    "reserved_cny": 0.6,
+    "remaining_requests": 11,
+    "manual_pages_visually_checked": [
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59
+    ],
+    "appendix_9_chapters": 7,
+    "appendix_10_regression_chapters": 5,
+    "chapter_detail_answer_completeness": "PARTIAL",
+    "template_outline_owner_acceptance": false,
+    "all_content_gaps_closed": false,
+    "browser": "Edge headless",
+    "final_browser_citation_page_range": "50-58",
+    "restarted_ports": [
+      8894,
+      8897
+    ],
+    "8000_changed": false,
+    "8010_restarted": false,
+    "old_8896_state_unchanged": true,
+    "frontend_changed": false,
+    "business_knowledge_published": 0,
+    "overall_owner_acceptance": false
+  }
 }

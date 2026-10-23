@@ -79,15 +79,19 @@ def build_catalog(records):
                     'display_location':(rows[0].get('heading_path') or '原文位置')+' > 原文分组清单',
                     'retrieved_child_ids':children,'retrieval_origin':'SAME_LOCATION_VERIFIED_GROUPED_LIST'}
             result.append({**entry,'record':record,'children':children})
-    return result
+    from .appendix_outline import build_outlines
+    return result+build_outlines(records)
 
 
 def list_bundle(question,catalog,eligible_ids):
     request=list_request(question)
     if request is None:return None
+    from .appendix_outline import outline_bundle
+    outline=outline_bundle(question,catalog,eligible_ids,request)
+    if outline is not None:return outline
     query=compact(question)
-    matching=[e for e in catalog if compact(e['topic']) in (request['topic'] or query)
-              or request['topic'] and request['topic'] in compact(e['topic'])]
+    matching=[e for e in catalog if e.get('kind')!='APPENDIX_OUTLINE' and (compact(e['topic']) in (request['topic'] or query)
+              or request['topic'] and request['topic'] in compact(e['topic']))]
     matching=[e for e in matching if set(e['children']).issubset(eligible_ids)]
     unique={(e['record']['source_version'],e['topic'],str(e['groups'])):e for e in matching}
     audit={**request,'status':'NO_VERIFIED_COMPLETE_LIST'}
@@ -109,6 +113,9 @@ def list_bundle(question,catalog,eligible_ids):
 
 def render_list(audit,cards,question):
     request=list_request(question)
+    if request and audit.get('kind')=='APPENDIX_OUTLINE':
+        from .appendix_outline import render_outline
+        return render_outline(audit,cards,question,request)
     if not request or request['question_sha256']!=audit.get('question_sha256') or audit.get('status')!='COMPLETE':return None
     count=len(audit['groups']) if request['count_kind']=='GROUPS' else audit['declared_count']
     topic=request['topic'] or compact(question)

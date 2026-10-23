@@ -24,7 +24,7 @@
       "matches": 0
     }
   },
-  "new_model_http_calls": 3,
+  "new_model_http_calls": 4,
   "private_content_uploaded": false,
   "concise_protocol": "APPROVED_DAILY_CONCISE_EVIDENCE_BOUND_TRIAL",
   "original_online_validation_passes": 0,
@@ -72,13 +72,13 @@
   },
   "daily_model_policy": {
     "status": "APPROVED_ACTIVE_BOUNDED_TRIAL",
-    "new_model_http_calls": 1,
+    "new_model_http_calls": 2,
     "synthetic_tests": 34,
     "typescript": "PASS",
     "platform_build": "PASS",
     "served_ui_bundle": true,
     "unapproved_request_blocked_403": true,
-    "used_requests": 1,
+    "used_requests": 2,
     "existing_history_preserved": true,
     "original_workbench_state_preserved": true,
     "backup_does_not_rewind_budget": true,
@@ -87,12 +87,26 @@
     "real_model_new_topic_acceptance": false,
     "implementation_new_model_http_calls": 0,
     "activation_model_http_calls": 1,
-    "real_model_probe_path_passes": 1,
+    "real_model_probe_path_passes": 2,
     "exact_quote_check": "PASS",
     "source_original_http_and_hash": "PASS",
     "local_route_probes": 2,
-    "local_route_additional_model_calls": 0
+    "local_route_additional_model_calls": 0,
+    "topic_model_http_calls": 1
   },
-  "model_http_call_count_scope": "Two historical concise-validation calls plus one daily-activation probe; excludes earlier project stages.",
-  "legacy_per_request_execution_enabled": false
+  "model_http_call_count_scope": "Two historical concise-validation calls, one daily-activation probe, one daily-topic probe; excludes earlier project stages.",
+  "legacy_per_request_execution_enabled": false,
+  "daily_topic_checks": {
+    "frozen_cases": 6,
+    "answered_for_technical_review": 2,
+    "protected_but_not_fully_answered": 2,
+    "unresolved_retrieval_or_coverage": 2,
+    "new_model_http_calls": 1,
+    "changed_runtime_code": false,
+    "paid_repair_calls": 0,
+    "automatic_retries": 0,
+    "model_probe_exact_quote_match": true,
+    "owner_acceptance": false,
+    "retrieval_feedback_recorded": true
+  }
 }

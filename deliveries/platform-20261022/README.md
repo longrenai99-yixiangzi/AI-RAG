@@ -19,6 +19,7 @@
 - [试用覆盖检查与面积范围保护](TRIAL_COVERAGE_REVIEW.md)
 - [限额日常模型答复与授权边界](DAILY_MODEL_POLICY.md)
 - [日常模型已启用及首条真实验证](DAILY_MODEL_ACTIVATION.md)
+- [六项扩展检查与未解决缺口](DAILY_TOPIC_COVERAGE.md)
 - [公开源码清单及校验值](source-manifest.json)
 - [本机处理产物的脱敏索引](processing-ledger.json)
 - [本次交付验证](VALIDATION.md)

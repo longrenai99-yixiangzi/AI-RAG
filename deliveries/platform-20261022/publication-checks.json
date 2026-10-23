@@ -1,8 +1,8 @@
 {
-  "date": "2026-10-23",
+  "date": "2026-10-24",
   "source_files": 275,
   "backend_tests": {
-    "passed": 671,
+    "passed": 673,
     "failed": 0,
     "warnings": 3
   },
@@ -404,7 +404,7 @@
     "business_knowledge_auto_published": false,
     "overall_owner_acceptance": false
   },
-  "latest_readiness_status": "LOCAL_LIMITED_USE_REAL_CONTENT_LIFECYCLE_DRILL_PASSED",
+  "latest_readiness_status": "LOCAL_LIMITED_USE_BROWSER_LIFECYCLE_VERIFIED_NAME_PROPAGATION_FIXED",
   "appendix_outline": {
     "status": "APPENDIX_OUTLINE_LIVE_DETAILS_PARTIAL",
     "backend_passed": 627,
@@ -612,6 +612,40 @@
     "new_browser_acceptance": false,
     "backend_result_retained_not_rerun": 671,
     "first_harness_assumption_failure_preserved": true,
+    "multi_day_stability_verified": false,
+    "full_machine_disaster_recovery_verified": false
+  },
+  "browser_review_lifecycle": {
+    "status": "PASS",
+    "backend_passed": 673,
+    "backend_warnings": 3,
+    "new_backend_tests": 2,
+    "targeted_backend_passed": 9,
+    "browser_check_groups": 8,
+    "browser": "local Edge headless",
+    "browser_page_errors": 0,
+    "readable_source_name_fixed": true,
+    "source_ids_paths_and_hashes_unchanged": true,
+    "original_and_converted_source_hashes_verified": 2,
+    "live_state_policy_prepared_byte_identical": true,
+    "daily_workbench_restarted": true,
+    "retrieval_process_unchanged": true,
+    "isolated_service_stopped": true,
+    "isolated_final_active_knowledge": 0,
+    "live_business_knowledge_published": 0,
+    "new_business_owner_acceptance": false,
+    "new_model_http_calls": 0,
+    "used_requests": 9,
+    "reserved_cny": 0.6,
+    "remaining_requests": 11,
+    "managed_stop_backup_id": "5d392aebf5e24ebb8f94282966f31165",
+    "managed_stop_backup_sha256": "5496237614fdb7c77d6f8c4308097fbd2c1d294eeb8cbdf3a4e616ed366bf9b1",
+    "backup_manifest_verified": true,
+    "production_frontend_changed": false,
+    "frontend_build_repeated": false,
+    "formal_service_switched": false,
+    "first_harness_failures_preserved": 4,
+    "native_foreground_interaction_verified": false,
     "multi_day_stability_verified": false,
     "full_machine_disaster_recovery_verified": false
   }

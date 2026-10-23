@@ -755,8 +755,8 @@
     },
     {
       "path": "app/trial/platform_store.py",
-      "source_sha256": "7976e91ad4cc23434c872f36eda2ea274d94f7111f522c8d93962b22e38bfe69",
-      "published_sha256": "7976e91ad4cc23434c872f36eda2ea274d94f7111f522c8d93962b22e38bfe69",
+      "source_sha256": "ca467930393b2c6b171e422e4ef2032f37f73be1008f06b141707eb9432db3ed",
+      "published_sha256": "ca467930393b2c6b171e422e4ef2032f37f73be1008f06b141707eb9432db3ed",
       "privacy_transformed": false
     },
     {
@@ -1529,8 +1529,8 @@
     },
     {
       "path": "tests/test_platform_existing_content.py",
-      "source_sha256": "a9891155ddc01ba390ff304e8ca781710730595d148397cf89ae3a5227b78bde",
-      "published_sha256": "a9891155ddc01ba390ff304e8ca781710730595d148397cf89ae3a5227b78bde",
+      "source_sha256": "b8781a5e86f401af2ec9148c609b8ecafa2109dc3325dbc740d7ebd94ec6a28b",
+      "published_sha256": "b8781a5e86f401af2ec9148c609b8ecafa2109dc3325dbc740d7ebd94ec6a28b",
       "privacy_transformed": false
     },
     {

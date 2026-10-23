@@ -122,6 +122,28 @@ def test_query_and_feedback_retries_are_idempotent(runtime):
     assert client.post("/api/platform/query-feedback", headers=HEADERS, json=values).status_code == 409
 
 
+@pytest.mark.parametrize('display_name', ['已核对制度（转换稿）', ''])
+def test_readable_source_name_survives_feedback_and_publication(runtime, display_name):
+    client, existing = runtime
+    retrieve = existing.retrieve
+    def with_display(*args, **kwargs):
+        result = retrieve(*args, **kwargs)
+        result['citations'][0]['display_file_name'] = display_name
+        return result
+    existing.retrieve = with_display
+    run = ask(client)
+    response, _ = feedback(client, run)
+    assert response.status_code == 200
+    source = client.get('/api/platform/state').json()['sources'][0]
+    assert source['name'] == (display_name or existing.source['file_name'])
+    assert source['external_path'] == str(existing.path) and source['external_hash'] == existing.hash
+    assert source['source_id'] == existing.source['source_id']
+    publish(client, response.json()['candidate_id'])
+    knowledge = client.get('/api/platform/state').json()['knowledge'][0]
+    assert knowledge['source_name'] == source['name']
+    assert knowledge['origin_citation'] == run['result']['citations'][0]
+
+
 def test_source_change_blocks_publish_reuse_restore_and_original(runtime):
     client, existing = runtime
     run = ask(client)

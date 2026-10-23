@@ -4,7 +4,7 @@
 
 | 检查 | 结果 |
 | --- | --- |
-| `runtime` 下 `python -m pytest tests -q` | 最新493项通过，3条依赖弃用提示。仅覆盖本交付附带的测试，不是根目录另一版本的全部测试。 |
+| `runtime` 下 `python -m pytest tests -q` | 最新673项通过，3条依赖弃用提示。仅覆盖本交付附带的测试，不是根目录另一版本的全部测试。 |
 | `knowledge-ui` 下 `node --test tests/assistedChat.test.mjs` | 3 项通过；测试中断、拆分帧和无效完成状态。 |
 | `knowledge-ui` 下 `tsc -b` | 通过；使用合成分类快照，不读取业务资料库。 |
 | `vite build --config vite.platform.config.ts` | 工作台构建通过；构建产物留本地，不上传生成包。 |
@@ -60,3 +60,5 @@ Direct requirements/practices/content lookups now retain a full-topic necessity 
 Native column-label lookup and a visible, version-checked source-page image preview are live: [scope and final validation](NATIVE_TABLE_SCHEMA.md). Final backend: 671 checks. Current approval and expiry are preserved; no new real model calls.
 
 Existing accepted-answer lifecycle: [isolated real-content drill and boundaries](REVIEWED_KNOWLEDGE_LIFECYCLE.md). Eleven assertion groups passed; no runtime change, new model call or live publication. Prior backend result retained separately.
+
+Browser lifecycle and readable source-name propagation: [interaction evidence and scope](BROWSER_REVIEW_LIFECYCLE.md). Eight browser check groups and final exported backend 673 checks passed. Only the daily workbench restarted; no live business publication or new model call.

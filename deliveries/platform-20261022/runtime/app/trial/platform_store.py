@@ -292,7 +292,7 @@ class PlatformStore(TrialKnowledgeStore):
                 if source and source.get("status") != "REGISTERED":
                     raise PlatformConflict("此来源已经停用，请先核查后恢复。")
                 if not source:
-                    source = {"source_id": sid, "name": catalog_source["file_name"], "reference": catalog_source["source_path"],
+                    source = {"source_id": sid, "name": citation.get("display_file_name") or catalog_source["file_name"], "reference": catalog_source["source_path"],
                               "version_label": citation["source_version"][:12], "product_line": "通用", "revision": 1,
                               "status": "REGISTERED", "index_status": "EXISTING_READ_ONLY", "external_path": catalog_source["source_path"],
                               "external_hash": citation["source_version"], "external_bound": True, "updated_at": _now()}

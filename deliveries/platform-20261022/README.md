@@ -82,3 +82,5 @@ Direct requirements/practices/content lookups now retain a full-topic necessity 
 Native column-label lookup and a visible, version-checked source-page image preview are live: [scope and final validation](NATIVE_TABLE_SCHEMA.md). Final backend: 671 checks. Current approval and expiry are preserved; no new real model calls.
 
 Existing accepted-answer lifecycle: [isolated real-content drill and boundaries](REVIEWED_KNOWLEDGE_LIFECYCLE.md). Eleven assertion groups passed; no runtime change, new model call or live publication. Prior backend result retained separately.
+
+Browser lifecycle and readable source-name propagation: [interaction evidence and scope](BROWSER_REVIEW_LIFECYCLE.md). Eight browser check groups and final exported backend 673 checks passed. Only the daily workbench restarted; no live business publication or new model call.

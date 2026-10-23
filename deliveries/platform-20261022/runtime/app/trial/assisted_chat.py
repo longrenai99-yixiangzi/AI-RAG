@@ -11,7 +11,7 @@ from typing import Literal
 
 from fastapi import APIRouter,HTTPException,Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel,ConfigDict,Field
+from pydantic import BaseModel,ConfigDict,Field,field_validator
 from starlette.background import BackgroundTask
 
 from app.answer_engine.answer_policy import policy_for_intent
@@ -36,13 +36,22 @@ class AssistedQuery(BaseModel):
     conversation_id:str=Field(default='',max_length=100)
     node_id:str=Field(default='',max_length=100)
     request_id:str=Field(default_factory=lambda:uuid.uuid4().hex,pattern=r'^[a-f0-9]{32}$')
+    source_versions:dict[str,str]|None=Field(default=None,min_length=1,max_length=20)
+
+    @field_validator('source_versions')
+    @classmethod
+    def valid_source_versions(cls,value):
+        if value is not None and any(not re.fullmatch(r'SRC_[A-Za-z0-9_-]{1,64}',sid) or not re.fullmatch(r'[a-f0-9]{64}',version) for sid,version in value.items()):
+            raise ValueError('资料范围须为目录标识及完整版本，不接受路径或模糊版本。')
+        return value
 
 
 def runtime(request):
     from app.trial import v2
     retrieve=getattr(request.app.state,'assisted_retrieve',None)
     if retrieve is None:
-        def retrieve(question):
+        def retrieve(question,*,source_versions=None):
+            if source_versions is not None:raise ValueError('当前检索入口不支持指定资料版本范围，未忽略限制。')
             engine=v2._engine_instance()
             bundle=engine.answer(question,detect_growth=False,retrieve_only=True)
             # Use the complete frozen text, not the legacy display excerpt.
@@ -92,6 +101,7 @@ def run_flow(data,retrieve,generator,save,resolved_question=None):
     resolved_question=resolved_question or data.question
     base={'query_id':qid,'query_run_id':run_id,'question':data.question,'resolved_question':resolved_question,'response_mode':data.mode,
           'pipeline_version':'COLLEAGUE_FLOW_EXISTING_V2_CANDIDATE','growth_candidate_ids':[],'claims':[],'citations':[],'debug':{},'latency':{'total_ms':0}}
+    if data.source_versions is not None:base['retrieval_source_versions']=data.source_versions
     scope_hint=question_scope(data.question)
     if scope_hint:base['question_scope']=scope_hint
     state={**base,'conversation_id':data.conversation_id,'node_id':data.node_id,'trial_user':data.trial_user,'status':'RUNNING','created_at':datetime.now(timezone.utc).isoformat()}
@@ -99,9 +109,10 @@ def run_flow(data,retrieve,generator,save,resolved_question=None):
     finished=False
     try:
         yield {'type':'status','stage':'retrieval','msg':'正在检索已有知识库。','query_run_id':run_id}
-        bundle=retrieve(resolved_question);evidence,cards=assemble(bundle,resolved_question,include_background=data.mode=='sources')
+        bundle=retrieve(resolved_question,source_versions=data.source_versions) if data.source_versions is not None else retrieve(resolved_question)
+        evidence,cards=assemble(bundle,resolved_question,include_background=data.mode=='sources')
         yield {'type':'sources','sources':cards,'query_run_id':run_id}
-        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','coverage_audit','chapter_coverage','intent_audit','personnel_scope_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
+        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','retrieval_source_filter','coverage_audit','chapter_coverage','intent_audit','personnel_scope_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
         if bundle.get('reference_resolution'):result['source_resolution_note']='本题由登记卡关联到同版原件；引用来自原件，登记卡未被补写为正文，内容与适用范围仍待核对。'
         blocked=bundle.get('bundle_status') in {'SOURCE_SCOPE_MISSING','LINEAGE_BLOCKED','CONFLICTING_EVIDENCE'}
         if not evidence.items or blocked:
@@ -201,7 +212,7 @@ def query(data:AssistedQuery,request:Request):
     if request.url.hostname not in {'127.0.0.1','localhost'} or origin!=expected:raise HTTPException(403,'仅允许本机同源页面。')
     retrieve,store,generator=runtime(request);run_id='QR_'+data.request_id;prior=store.query_run(run_id)
     if prior:
-        if prior.get('question')!=data.question or prior.get('conversation_id')!=data.conversation_id or prior.get('response_mode')!=data.mode:raise HTTPException(409,'请求编号已用于另一条问题。')
+        if prior.get('question')!=data.question or prior.get('conversation_id')!=data.conversation_id or prior.get('response_mode')!=data.mode or prior.get('retrieval_source_versions')!=data.source_versions:raise HTTPException(409,'请求编号已用于另一条问题或资料范围。')
         if not prior.get('result'):raise HTTPException(409,'该问题仍在处理，未重复调用。')
         return StreamingResponse(iter(['data: '+json.dumps({'type':'result','result':prior['result']},ensure_ascii=False)+'\n\n']),media_type='text/event-stream')
     resolved=v2._resolve_followup(data.question,store.last_query_for_conversation(data.conversation_id))

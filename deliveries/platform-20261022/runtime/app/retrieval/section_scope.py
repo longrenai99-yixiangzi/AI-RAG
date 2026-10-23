@@ -3,6 +3,7 @@ from pathlib import Path
 from app.bm25 import BM25Index
 from app.domain import Chunk
 from app.retrieval.query_planner_v1 import SPECIALTIES
+from app.retrieval.named_source_scope import path_key
 
 STAGES={'PRELIMINARY':('初步设计','初设'),'CONSTRUCTION':('施工图',),'SCHEME':('方案阶段','方案设计'),'CONCEPT':('概念设计','概念方案')}
 
@@ -40,10 +41,12 @@ class SectionTitleIndex:
         self.bm25.build([Chunk(s['section_id'],s['source_path'],i,s['source_path'],Path(s['source_path']).name,
                                s['heading_path']+'\n'+s['text'],s['heading_path'],s['location']) for i,s in enumerate(sections)])
 
-    def search(self,question):
+    def search(self,question,*,allowed_versions=None):
         items=[]
         for sid,score in self.bm25.search(question,limit=len(self.sections)):
-            s=self.sections[sid];scope=section_scope(question,s)
+            s=self.sections[sid]
+            if allowed_versions is not None and (path_key(s['source_path']),s['source_version']) not in allowed_versions:continue
+            scope=section_scope(question,s)
             if 'MISMATCH' in scope.values():continue
             items.append({**s,'evidence_id':'section-'+sid,'document_id':s['source_path'],'source_id':s['source_path'],
                           'file_name':Path(s['source_path']).name,'role':'DIRECT','score':score,'scope':scope,

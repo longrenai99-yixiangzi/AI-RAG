@@ -38,8 +38,11 @@ class ExistingFixture:
 
     version_current = staticmethod(ExistingKnowledge.version_current)
 
-    def retrieve(self, question, request_id):
+    def retrieve(self, question, request_id, *, source_versions=None):
         self.calls += 1
+        self.last_source_versions=source_versions
+        if source_versions is not None and source_versions.get(self.source['source_id'])!=self.hash:
+            return {'answer_status':'EVIDENCE_INSUFFICIENT','citations':[]}
         if self.failed:
             raise RuntimeError("fixture failure")
         return {"answer_status": "SOURCES_ONLY", "citations": [{"citation_id": "S1", "source_id": self.source["source_id"], "source_version": self.hash,

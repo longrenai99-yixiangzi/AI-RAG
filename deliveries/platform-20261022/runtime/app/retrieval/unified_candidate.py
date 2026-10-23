@@ -153,7 +153,7 @@ class UnifiedCandidate:
         rows += [self.records[i] for i in self.by_source.get(source_id,[])]
         return {'items':[{'evidence_id':r['evidence_id'],'source_version':r['source_version'],'heading_path':r.get('heading_path'),'location':r.get('location') or {},'raw_text':r['text'],'excerpt':r['text'],**({'answer_exclusion_reason':self.quality_exclusions[r['evidence_id']]} if r['evidence_id'] in self.quality_exclusions else {})} for r in rows[:limit]], 'candidate_hash':self.candidate_hash,**({'personnel_index_sha256':self.personnel.manifest['records_sha256']} if self.personnel else {})}
 
-    def retrieve(self,question,query_vector=None):
+    def retrieve(self,question,query_vector=None,*,source_versions=None):
         start=time.perf_counter()
         named_paths={path_key(self.documents[did]['source_path']) for title in named_titles(question) or [] for did in named_document_ids(self.documents,title)}
         bindings=[b for b in self.reference_bindings.values() if path_key(b['note_path']) in named_paths]
@@ -164,6 +164,24 @@ class UnifiedCandidate:
             return {'candidate_evidence':[],'bundle_status':'CONFLICTING_EVIDENCE' if route['status']=='CONFLICTING_EVIDENCE' else 'SOURCE_SCOPE_MISSING','scope_resolution':route,'candidate_hash':self.candidate_hash}
         scope=resolve_named_scope(routed,self.scope_documents);allowed=scope['allowed_paths']
         if allowed is not None and not allowed:return {'candidate_evidence':[],'bundle_status':scope['status'],'source_scope':scope,'candidate_hash':self.candidate_hash}
+        allowed_versions=None
+        if source_versions is not None:
+            allowed_versions=set()
+            if not source_versions:raise ValueError('限定资料清单为空，未回退到全库。')
+            for sid,version in source_versions.items():
+                indices=self.by_source.get(sid,[])
+                record=self.records[indices[0]] if indices else None
+                if not record or record['source_version']!=version or file_sha(record['source_path'])!=version:
+                    return {'candidate_evidence':[],'bundle_status':'SOURCE_SCOPE_MISSING','candidate_hash':self.candidate_hash,
+                            'selection_notes':['限定资料不存在或版本已变化，未回退到其他资料。']}
+                allowed_versions.add((path_key(record['source_path']),version))
+            paths={p for p,_ in allowed_versions}
+            allowed=sorted(paths if allowed is None else paths.intersection(allowed))
+            reference_meta['retrieval_source_filter']={'status':'EXACT_SOURCE_VERSIONS','source_versions':source_versions}
+            if not allowed:
+                return {'candidate_evidence':[],'bundle_status':'SOURCE_SCOPE_MISSING','candidate_hash':self.candidate_hash,
+                        'scope_resolution':route,'source_scope':scope,**reference_meta,
+                        'selection_notes':['本题指定资料不在当前批准的资料范围内，未改用其他项目或文件代答。']}
         mask=list(range(len(self.records))) if allowed is None else sorted({i for p in allowed for i in self.by_path.get(p,[])})
         if not mask:return {'candidate_evidence':[],'bundle_status':'SOURCE_SCOPE_MISSING','candidate_hash':self.candidate_hash}
         reference_rows={i for i in mask if path_key(self.records[i]['source_path']) in self.reference_only or self.records[i]['evidence_id'] in self.quality_exclusions}
@@ -195,7 +213,7 @@ class UnifiedCandidate:
             bundle.update(candidate_hash=self.candidate_hash,scope_resolution=route,**reference_meta,
                           retrieval_audit={'method':'EXISTING_VERSIONED_TEXT_SCALAR','eligible_rows':len(mask),'recalled_ids':[r['evidence_id'] for r in recalled],'new_document_embeddings':0,'total_ms':round((time.perf_counter()-start)*1000,2)})
             return bundle
-        bundle=self.focused.rank(routed,recalled)
+        bundle=self.focused.rank(routed,recalled,allowed_versions=allowed_versions)
         if uncovered:
             bundle.update(bundle_status='SOURCE_SCOPE_MISSING',personnel_scope_audit=scoped['personnel_scope_audit'],selection_notes=scoped['selection_notes'])
             for r in bundle['candidate_evidence']:r['answer_usage']='BACKGROUND'

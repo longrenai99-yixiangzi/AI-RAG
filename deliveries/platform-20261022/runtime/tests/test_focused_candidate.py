@@ -19,7 +19,7 @@ class Reranker:
 
 
 class Titles:
-    def search(self,q):return []
+    def search(self,q,*,allowed_versions=None):return []
 
 
 def records(tmp_path):

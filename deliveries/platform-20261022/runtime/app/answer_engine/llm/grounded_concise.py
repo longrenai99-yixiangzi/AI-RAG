@@ -18,6 +18,7 @@ def concise_packet(question, units, body):
                          '先答问题所问内容，不展开无关背景；单字段一到两句，列举题按条作答。最多8项，每项400字，总计1600字。',
                          '短引文必须保留主体、数字、单位、否定、前提和例外；概括不能改变事实，优先沿用原文字句。',
                          '不能从岗位人数推算团队总人数；不能擅自换算、相加或把估算价当合同价。',
+                         '并列子问逐项核对；某子问未在证据中明确说明，用PARTIAL并在gaps写出该子问，不用相关段落代答。',
                          '缺少所问范围或证据冲突时用PARTIAL或INSUFFICIENT并写gaps；不足时claims为空。',
                          '引用是必要条件，不表示整题完整回答或通过业务审核。']}
     if len({u['source_id'] for u in units}) > 1:
@@ -120,12 +121,20 @@ def render_concise(raw, units, citations, question):
                         'check': 'SOURCE_TEXT_MATCHED' if matched else 'PARAPHRASE_REPLACED_BY_SOURCE_QUOTE'})
     if len({(c['unit_id'], c['support_quote']) for c in checked}) != len(checked):
         raise ValueError('事实重复引用同一原文单元和短引文。')
+    model_gaps=list(gaps);coverage_gaps=[]
+    # shortcut: explicit balance predicates only; other semantic subquestions still need business review.
+    balance_asks=[part.strip() for part in re.split(r'[？?；;，,]+',question)
+                  if re.search(r'兼顾.{0,6}(?:什么|哪些|哪几)|(?:如何|怎么|应当|应该|需要|必须|应)(?:兼顾|平衡)',part)]
+    if balance_asks and not any(re.search(r'兼顾|平衡|统筹|同时(?:考虑|满足)|既要[^。；]{0,40}又要',c['support_quote']) for c in checked):
+        coverage_gaps=[f'子问“{part}”尚无明确兼顾或平衡依据，未用选择结果代答。' for part in balance_asks]
+        gaps=[*model_gaps,*coverage_gaps]
+        checked=[c for c in checked if not re.fullmatch(r'(?:确定|选择|选取|选出)(?:最优|最佳)[^，,。；;]{0,20}[。；;]?',c['support_quote'])]
     if sum(len(c['text']) for c in checked) > 1600:
         raise ValueError('答复过长，未截断可能存在的条件。')
     used = {c['citation_id'] for c in checked}
     chapter_sources = {c['citation_id'] for c in citations if c.get('answer_usage')=='PRIMARY'
                        and c.get('chapter_coverage',{}).get('status')=='PARENT_NARRATIVES_COLLECTED'}
-    if status=='ANSWERED' and not chapter_sources.issubset(used):
+    if status=='ANSWERED' and not gaps and not chapter_sources.issubset(used):
         raise ValueError('父章节措施概览遗漏主证据子节，不能认定为完整答复。')
     context_ids = {mapping[c['unit_id']].get('context_unit_id') for c in checked}
     contexts = [c for c in checked if c['unit_id'] in context_ids]
@@ -137,11 +146,11 @@ def render_concise(raw, units, citations, question):
     if chapter_tables:
         answer += '\n\n以上汇聚同章说明文字；附表明细未逐行核对，不作为完整清单或人数统计。'
     if gaps:
-        answer += ('\n\n' if answer else '') + '模型报告本题仍有证据缺口，请结合引用核对；未补写缺失事实。'
+        answer += ('\n\n' if answer else '') + ('尚未核定：'+'；'.join(coverage_gaps) if coverage_gaps else '模型报告本题仍有证据缺口，请结合引用核对；未补写缺失事实。')
     return {'answer_status': 'MODEL_CONCISE_DRAFT' if checked else 'MODEL_EVIDENCE_GAP',
-            'status_label': '模型简短答复 · 逐项引文核对 · 待业务复核' if checked else '模型报告证据不足 · 待核对',
+            'status_label': '模型简短答复 · 部分子问待核定' if checked and coverage_gaps else '模型简短答复 · 逐项引文核对 · 待业务复核' if checked else '答复证据不足 · 待核对',
             'answer': answer, 'claims': checked, 'citations': ([c for c in citations if c['citation_id'] in used] if checked
                 else [{**c, 'answer_usage': 'BACKGROUND'} for c in citations]),
-            'generation_mode': 'MODEL_CONCISE_EVIDENCE_BOUND', 'model_gaps': gaps,
+            'generation_mode': 'MODEL_CONCISE_EVIDENCE_BOUND', 'model_gaps': model_gaps,'coverage_gaps':coverage_gaps,
             'answer_completeness': 'PARTIAL' if gaps else 'NOT_INDEPENDENTLY_VERIFIED',
             'notice': '主张已逐项绑定原文；不能可靠核对的改写已换回短引文。字面核对不证明语义完整或业务正确，仍需核对范围与遗漏。'}

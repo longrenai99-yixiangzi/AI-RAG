@@ -25,8 +25,10 @@ def collect_overview(question, primary, records):
     headings = [s.strip() for s in primary.get('heading_path', '').split(' > ')]
     # shortcut: only explicitly named parent topics; semantic topic expansion needs separate review.
     query = topic_key(question)
+    criteria=bool(re.search(r'(?:比较|对比).{0,8}(?:方面|维度|指标)|(?:比较|对比|比选)(?:的)?(?:标准|原则|依据|维度|指标)',question))
     # A leaf topic in the question takes precedence over its ancestors.
-    matches = [i for i, title in enumerate(headings) if len(topic_key(title)) >= 4 and topic_key(title) in query]
+    matches = [i for i,title in enumerate(headings)
+               if any(len(name)>=4 and name in query for name in (topic_key(title),topic_key(title).removeprefix('设计') if criteria else topic_key(title)))]
     if not matches or max(matches) == len(headings)-1:
         return [], {'status': 'NOT_PARENT_OVERVIEW'}
     prefix = headings[:max(matches)+1]
@@ -54,9 +56,13 @@ def collect_overview(question, primary, records):
     missing = [h for h in children if h not in {r['heading_path'] for r in narratives}]
     audit.update(child_headings=children, narrative_count=len(narratives), table_rows_not_selected=tables,
                  missing_narrative_headings=missing)
+    if criteria:
+        narratives=[r for r in narratives if re.search(r'(?:从|围绕|按照|根据|考虑)[^。\n]{2,100}(?:方面|维度|指标)[^。\n]{0,20}(?:比选|比较|评价|评估)|(?:比选|比较|评价|评估)(?:标准|原则|依据|指标)[：:为是]',r['text'])]
+        audit.update(focused_headings=[r['heading_path'] for r in narratives],selected_narrative_count=len(narratives),selection='EXPLICIT_COMPARISON_CRITERIA',coverage_not_proven=True)
+        missing=[]
     if missing or not narratives or len(narratives) > 8 or sum(len(r['text']) for r in narratives) > 6000:
         return [], {**audit, 'reason': 'INCOMPLETE_OR_OVERSIZED_NARRATIVE_SET'}
-    audit['status'] = 'PARENT_NARRATIVES_COLLECTED'
+    audit['status'] = 'PARENT_FOCUS_EVIDENCE_COLLECTED' if criteria else 'PARENT_NARRATIVES_COLLECTED'
     for r in narratives:
         r.update(answer_usage='PRIMARY', chapter_coverage=audit,
                  display_location=r['heading_path'], retrieval_origin='SAME_VERSION_PARENT_NARRATIVES')

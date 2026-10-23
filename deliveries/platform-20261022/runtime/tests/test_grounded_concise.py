@@ -45,6 +45,27 @@ def test_short_answer_preserves_full_citation_and_reports_coverage_limit():
     assert result['answer_completeness'] == 'NOT_INDEPENDENTLY_VERIFIED'
 
 
+def test_selection_outcome_is_not_an_answer_to_requested_balance_criteria():
+    source='各方案从效益、质量、进度等方面开展比选，确定最优方案。'
+    evidence=[{**cards()[0],'excerpt':source}]
+    claims=[{'text':quote,'evidence_ids':['U1'],'support_quotes':[quote]} for quote in
+            ['各方案从效益、质量、进度等方面开展比选','确定最优方案']]
+    result=render({'status':'ANSWERED','claims':claims,'gaps':[]},evidence,'方案需要比较哪些方面，最优方案应兼顾什么？')
+    assert result['answer_completeness']=='PARTIAL' and len(result['claims'])==1
+    assert result['coverage_gaps'] and result['model_gaps']==[]
+    assert '确定最优方案' not in result['answer'] and '尚未核定' in result['answer']
+
+
+def test_explicit_balance_evidence_preserves_supported_answer_and_valve_is_not_a_balance_request():
+    quote='最优方案应兼顾采光要求和噪声控制。'
+    evidence=[{**cards()[0],'excerpt':quote}]
+    result=render(response(quote),evidence,'最优方案应兼顾什么？')
+    assert result['coverage_gaps']==[] and result['answer_completeness']=='NOT_INDEPENDENTLY_VERIFIED'
+    quote='平衡阀用于调节流量。'
+    result=render(response(quote),[{**cards()[0],'excerpt':quote}],'平衡阀是什么？')
+    assert result['coverage_gaps']==[]
+
+
 @pytest.mark.parametrize('model_text', ['所有会议都必须记录期限。', '项目配置9人。', '协调会不应记录责任人和期限。'])
 def test_unsupported_paraphrase_number_and_negation_are_replaced_not_displayed(model_text):
     result = render(response(model_text, '协调会应记录责任人和期限。'))

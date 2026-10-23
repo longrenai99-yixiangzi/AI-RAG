@@ -7,7 +7,7 @@ import math
 import re
 
 from app.bm25 import tokenize
-from app.retrieval.anchored_sections import expand_candidates
+from app.retrieval.anchored_sections import expand_candidates,ANCHOR
 from app.retrieval.section_scope import mark_scope
 from app.retrieval.named_source_scope import resolve_named_scope,path_key,ranking_question
 from app.retrieval.section_overview import comparison_required,collect_overview
@@ -35,14 +35,26 @@ class FocusedCandidate:
         self.records_by_source={}
         for r in records:
             self.records_by_source.setdefault((path_key(r['source_path']),r['source_version']),[]).append(r)
+        by_source={}
+        for s in sections:
+            if len(s.get('paragraph_anchors',[]))>1:
+                by_source.setdefault((path_key(s['source_path']),s['source_version']),[]).append(s)
+        for key,group in by_source.items():
+            rows=self.records_by_source.get(key,[])
+            if not rows:continue
+            anchors={a for r in rows for a in ANCHOR.findall(r['text'])}
+            self.records_by_source[key]=[{**rows[0],**s,'evidence_id':'section-'+s['section_id'],
+                'text':s['text'] if set(s['paragraph_anchors'][1:]).issubset(anchors) else ''} for s in group]
         self.cache=OrderedDict();self.stats={'computed_pairs':0,'cache_hits':0}
 
-    def rank(self,question,candidates):
+    def rank(self,question,candidates,*,allowed_versions=None):
         source_scope=resolve_named_scope(question,self.documents)
         allowed=source_scope['allowed_paths']
         if allowed is not None:
             if not allowed:return {'candidate_evidence':[],'bundle_status':source_scope['status'],'source_scope':source_scope}
             candidates=[c for c in candidates if path_key(c.get('source_path','')) in allowed]
+        if allowed_versions is not None:
+            candidates=[c for c in candidates if (path_key(c['source_path']),c['source_version']) in allowed_versions]
         rows=expand_candidates(candidates,self.sections)
         unique=[];seen=set()
         for c in rows:
@@ -50,7 +62,8 @@ class FocusedCandidate:
             if identity not in seen:seen.add(identity);unique.append(c)
         rows=unique
         by_path={c['source_path']:c for c in rows};by_id={c['evidence_id']:deepcopy(c) for c in rows}
-        title_hits=self.title_index.search(question)
+        title_hits=self.title_index.search(question,allowed_versions=allowed_versions) if allowed_versions is not None else self.title_index.search(question)
+        if allowed_versions is not None:title_hits=[c for c in title_hits if (path_key(c['source_path']),c['source_version']) in allowed_versions]
         if allowed is not None:title_hits=[c for c in title_hits if path_key(c.get('source_path','')) in allowed]
         for c in title_hits:
             parent=by_path.get(c['source_path'])

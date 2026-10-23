@@ -356,11 +356,14 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
                               "citations": [knowledge["origin_citation"]], "knowledge_id": knowledge["knowledge_id"], "knowledge_version": knowledge["version"],
                               "applicability": knowledge["applicability"], "generation_mode": "HUMAN_REVIEWED_EXACT_QUESTION"}
                 else:
-                    base=existing.retrieve(value.question, value.request_id)
+                    source_versions=daily.retrieval_scope() if daily else None
+                    base=existing.retrieve(value.question,value.request_id,source_versions=source_versions) if source_versions is not None else existing.retrieve(value.question,value.request_id)
                     cards=base.get('citations',[])
                     disabled={s['source_id'] for s in store.snapshot()['sources'] if s.get('status')!='REGISTERED'}
                     cards=[c for c in cards if c['source_id'] not in disabled]
                     added=lifecycle.retrieve(value.question) if hasattr(existing,'features') else []
+                    if source_versions is not None:
+                        added=[r for r in added if source_versions.get(r['source_id'])==r['source_version']]
                     route=base.get('debug',{}).get('scope_resolution',{})
                     if route.get('status') in {'AMBIGUOUS_PROJECT_SELECTOR','CONFLICTING_EVIDENCE'}:
                         added=[]

@@ -31,15 +31,15 @@ async def lifespan(app):
     dense.close();reranker.close()
 
 app=FastAPI(lifespan=lifespan);app.include_router(router)
-def serialized_retrieve(question):
-    with inference_lock:return candidate.retrieve(question)
+def serialized_retrieve(question,*,source_versions=None):
+    with inference_lock:return candidate.retrieve(question,source_versions=source_versions)
 app.state.assisted_retrieve=serialized_retrieve
 app.state.assisted_store=TrialKnowledgeStore(HERE/'preview_state.json')
 app.state.assisted_generator=ShadowAnswerGenerator(UnavailableLLMProvider('统一候选已启用真实本地检索，未启用公网生成。'))
 UI=HERE/'ui-dist';app.mount('/assets',StaticFiles(directory=UI/'assets'),name='assets')
 
 @app.get('/api/v2/unified/status')
-def status():return {'candidate_hash':candidate.candidate_hash,'records':len(candidate.records),'personnel_scope_records':len(candidate.personnel.records),'personnel_index_sha256':candidate.personnel.manifest['records_sha256'],'sources':candidate.sources(limit=1)['total'],'source_extract_enabled':True,'model_http_enabled':False,'same_candidate_for_sources_and_retrieval':True}
+def status():return {'candidate_hash':candidate.candidate_hash,'records':len(candidate.records),'personnel_scope_records':len(candidate.personnel.records),'personnel_index_sha256':candidate.personnel.manifest['records_sha256'],'sources':candidate.sources(limit=1)['total'],'source_extract_enabled':True,'source_version_filter_enabled':True,'model_http_enabled':False,'same_candidate_for_sources_and_retrieval':True}
 
 class LocalFeatures(BaseModel):
     texts:list[str]=Field(min_length=1,max_length=32)

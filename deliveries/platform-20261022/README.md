@@ -52,3 +52,5 @@ npx vite build --config vite.platform.config.ts --outDir ../evaluation/platform_
 后续用户已明确批准，独立试用的日常模型已启用，并完成1次真实生成及2条本地保护检查；详见[启用记录](DAILY_MODEL_ACTIVATION.md)。不覆盖此前待批阶段的原始记录或历史失败。
 
 2026-10-23同章汇聚与意图识别修复已在本机试用加载，实际限制及验证见[修复记录](SECTION_INTENT_REPAIR.md)。
+
+已补齐日常策略有效时按批准版本优先检索，并对实际模型漏答子问做离线保护；实际结果为部分答复，见[范围与缺口修复](APPROVED_SCOPE_RETRIEVAL.md)。

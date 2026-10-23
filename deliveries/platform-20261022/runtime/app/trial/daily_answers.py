@@ -60,6 +60,9 @@ class DailyAnswers:
     def _active(self,row):
         return bool(row.get('approved') and not row.get('paused') and self.clock()<datetime.fromisoformat(row['expires_at']))
 
+    def retrieval_scope(self):
+        return {sid:s['source_version'] for sid,s in self.sources.items()} if self._active(self._record()) else None
+
     def status(self):
         row=self._record();used=row.get('reservations',{})
         return {'policy_sha256':self.policy_hash,'approved':bool(row.get('approved')),'active':self._active(row),

@@ -64,12 +64,14 @@ class ExistingKnowledge:
         except OSError:
             return False
 
-    def retrieve(self, question: str, request_id: str) -> dict:
+    def retrieve(self, question: str, request_id: str, *, source_versions=None) -> dict:
         # sources mode exits before every provider branch, even if upstream generation is later enabled.
-        response = self.client.post("/api/v2/assisted/query", headers={"Origin": "http://127.0.0.1:8894"}, json={
+        payload={
             "question": question, "mode": "sources", "trial_user": "reviewer-001",
             "conversation_id": "platform-" + request_id, "request_id": request_id,
-        })
+        }
+        if source_versions is not None:payload['source_versions']=source_versions
+        response = self.client.post("/api/v2/assisted/query", headers={"Origin": "http://127.0.0.1:8894"}, json=payload)
         response.raise_for_status()
         result = None
         for frame in response.text.replace("\r\n", "\n").split("\n\n"):

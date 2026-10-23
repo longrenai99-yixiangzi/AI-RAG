@@ -54,3 +54,5 @@
 后续已将必要的资料用途/项目范围约束接入8897及共用检索：本地、审核复用、日常生成及旧预览均检查。最终593项后端通过，本轮真实模型调用0次；效力、章节完整性和业务验收仍不自动成立，见[运行时适用约束](EVIDENCE_APPLICABILITY.md)。
 
 后续已分开默认本地检索和模型外发白名单，并在生成前核对完整清单；原问题本地直接答复，原文版本校验保留。最终615项后端通过，本轮模型请求0次，见[本地范围与清单修复](LOCAL_RETRIEVAL_COMPLETE_LIST.md)。
+
+Current limited-trial UI, backup/restore and runtime readiness checks: [verification and limits](LIMITED_READINESS_VERIFICATION.md). Backend baseline unchanged; no new model HTTP calls.

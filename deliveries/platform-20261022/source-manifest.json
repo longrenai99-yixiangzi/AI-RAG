@@ -1109,8 +1109,8 @@
     },
     {
       "path": "knowledge-ui/src/pages/PlatformWorkbench.tsx",
-      "source_sha256": "1cc211fdd6db94d0dcf2a8514260b755af3e914d5e76559ab0f5f8bc0c58edd7",
-      "published_sha256": "1cc211fdd6db94d0dcf2a8514260b755af3e914d5e76559ab0f5f8bc0c58edd7",
+      "source_sha256": "199882c011310b67b03675cfd3696f736166c88cfdbc4d498915bccbe3b94dbb",
+      "published_sha256": "199882c011310b67b03675cfd3696f736166c88cfdbc4d498915bccbe3b94dbb",
       "privacy_transformed": false
     },
     {

@@ -479,8 +479,8 @@
     },
     {
       "path": "app/retrieval/focused_candidate.py",
-      "source_sha256": "44ad9edda57a14facaf374097ade10131073f428deadfd82ccbbb9ab25ea402e",
-      "published_sha256": "44ad9edda57a14facaf374097ade10131073f428deadfd82ccbbb9ab25ea402e",
+      "source_sha256": "37621e032724212424b9af21de4151ca62b8fe891f9b1889710261a770f47cf1",
+      "published_sha256": "37621e032724212424b9af21de4151ca62b8fe891f9b1889710261a770f47cf1",
       "privacy_transformed": false
     },
     {
@@ -1451,8 +1451,8 @@
     },
     {
       "path": "tests/test_focused_candidate.py",
-      "source_sha256": "08f1a1ba399f7449e4e26da779dfbfcd6ed8911c5d6a1f2aa53453c6419a3c61",
-      "published_sha256": "08f1a1ba399f7449e4e26da779dfbfcd6ed8911c5d6a1f2aa53453c6419a3c61",
+      "source_sha256": "4a056e3979e6033901f89cab72668bd0ecc346b90461479d56e4046bb70d7507",
+      "published_sha256": "4a056e3979e6033901f89cab72668bd0ecc346b90461479d56e4046bb70d7507",
       "privacy_transformed": false
     },
     {

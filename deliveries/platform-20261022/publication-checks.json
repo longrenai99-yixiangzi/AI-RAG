@@ -2,7 +2,7 @@
   "date": "2026-10-23",
   "source_files": 273,
   "backend_tests": {
-    "passed": 639,
+    "passed": 646,
     "failed": 0,
     "warnings": 3
   },
@@ -404,7 +404,7 @@
     "business_knowledge_auto_published": false,
     "overall_owner_acceptance": false
   },
-  "latest_readiness_status": "LOCAL_LIMITED_USE_NUMBERED_NOTES_RETRIEVED",
+  "latest_readiness_status": "LOCAL_LIMITED_USE_UNSUPPORTED_VERSION_TOPIC_REFUSES_SUBSTITUTION",
   "appendix_outline": {
     "status": "APPENDIX_OUTLINE_LIVE_DETAILS_PARTIAL",
     "backend_passed": 627,
@@ -492,5 +492,48 @@
     "8010_restarted": false,
     "frontend_changed": false,
     "browser": "Edge headless"
+  },
+  "direct_topic_guard": {
+    "status": "VERSION_TOPIC_GUARD_FIXED_SOURCE_RULES_NOT_ESTABLISHED",
+    "backend_passed": 646,
+    "backend_warnings": 3,
+    "new_tests": 7,
+    "source_files": 273,
+    "sources_only_checks": 6,
+    "live_question_variants": 6,
+    "single_version_queries_refuse_unrelated_evidence": 3,
+    "parallel_partial_answer_preserved": true,
+    "positive_file_receipt_and_submission_lookups_preserved": true,
+    "audited_source_native_records": 221,
+    "officecli_readonly_checks": true,
+    "native_body_blocks": 123,
+    "embedded_media_previews_checked": 9,
+    "embedded_visio_editable_layers_inspected": false,
+    "source_scope": "one project document version; not the entire library",
+    "version_control_rules_established": false,
+    "claim_that_project_has_no_version_management": false,
+    "source_inputs_changed": false,
+    "new_document_embeddings": 0,
+    "old_queries_preserved": 110,
+    "generation_workflow_records_preserved": 10,
+    "model_policy_and_expiry_unchanged": true,
+    "used_requests": 9,
+    "reserved_cny": 0.6,
+    "remaining_requests": 11,
+    "new_model_http_calls": 0,
+    "old_8896_state_unchanged": true,
+    "restarted_ports": [
+      8894
+    ],
+    "8000_changed": false,
+    "8010_restarted": false,
+    "frontend_changed": false,
+    "browser": "Edge headless",
+    "business_knowledge_published": 0,
+    "business_owner_acceptance": false,
+    "initial_probe_validation_error_preserved": true,
+    "new_ingestion_or_reindex": 0,
+    "readonly_original_audit_performed": true,
+    "error_reproduced_in_sources_only_mode": true
   }
 }

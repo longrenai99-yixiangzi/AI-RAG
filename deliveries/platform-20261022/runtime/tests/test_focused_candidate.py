@@ -156,3 +156,30 @@ def test_content_list_requires_topic_section_or_explicit_statement(tmp_path,head
     result=FocusedCandidate([],Titles(),Reranker()).rank('采购界面策划需要明确哪些内容？',rows)
     assert any(r['answer_usage']=='PRIMARY' for r in result['candidate_evidence'])==ready
     if not ready:assert result['topic_coverage']['status']=='RELATED_MENTION_ONLY'
+
+
+@pytest.mark.parametrize('ending',['有哪些要求？','有哪些具体做法？','有哪些内容？','有哪些措施？','有哪些规定？'])
+def test_direct_lookup_requires_the_full_requested_topic(tmp_path,ending):
+    rows=records(tmp_path)[:1]
+    rows[0].update(text='通过清单移交设备资料，按交接日期提供文件。',heading_path='设备资料交接')
+    question='设备版本管理'+ending
+    result=FocusedCandidate([],Titles(),Reranker()).rank(question,rows)
+    assert result['bundle_status']=='SOURCE_SCOPE_MISSING'
+    assert result['topic_coverage']['normalized_topic']=='设备版本管理'
+    assert all(c['answer_usage']=='BACKGROUND' for c in result['candidate_evidence'])
+
+
+def test_direct_lookup_preserves_a_matching_topic(tmp_path):
+    rows=records(tmp_path)[:1]
+    rows[0].update(text='设备版本管理应保留版本号，并撤回旧版文件。',heading_path='设备版本管理')
+    result=FocusedCandidate([],Titles(),Reranker()).rank('设备版本管理有哪些要求？',rows)
+    assert result['candidate_evidence'][0]['answer_usage']=='PRIMARY'
+    assert result['topic_coverage']['status']=='TOPIC_PRESENT'
+
+
+def test_named_source_direct_lookup_strips_filename_before_topic_check(tmp_path):
+    rows=records(tmp_path)[:1];rows[0].update(text='通过清单移交设备资料。',heading_path='设备资料交接')
+    docs={rows[0]['document_id']:{**rows[0],'file_name':'设备复盘.md'}}
+    result=FocusedCandidate([],Titles(),Reranker(),documents=docs).rank('《设备复盘.md》中，设备版本管理有哪些要求？',rows)
+    assert result['bundle_status']=='SOURCE_SCOPE_MISSING'
+    assert result['topic_coverage']['requested_topic']=='设备版本管理'

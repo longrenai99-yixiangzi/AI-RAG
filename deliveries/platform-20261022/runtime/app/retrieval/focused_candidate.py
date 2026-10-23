@@ -18,7 +18,7 @@ from app.retrieval.section_tables import parallel_facets,associate_section
 def explicit_topic_coverage(question,candidate):
     if candidate.get('explanation_block') and re.search(r'表头|字段|列名|单元格',question):
         return {'status':'RELATED_MENTION_ONLY','reason':'NUMBERED_NOTE_IS_NOT_TABLE_FIELDS'}
-    match=re.match(r'^([^，,。；;！？?《》]{2,50}?)(?:实施前|应当|应该|应(?:重点|主要)?(?:完成|关注|具备|满足|采取|包含|包括|遵循|考虑|明确)|需要|如何|怎么)',question)
+    match=re.match(r'^([^，,。；;！？?《》]{2,50}?)(?:实施前|应当|应该|应(?:重点|主要)?(?:完成|关注|具备|满足|采取|包含|包括|遵循|考虑|明确)|需要|如何|怎么|有哪些(?:具体)?(?:要求|做法|内容|措施|规定))',question)
     if not match:return {'status':'NOT_EXPLICIT_TOPIC'}
     topic=re.sub(r'^(?:请问|请说明|请|关于|针对)+','',match[1]).strip()
     key=topic_key(topic).replace('设计供方','设计方').replace('的','')

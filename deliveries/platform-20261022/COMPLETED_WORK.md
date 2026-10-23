@@ -62,3 +62,5 @@ Owner follow-up: both reviewed historical answers and their sources are accepted
 Explicit appendix outline retrieval is live, with detailed-content gaps kept partial and local: [behavior and validation](APPENDIX_OUTLINE.md). Final backend: 627 checks; this phase added no real model calls.
 
 Titled numbered PDF explanations are now selectable as bounded primary evidence, preserving the existing topic and source guards: [implementation and validation](PDF_NUMBERED_NOTES.md). Final backend: 639 checks; no new real model HTTP calls.
+
+Direct requirements/practices/content lookups now retain a full-topic necessity check; the audited unsupported project question refuses unrelated submission evidence: [audit and validation](DIRECT_TOPIC_GUARD.md). Backend: 646 checks; no new real model HTTP calls.

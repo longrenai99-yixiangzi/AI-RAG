@@ -5,12 +5,26 @@ import hashlib
 import json
 import math
 import re
+import unicodedata
 
 from app.bm25 import tokenize
 from app.retrieval.anchored_sections import expand_candidates,ANCHOR
 from app.retrieval.section_scope import mark_scope
 from app.retrieval.named_source_scope import resolve_named_scope,path_key,ranking_question
-from app.retrieval.section_overview import comparison_required,collect_overview
+from app.retrieval.section_overview import comparison_required,collect_overview,topic_key
+
+
+def explicit_topic_coverage(question,candidate):
+    match=re.match(r'^([^，,。；;！？?《》]{2,50}?)(?:实施前|应当|应该|应(?:重点|主要)?(?:完成|关注|具备|满足|采取|包含|包括|遵循|考虑|明确)|需要|如何|怎么)',question)
+    if not match:return {'status':'NOT_EXPLICIT_TOPIC'}
+    topic=re.sub(r'^(?:请问|请说明|请|关于|针对)+','',match[1]).strip()
+    key=topic_key(topic).replace('设计供方','设计方').replace('的','')
+    if key.startswith('设计管理') and len(key[4:])>=4:key=key[4:]
+    if len(key)<2 or key in {'设计','管理','工作','项目','本项目','该项目','设计管理'}:return {'status':'NOT_EXPLICIT_TOPIC'}
+    text=unicodedata.normalize('NFKC',(candidate.get('heading_path') or '')+'\n'+candidate['text'])
+    text=re.sub(r'[ \t\u3000]+','',text).replace('管控','管理').replace('设计供方','设计方').replace('的','')
+    # shortcut: a lexical necessary condition, not proof of relevance or semantic answer coverage.
+    return {'status':'TOPIC_PRESENT' if key in text else 'TOPIC_NOT_FOUND','requested_topic':topic,'normalized_topic':key}
 
 
 def compound_coverage(question,text):
@@ -103,12 +117,16 @@ class FocusedCandidate:
         for c,key in zip(chosen,keys,strict=True):c['reranker_score']=self.cache[key]
         while len(self.cache)>128:self.cache.popitem(last=False)
         chosen.sort(key=lambda c:(-c['reranker_score'],c['evidence_id']))
+        for c in chosen:c['topic_coverage']=explicit_topic_coverage(task_question,c)
+        topical=[c for c in chosen if c['topic_coverage']['status']!='TOPIC_NOT_FOUND']
+        topic_blocked=not topical
+        if topical:chosen=topical+[c for c in chosen if c['topic_coverage']['status']=='TOPIC_NOT_FOUND']
         # COUNT/LIST/"方案" are weak intent hints, not proof that several sources are required.
         coverage=compound_coverage(task_question,chosen[0]['text'])
         broad=bool(re.search(r'全流程|全部资料|跨专业|跨项目|综合汇总',question) or len(source_scope.get('bindings',[]))>1)
         temporal=bool(re.search(r'(?<!\d)(?:19|20)\d{2}(?!\d)|今年|去年|截至',task_question)) and chosen[0]['scope'].get('year')!='MATCH'
         comparison=comparison_required(task_question)
-        blocked=broad or temporal or comparison or coverage['status']=='COMPOUND_COVERAGE_UNVERIFIED'
+        blocked=broad or temporal or comparison or topic_blocked or coverage['status']=='COMPOUND_COVERAGE_UNVERIFIED'
         for i,c in enumerate(chosen):c['answer_usage']='PRIMARY' if i==0 and not blocked else 'BACKGROUND'
         chapter={'status':'NOT_PARENT_OVERVIEW'}
         if not blocked:
@@ -121,9 +139,19 @@ class FocusedCandidate:
             elif chapter['status']=='PARENT_COVERAGE_UNVERIFIED':
                 blocked=True
                 for c in chosen:c['answer_usage']='BACKGROUND'
+        if temporal:notes=['所问年度或截止时间尚无明确范围证据，不能将通用原文直接认定为该时期的规定或变化。']
+        elif comparison:notes=['本题需要比较或变化分析，单个主证据的排序结果不能证明比较完整。']
+        elif broad:notes=['本题要求跨资料或整体汇总，尚未验证完整覆盖。']
+        elif topic_blocked:notes=['候选尚未明确涵盖所问主题，只提供相关线索，不用相似段落代答；不能据此认定原件或整库没有答案。']
+        elif chapter['status']=='PARENT_COVERAGE_UNVERIFIED':notes=['父章节的子节说明尚未完整取得，或本题要求清单、统计及限定范围；未用单个子节代答。']
+        elif blocked:notes=['同一主证据尚未覆盖每个子问题的主题词，或包含尚未验证的推理问题。']
+        elif chapter['status']=='PARENT_NARRATIVES_COLLECTED':notes=['已汇聚同资料同版本的子节说明；附表未逐行核对，业务完整性仍待验收。']
+        elif chapter['status']=='PARENT_FOCUS_EVIDENCE_COLLECTED':notes=['已按所问评价维度补取同章明确说明，尚未证明全部子问均已覆盖。']
+        else:notes=['仅使用一份主证据；多问句主题词匹配不等于业务答案完整性已验收。']
         return {'candidate_evidence':chosen,'bundle_status':'SOURCE_SCOPE_MISSING' if blocked else 'PRIMARY_SECTION_CANDIDATE',
                 'source_scope':source_scope,
+                'topic_coverage':explicit_topic_coverage(task_question,chosen[0]),
                 'intent_audit':{'comparison_required':comparison},'chapter_coverage':chapter,
                 'coverage_audit':coverage,
-                'selection_notes':['所问年度或截止时间尚无明确范围证据，不能将通用原文直接认定为该时期的规定或变化。'] if temporal else ['本题需要比较或变化分析，单个主证据的排序结果不能证明比较完整。'] if comparison else ['本题要求跨资料或整体汇总，尚未验证完整覆盖。'] if broad else ['父章节的子节说明尚未完整取得，或本题要求清单、统计及限定范围；未用单个子节代答。'] if chapter['status']=='PARENT_COVERAGE_UNVERIFIED' else ['同一主证据尚未覆盖每个子问题的主题词，或包含尚未验证的推理问题。'] if blocked else ['已汇聚同资料同版本的子节说明；附表未逐行核对，业务完整性仍待验收。'] if chapter['status']=='PARENT_NARRATIVES_COLLECTED' else ['仅使用一份主证据；多问句主题词匹配不等于业务答案完整性已验收。'],
+                'selection_notes':notes,
                 'ranking_audit':{'union_candidates':len(marked),'scope_eligible':len(eligible),'ranked_candidates':len(chosen),'max_pair_tokens':max_tokens,'candidate_limit':12,'probe_token_limit':256,'coverage_not_proven':True}}

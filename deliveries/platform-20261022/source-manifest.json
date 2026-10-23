@@ -461,8 +461,8 @@
     },
     {
       "path": "app/retrieval/focused_candidate.py",
-      "source_sha256": "5eb3f77b86d0ae2b771376bd43ffeab2c51bbc0962ba994c48cfefb0f4323137",
-      "published_sha256": "5eb3f77b86d0ae2b771376bd43ffeab2c51bbc0962ba994c48cfefb0f4323137",
+      "source_sha256": "b3557ba9eddac007538363eb86bb655db61ca0ec495a233cd743087786d35a27",
+      "published_sha256": "b3557ba9eddac007538363eb86bb655db61ca0ec495a233cd743087786d35a27",
       "privacy_transformed": false
     },
     {
@@ -611,8 +611,8 @@
     },
     {
       "path": "app/trial/assisted_chat.py",
-      "source_sha256": "f0bd370ab7623b16f7c2543bd4b4a45adc38df5eece0dd1a02da15b5e4b113e3",
-      "published_sha256": "f0bd370ab7623b16f7c2543bd4b4a45adc38df5eece0dd1a02da15b5e4b113e3",
+      "source_sha256": "4e4437abe75644bb40c3e11d106a58286a2a67b89dddf0828119e779c789786b",
+      "published_sha256": "4e4437abe75644bb40c3e11d106a58286a2a67b89dddf0828119e779c789786b",
       "privacy_transformed": false
     },
     {
@@ -1403,8 +1403,8 @@
     },
     {
       "path": "tests/test_focused_candidate.py",
-      "source_sha256": "4735b233c9cc50132d4ac863795a59b8cfdb55d6e48f0da5c932df8513d11ee9",
-      "published_sha256": "4735b233c9cc50132d4ac863795a59b8cfdb55d6e48f0da5c932df8513d11ee9",
+      "source_sha256": "8ca7f7cab44b840d346b8f120877e7bc049403654153bbb762e3f079980b952c",
+      "published_sha256": "8ca7f7cab44b840d346b8f120877e7bc049403654153bbb762e3f079980b952c",
       "privacy_transformed": false
     },
     {

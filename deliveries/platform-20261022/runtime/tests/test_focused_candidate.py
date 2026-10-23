@@ -1,7 +1,7 @@
 import hashlib
 from types import SimpleNamespace
 import pytest
-from app.retrieval.focused_candidate import FocusedCandidate
+from app.retrieval.focused_candidate import FocusedCandidate,explicit_topic_coverage
 from app.trial.assisted_chat import assemble
 
 
@@ -115,3 +115,30 @@ def test_compound_lookup_requires_each_topic_in_the_same_primary_unit(tmp_path,q
     assert bool(assemble(result)[0].items)==ready
     assert result['coverage_audit']['status']==('SINGLE_UNIT_ANCHORS_MATCHED' if ready else 'COMPOUND_COVERAGE_UNVERIFIED')
     assert all(c['matched'] for c in result['coverage_audit']['units'])==ready
+
+
+@pytest.mark.parametrize('question,text,heading,status',[
+    ('幕墙接口应关注哪些内容？','室内接口需要复核。','精装接口','TOPIC_NOT_FOUND'),
+    ('幕墙接口应关注哪些内容？','玻璃幕墙、接口转接分别列项。','构件清单','TOPIC_NOT_FOUND'),
+    ('幕墙接口应关注哪些内容？','核对锚固条件。','幕墙接口','TOPIC_PRESENT'),
+    ('设计管理成果复核应关注哪些内容？','成果复核包括图纸完整性。','质量管理','TOPIC_PRESENT'),
+    ('设计供方评价应重点关注哪些方面？','合同中约定对设计方的评价机制。','资源管理','TOPIC_PRESENT'),
+    ('平衡阀是什么？','调节流量。','阀门','NOT_EXPLICIT_TOPIC'),
+    ('管理应该如何开展？','记录责任分工。','通用工作','NOT_EXPLICIT_TOPIC'),
+])
+def test_explicit_topic_is_a_necessary_check_not_a_question_answer_registry(question,text,heading,status):
+    assert explicit_topic_coverage(question,{'text':text,'heading_path':heading})['status']==status
+
+
+def test_irrelevant_top_score_cannot_hide_a_matching_lower_candidate_or_become_primary(tmp_path):
+    rows=records(tmp_path)
+    rows[0].update(text='幕墙接口应核对锚固条件。',heading_path='幕墙接口')
+    rows[1].update(text='查找标记：室内接口要求。',heading_path='室内接口')
+    provider=FocusedCandidate([],Titles(),Reranker())
+    result=provider.rank('幕墙接口应关注哪些内容？',rows)
+    assert result['candidate_evidence'][0]['evidence_id']=='0'
+    assert result['candidate_evidence'][0]['answer_usage']=='PRIMARY'
+    missing=provider.rank('外墙防水实施前应完成哪些确认？',rows)
+    assert missing['bundle_status']=='SOURCE_SCOPE_MISSING'
+    assert all(c['answer_usage']=='BACKGROUND' for c in missing['candidate_evidence'])
+    assert missing['topic_coverage']['status']=='TOPIC_NOT_FOUND'

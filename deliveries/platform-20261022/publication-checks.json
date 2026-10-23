@@ -2,7 +2,7 @@
   "date": "2026-10-23",
   "source_files": 263,
   "backend_tests": {
-    "passed": 525,
+    "passed": 533,
     "failed": 0,
     "warnings": 3
   },
@@ -24,7 +24,7 @@
       "matches": 0
     }
   },
-  "new_model_http_calls": 6,
+  "new_model_http_calls": 7,
   "private_content_uploaded": false,
   "concise_protocol": "APPROVED_DAILY_CONCISE_EVIDENCE_BOUND_TRIAL",
   "original_online_validation_passes": 0,
@@ -72,13 +72,13 @@
   },
   "daily_model_policy": {
     "status": "APPROVED_ACTIVE_BOUNDED_TRIAL",
-    "new_model_http_calls": 4,
+    "new_model_http_calls": 5,
     "synthetic_tests": 34,
     "typescript": "PASS",
     "platform_build": "PASS",
     "served_ui_bundle": true,
     "unapproved_request_blocked_403": true,
-    "used_requests": 4,
+    "used_requests": 5,
     "existing_history_preserved": true,
     "original_workbench_state_preserved": true,
     "backup_does_not_rewind_budget": true,
@@ -87,16 +87,17 @@
     "real_model_new_topic_acceptance": false,
     "implementation_new_model_http_calls": 0,
     "activation_model_http_calls": 1,
-    "real_model_probe_path_passes": 4,
+    "real_model_probe_path_passes": 5,
     "exact_quote_check": "PASS",
     "source_original_http_and_hash": "PASS",
     "local_route_probes": 2,
     "local_route_additional_model_calls": 0,
     "topic_model_http_calls": 1,
     "section_repair_model_http_calls": 1,
-    "approved_scope_model_http_calls": 1
+    "approved_scope_model_http_calls": 1,
+    "new_topic_probe_model_http_calls": 1
   },
-  "model_http_call_count_scope": "Two historical concise-validation calls, one activation probe, one topic probe, one section-repair probe, one approved-scope probe; excludes earlier project stages. Path and quote matches do not prove full-question support.",
+  "model_http_call_count_scope": "Two historical concise-validation calls and five daily probes across activation, topics, section repair, approved scope, and new-topic repair; excludes earlier project stages. Quote matches are not full-question or business acceptance.",
   "legacy_per_request_execution_enabled": false,
   "daily_topic_checks": {
     "frozen_cases": 6,
@@ -159,6 +160,33 @@
     "restarted_ports": [
       8894,
       8897
+    ]
+  },
+  "new_business_probes": {
+    "frozen_questions": 5,
+    "initial_wrong_topic_primaries": 2,
+    "new_tests": 8,
+    "final_source_preflights": 5,
+    "prior_positive_source_replays": 2,
+    "explicit_topic_necessary_check": true,
+    "punctuation_and_line_boundaries_preserved": true,
+    "new_model_http_calls": 1,
+    "scene_limited_technical_answer": 1,
+    "model_claims_quote_checked": 4,
+    "unanswered_after_topic_guard": 2,
+    "numeric_or_cross_source_guards": 2,
+    "other_cases_model_calls": 0,
+    "automatic_retries": 0,
+    "paid_repair_calls": 0,
+    "strict_unseen_acceptance": false,
+    "owner_acceptance": false,
+    "browser_verified": false,
+    "old_questions_knowledge_and_policy_preserved": true,
+    "policy_used_requests": 5,
+    "reserved_cny": 0.34,
+    "remaining_requests": 15,
+    "restarted_ports": [
+      8894
     ]
   }
 }

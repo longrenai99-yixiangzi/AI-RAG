@@ -112,7 +112,7 @@ def run_flow(data,retrieve,generator,save,resolved_question=None):
         bundle=retrieve(resolved_question,source_versions=data.source_versions) if data.source_versions is not None else retrieve(resolved_question)
         evidence,cards=assemble(bundle,resolved_question,include_background=data.mode=='sources')
         yield {'type':'sources','sources':cards,'query_run_id':run_id}
-        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','retrieval_source_filter','coverage_audit','chapter_coverage','intent_audit','personnel_scope_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
+        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','retrieval_source_filter','coverage_audit','topic_coverage','chapter_coverage','intent_audit','personnel_scope_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
         if bundle.get('reference_resolution'):result['source_resolution_note']='本题由登记卡关联到同版原件；引用来自原件，登记卡未被补写为正文，内容与适用范围仍待核对。'
         blocked=bundle.get('bundle_status') in {'SOURCE_SCOPE_MISSING','LINEAGE_BLOCKED','CONFLICTING_EVIDENCE'}
         if not evidence.items or blocked:

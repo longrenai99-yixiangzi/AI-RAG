@@ -10,6 +10,7 @@ from app.bm25 import tokenize
 from app.retrieval.anchored_sections import expand_candidates
 from app.retrieval.section_scope import mark_scope
 from app.retrieval.named_source_scope import resolve_named_scope,path_key,ranking_question
+from app.retrieval.section_overview import comparison_required,collect_overview
 
 
 def compound_coverage(question,text):
@@ -20,7 +21,7 @@ def compound_coverage(question,text):
     for unit in units:
         anchors=list(dict.fromkeys(t for t in tokenize(unit) if t not in filler and (len(t)>1 or t.isalnum() and t.isascii())))
         missing=[t for t in anchors if t not in text.casefold()]
-        reasoning=bool(re.search(r'为什么|为何|如何|怎么|是否|原因|比较|区别|对比',unit))
+        reasoning=bool(re.search(r'为什么|为何|如何|怎么|是否|原因',unit)) or comparison_required(unit)
         checks.append({'question':unit,'anchors':anchors,'missing_anchors':missing,'matched':bool(anchors) and not missing and not reasoning})
     # shortcut: lexical single-unit lookup only; reasoning and semantic coverage still need review.
     return {'status':'SINGLE_UNIT_ANCHORS_MATCHED' if all(c['matched'] for c in checks) else 'COMPOUND_COVERAGE_UNVERIFIED','units':checks}
@@ -28,9 +29,12 @@ def compound_coverage(question,text):
 
 class FocusedCandidate:
     """One existing provider per caller; bounded score cache, never cached answers."""
-    def __init__(self,sections,title_index,reranker,documents=None):
+    def __init__(self,sections,title_index,reranker,documents=None,records=()):
         self.sections=sections;self.title_index=title_index;self.reranker=reranker
         self.documents=documents
+        self.records_by_source={}
+        for r in records:
+            self.records_by_source.setdefault((path_key(r['source_path']),r['source_version']),[]).append(r)
         self.cache=OrderedDict();self.stats={'computed_pairs':0,'cache_hits':0}
 
     def rank(self,question,candidates):
@@ -90,11 +94,23 @@ class FocusedCandidate:
         coverage=compound_coverage(task_question,chosen[0]['text'])
         broad=bool(re.search(r'全流程|全部资料|跨专业|跨项目|综合汇总',question) or len(source_scope.get('bindings',[]))>1)
         temporal=bool(re.search(r'(?<!\d)(?:19|20)\d{2}(?!\d)|今年|去年|截至',task_question)) and chosen[0]['scope'].get('year')!='MATCH'
-        comparison=bool(re.search(r'比较|对比|区别|异同|差异|发生.{0,4}变化',task_question))
+        comparison=comparison_required(task_question)
         blocked=broad or temporal or comparison or coverage['status']=='COMPOUND_COVERAGE_UNVERIFIED'
         for i,c in enumerate(chosen):c['answer_usage']='PRIMARY' if i==0 and not blocked else 'BACKGROUND'
+        chapter={'status':'NOT_PARENT_OVERVIEW'}
+        if not blocked:
+            parent=chosen[0]
+            siblings,chapter=collect_overview(task_question,parent,self.records_by_source.get((path_key(parent['source_path']),parent['source_version']),()))
+            if siblings:
+                for c in chosen:c['answer_usage']='BACKGROUND'
+                ids={c['evidence_id'] for c in siblings}
+                chosen=siblings+[c for c in chosen if c['evidence_id'] not in ids]
+            elif chapter['status']=='PARENT_COVERAGE_UNVERIFIED':
+                blocked=True
+                for c in chosen:c['answer_usage']='BACKGROUND'
         return {'candidate_evidence':chosen,'bundle_status':'SOURCE_SCOPE_MISSING' if blocked else 'PRIMARY_SECTION_CANDIDATE',
                 'source_scope':source_scope,
+                'intent_audit':{'comparison_required':comparison},'chapter_coverage':chapter,
                 'coverage_audit':coverage,
-                'selection_notes':['所问年度或截止时间尚无明确范围证据，不能将通用原文直接认定为该时期的规定或变化。'] if temporal else ['本题需要比较或变化分析，单个主证据的排序结果不能证明比较完整。'] if comparison else ['本题要求跨资料或整体汇总，尚未验证完整覆盖。'] if broad else ['同一主证据尚未覆盖每个子问题的主题词，或包含尚未验证的推理问题。'] if blocked else ['仅使用一份主证据；多问句主题词匹配不等于业务答案完整性已验收。'],
+                'selection_notes':['所问年度或截止时间尚无明确范围证据，不能将通用原文直接认定为该时期的规定或变化。'] if temporal else ['本题需要比较或变化分析，单个主证据的排序结果不能证明比较完整。'] if comparison else ['本题要求跨资料或整体汇总，尚未验证完整覆盖。'] if broad else ['父章节的子节说明尚未完整取得，或本题要求清单、统计及限定范围；未用单个子节代答。'] if chapter['status']=='PARENT_COVERAGE_UNVERIFIED' else ['同一主证据尚未覆盖每个子问题的主题词，或包含尚未验证的推理问题。'] if blocked else ['已汇聚同资料同版本的子节说明；附表未逐行核对，业务完整性仍待验收。'] if chapter['status']=='PARENT_NARRATIVES_COLLECTED' else ['仅使用一份主证据；多问句主题词匹配不等于业务答案完整性已验收。'],
                 'ranking_audit':{'union_candidates':len(marked),'scope_eligible':len(eligible),'ranked_candidates':len(chosen),'max_pair_tokens':max_tokens,'candidate_limit':12,'probe_token_limit':256,'coverage_not_proven':True}}

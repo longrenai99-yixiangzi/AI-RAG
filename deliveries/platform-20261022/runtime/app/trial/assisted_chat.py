@@ -82,6 +82,7 @@ def assemble(bundle,question=None,include_background=False):
         items.append(item)
         cards.append({'citation_id':sid,'evidence_id':candidate['evidence_id'],'source_id':candidate.get('source_id') or candidate['document_id'],
                       'source_version':version,'file_name':path.name,'source_path':str(path),'location':item.location,'display_location':candidate.get('display_location') or candidate.get('heading_path') or '位置见原文','excerpt':text,'answer_usage':candidate.get('answer_usage','UNCLASSIFIED')})
+        if candidate.get('chapter_coverage'):cards[-1]['chapter_coverage']=candidate['chapter_coverage']
         if len(items)==8:break
     return EvidenceBundle(items=items,status='EVIDENCE_READY' if items else 'NO_EVIDENCE'),cards
 
@@ -100,7 +101,7 @@ def run_flow(data,retrieve,generator,save,resolved_question=None):
         yield {'type':'status','stage':'retrieval','msg':'正在检索已有知识库。','query_run_id':run_id}
         bundle=retrieve(resolved_question);evidence,cards=assemble(bundle,resolved_question,include_background=data.mode=='sources')
         yield {'type':'sources','sources':cards,'query_run_id':run_id}
-        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','coverage_audit','personnel_scope_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
+        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','coverage_audit','chapter_coverage','intent_audit','personnel_scope_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
         if bundle.get('reference_resolution'):result['source_resolution_note']='本题由登记卡关联到同版原件；引用来自原件，登记卡未被补写为正文，内容与适用范围仍待核对。'
         blocked=bundle.get('bundle_status') in {'SOURCE_SCOPE_MISSING','LINEAGE_BLOCKED','CONFLICTING_EVIDENCE'}
         if not evidence.items or blocked:

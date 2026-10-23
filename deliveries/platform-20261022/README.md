@@ -50,3 +50,5 @@ npx vite build --config vite.platform.config.ts --outDir ../evaluation/platform_
 2026-10-23追加：日常模型策略已接入独立试用，保持待批准；需要本机私有资料版本清单及明确费用授权。通用实现与未完成验证见[限额日常模型](DAILY_MODEL_POLICY.md)。
 
 后续用户已明确批准，独立试用的日常模型已启用，并完成1次真实生成及2条本地保护检查；详见[启用记录](DAILY_MODEL_ACTIVATION.md)。不覆盖此前待批阶段的原始记录或历史失败。
+
+2026-10-23同章汇聚与意图识别修复已在本机试用加载，实际限制及验证见[修复记录](SECTION_INTENT_REPAIR.md)。

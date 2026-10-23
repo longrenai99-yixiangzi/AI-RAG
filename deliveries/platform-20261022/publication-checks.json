@@ -1,8 +1,8 @@
 {
   "date": "2026-10-23",
-  "source_files": 260,
+  "source_files": 262,
   "backend_tests": {
-    "passed": 493,
+    "passed": 506,
     "failed": 0,
     "warnings": 3
   },
@@ -24,7 +24,7 @@
       "matches": 0
     }
   },
-  "new_model_http_calls": 4,
+  "new_model_http_calls": 5,
   "private_content_uploaded": false,
   "concise_protocol": "APPROVED_DAILY_CONCISE_EVIDENCE_BOUND_TRIAL",
   "original_online_validation_passes": 0,
@@ -72,13 +72,13 @@
   },
   "daily_model_policy": {
     "status": "APPROVED_ACTIVE_BOUNDED_TRIAL",
-    "new_model_http_calls": 2,
+    "new_model_http_calls": 3,
     "synthetic_tests": 34,
     "typescript": "PASS",
     "platform_build": "PASS",
     "served_ui_bundle": true,
     "unapproved_request_blocked_403": true,
-    "used_requests": 2,
+    "used_requests": 3,
     "existing_history_preserved": true,
     "original_workbench_state_preserved": true,
     "backup_does_not_rewind_budget": true,
@@ -87,14 +87,15 @@
     "real_model_new_topic_acceptance": false,
     "implementation_new_model_http_calls": 0,
     "activation_model_http_calls": 1,
-    "real_model_probe_path_passes": 2,
+    "real_model_probe_path_passes": 3,
     "exact_quote_check": "PASS",
     "source_original_http_and_hash": "PASS",
     "local_route_probes": 2,
     "local_route_additional_model_calls": 0,
-    "topic_model_http_calls": 1
+    "topic_model_http_calls": 1,
+    "section_repair_model_http_calls": 1
   },
-  "model_http_call_count_scope": "Two historical concise-validation calls, one daily-activation probe, one daily-topic probe; excludes earlier project stages.",
+  "model_http_call_count_scope": "Two historical concise-validation calls, one activation probe, one topic probe, one section-repair probe; excludes earlier project stages.",
   "legacy_per_request_execution_enabled": false,
   "daily_topic_checks": {
     "frozen_cases": 6,
@@ -108,5 +109,28 @@
     "model_probe_exact_quote_match": true,
     "owner_acceptance": false,
     "retrieval_feedback_recorded": true
+  },
+  "section_intent_repair": {
+    "source_replays": 5,
+    "new_synthetic_tests": 13,
+    "new_model_http_calls": 1,
+    "model_claims": 3,
+    "exact_quotes_matched": true,
+    "parent_narratives_covered": true,
+    "table_rows_not_selected": 80,
+    "method_intent_fixed": true,
+    "method_daily_answer_blocked_by_source_allowlist": true,
+    "automatic_retries": 0,
+    "restarted_ports": [
+      8894,
+      8897
+    ],
+    "original_workbench_state_preserved": true,
+    "existing_history_preserved": true,
+    "owner_acceptance": false,
+    "browser_ui_verified": false,
+    "frontend_changed": false,
+    "policy_used_requests": 3,
+    "reserved_cny": 0.2
   }
 }

@@ -126,6 +126,8 @@ def source_extract(result: dict, question: str = '') -> dict:
                 'citations':[{**c,'answer_usage':'BACKGROUND'} for c in cards],'claims':[],
                 'generation_mode':'NO_GENERATION','field_audit':{'reason':'PROJECT_NUMERIC_FIELD_NOT_EXTRACTED'}}
     answer = "\n\n".join(f'{text}\n[{c["citation_id"]}]' for c,text,_ in extracts)
+    if any(c.get('chapter_coverage',{}).get('table_rows_not_selected') for c in primary):
+        answer+='\n\n以上汇聚同章说明文字；附表明细未逐行核对，不作为完整清单或人数统计。'
     shortened=any(method!='FULL_SOURCE_FALLBACK' for _,_,method in extracts)
     return {**result, "answer_status": "SOURCE_EXTRACT", "status_label": "简明原文要点 · 待核对" if shortened else "原文摘录答复 · 待核对", "answer": answer,
             "generation_mode": "LOCAL_EXTRACTIVE_SUMMARY_NO_MODEL" if shortened else "VERBATIM_SOURCE_EXTRACT",

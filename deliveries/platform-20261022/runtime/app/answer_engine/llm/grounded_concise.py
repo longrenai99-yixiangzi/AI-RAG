@@ -1,6 +1,7 @@
 """Short evidence-bound drafts; unsupported paraphrases never become answer facts."""
 import json
 import re
+import unicodedata
 from types import SimpleNamespace
 
 from .claim_validator import check_source_units
@@ -19,6 +20,8 @@ def concise_packet(question, units, body):
                          '不能从岗位人数推算团队总人数；不能擅自换算、相加或把估算价当合同价。',
                          '缺少所问范围或证据冲突时用PARTIAL或INSUFFICIENT并写gaps；不足时claims为空。',
                          '引用是必要条件，不表示整题完整回答或通过业务审核。']}
+    if len({u['source_id'] for u in units}) > 1:
+        request['rules'].append('同一父章节的措施概览应逐节覆盖相关主证据；未覆盖的子节写入gaps，不得把单节说成整个章节。')
     result = {**body, 'messages': [{'role': 'system', 'content': system},
                                  {'role': 'user', 'content': json.dumps(request, ensure_ascii=False)}]}
     # Inspect original fields; serializing nested JSON turns newlines into false UNC matches.
@@ -85,12 +88,20 @@ def render_concise(raw, units, citations, question):
             unit_project = subject(unit_text)
             before_quote = unit_text.partition(clean(quote))[0]
             explicit = unit_text.replace('本项目','').replace('该项目','').replace('此项目','')
+            filename = unicodedata.normalize('NFKC',citation['file_name'])
+            native = re.fullmatch(r'EPC设计管理经验总结\(([^()]+)\)\.docx',filename,re.IGNORECASE)
+            alias_bound = bool(native and key(native[1].removesuffix('项目')) == key(project.removesuffix('项目')))
+            if alias_bound:
+                # Generic project references in a verified single-case file are not foreign project names.
+                explicit = re.sub(r'(^|[，,。；;：:\n]|依据|并对|针对|对)项目(?=部|管理|设计|实际|认质|业态)',r'\1',explicit)
             if '项目' in explicit:
                 if not unit_project or key(unit_project) != key(project) or key(project) not in key(before_quote):
                     raise ValueError('短引文或唯一前置上下文未绑定所问项目，不能借用其他案例。')
                 context_project = project
-            elif key(project) not in key(citation['file_name']):
+            elif not alias_bound and key(project) not in key(citation['file_name']):
                 raise ValueError('短引文及文件名均未绑定所问项目。')
+            elif alias_bound:
+                context_project = project
         if metric and metric[0] not in quote:
             raise ValueError('短引文没有所问面积指标，不能借用其他数值字段。')
         if count_scope in {'TEAM_COUNT','ROLE_AND_TEAM_COUNTS'}:
@@ -112,12 +123,19 @@ def render_concise(raw, units, citations, question):
     if sum(len(c['text']) for c in checked) > 1600:
         raise ValueError('答复过长，未截断可能存在的条件。')
     used = {c['citation_id'] for c in checked}
+    chapter_sources = {c['citation_id'] for c in citations if c.get('answer_usage')=='PRIMARY'
+                       and c.get('chapter_coverage',{}).get('status')=='PARENT_NARRATIVES_COLLECTED'}
+    if status=='ANSWERED' and not chapter_sources.issubset(used):
+        raise ValueError('父章节措施概览遗漏主证据子节，不能认定为完整答复。')
     context_ids = {mapping[c['unit_id']].get('context_unit_id') for c in checked}
     contexts = [c for c in checked if c['unit_id'] in context_ids]
     facts = [c for c in checked if c not in contexts]
     answer = '\n'.join([*(f'{c["text"]} [{c["citation_id"]}]' for c in contexts),
                         *(f'{i}. {c["text"]} [{c["citation_id"]}]' if len(facts) > 1 else f'{c["text"]} [{c["citation_id"]}]'
                           for i, c in enumerate(facts, 1))])
+    chapter_tables = max((c.get('chapter_coverage',{}).get('table_rows_not_selected',0) for c in citations),default=0)
+    if chapter_tables:
+        answer += '\n\n以上汇聚同章说明文字；附表明细未逐行核对，不作为完整清单或人数统计。'
     if gaps:
         answer += ('\n\n' if answer else '') + '模型报告本题仍有证据缺口，请结合引用核对；未补写缺失事实。'
     return {'answer_status': 'MODEL_CONCISE_DRAFT' if checked else 'MODEL_EVIDENCE_GAP',

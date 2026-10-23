@@ -184,7 +184,7 @@ def claim_preflight(
     ]
     approved_paths = {str(path).casefold() for path in (approved_body_paths or set())}
     outside_link = any(
-        not target.casefold().startswith(r"d:\设计管理".casefold())
+        not target.casefold().startswith(r"d:\example-vault".casefold())
         and target.casefold() not in approved_paths
         for target in link_targets
     )

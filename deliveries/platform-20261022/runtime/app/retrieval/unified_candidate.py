@@ -74,7 +74,7 @@ class UnifiedCandidate:
         self.bm25=BM25Okapi([[sys.intern(t) for t in tokens] for tokens in sparse['corpus']]);del sparse
         sections=json.loads((folder/'sections.json').read_text(encoding='utf-8'))
         self.scope_documents=dict(self.documents)
-        self.encoder=encoder;self.focused=FocusedCandidate(sections,SectionTitleIndex(sections),reranker,documents=self.scope_documents)
+        self.encoder=encoder
         self.candidate_hash=self.manifest['candidate_hash'];self.by_path={};self.by_source={}
         source_ids={}
         for i,r in enumerate(self.records):
@@ -122,6 +122,8 @@ class UnifiedCandidate:
             # A derived duplicate can be excluded while its original remains admitted.
             pairs=((md,link['markdown_sha256']),(link['original_path'],link['original_sha256']))
             if not any((path_key(p),version) in source_ids for p,version in pairs):raise ValueError('Scalar scope is outside the admitted candidate')
+        self.focused=FocusedCandidate(sections,SectionTitleIndex(sections),reranker,documents=self.scope_documents,
+            records=[r for r in self.records if path_key(r['source_path']) not in self.reference_only and r['evidence_id'] not in self.quality_exclusions])
         self.load_ms=round((time.perf_counter()-started)*1000,2)
 
     def sources(self,query='',file_type='',offset=0,limit=50):

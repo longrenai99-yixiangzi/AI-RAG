@@ -623,8 +623,8 @@
     },
     {
       "path": "app/trial/concise_trial.py",
-      "source_sha256": "912f6b0c4a1c2f5776e54a3a137896e4dc1ebad18acb807e42bfc6c1bb82cf3c",
-      "published_sha256": "912f6b0c4a1c2f5776e54a3a137896e4dc1ebad18acb807e42bfc6c1bb82cf3c",
+      "source_sha256": "e14eaed619212759bce6d96fd4ff89235cad8caa65d71fdb98266e0bb595f9be",
+      "published_sha256": "e14eaed619212759bce6d96fd4ff89235cad8caa65d71fdb98266e0bb595f9be",
       "privacy_transformed": false
     },
     {
@@ -632,6 +632,12 @@
       "source_sha256": "cb4a7d6b754a23e7370b83d0206940245f8b83c06918bfdd4ac947f27a07657f",
       "published_sha256": "2fa446a50155aea72e867aed1a7bc0a1d4c1c225dd4a66960d8d47b34fe88506",
       "privacy_transformed": true
+    },
+    {
+      "path": "app/trial/daily_answers.py",
+      "source_sha256": "766a088b683ecb0070257b1853c114305af14093fed2a59e232c148304a3d847",
+      "published_sha256": "766a088b683ecb0070257b1853c114305af14093fed2a59e232c148304a3d847",
+      "privacy_transformed": false
     },
     {
       "path": "app/trial/existing_text_answers.py",
@@ -683,14 +689,14 @@
     },
     {
       "path": "app/trial/platform_app.py",
-      "source_sha256": "9fcf83d40797cd8ce53a51d1f2a58dfcf32570fbdc04e12e356b205077afa7e6",
-      "published_sha256": "025a24aac1648b33bf02128feeeea43dd06e3d7ee775cf1804b7128a17f52ebf",
+      "source_sha256": "a49f1a330f14fbf014574f8cb1b3ed3001af38307adeb6545249ddb92f946c88",
+      "published_sha256": "986f104bd8cd6cb786023e7f14ce8eec655f04f7989324cbb922fae949e6ac92",
       "privacy_transformed": true
     },
     {
       "path": "app/trial/platform_backup.py",
-      "source_sha256": "7341a87cfef94341ee385b8b4b69c9ba6a42bf72368efc6015ca6da0b4c13344",
-      "published_sha256": "7341a87cfef94341ee385b8b4b69c9ba6a42bf72368efc6015ca6da0b4c13344",
+      "source_sha256": "d454c2820d7f5a461fce25acb78af2f8b3142596f979d4939fc317ffd4d32a9e",
+      "published_sha256": "d454c2820d7f5a461fce25acb78af2f8b3142596f979d4939fc317ffd4d32a9e",
       "privacy_transformed": false
     },
     {
@@ -701,8 +707,8 @@
     },
     {
       "path": "app/trial/platform_generation.py",
-      "source_sha256": "ffffcc98ba600fe80986fb7d84012d25367a44df3ce894aca741a2944ee6812c",
-      "published_sha256": "ffffcc98ba600fe80986fb7d84012d25367a44df3ce894aca741a2944ee6812c",
+      "source_sha256": "4254727458c3f82c0b5064f8250bc249e248b1c8ca114a57797e3b8b3510eafa",
+      "published_sha256": "4254727458c3f82c0b5064f8250bc249e248b1c8ca114a57797e3b8b3510eafa",
       "privacy_transformed": false
     },
     {
@@ -1055,8 +1061,8 @@
     },
     {
       "path": "knowledge-ui/src/pages/PlatformContent.tsx",
-      "source_sha256": "190f9e371a5d6efe0bbfcb687d127f90a98f21673e00fbfa7169eebdf23f1a2c",
-      "published_sha256": "51cc76d2bebbbb5d24b4ce1ea4a7eadd0006e9854d6d9d1a280957fddf79ecec",
+      "source_sha256": "81e35c58f69392801111d60f828d4cec33400c0952eb40ad67c7364bec209d8d",
+      "published_sha256": "2b2d20418af89b5130ab424a20e96033787589c50e7be93356395302136e51e2",
       "privacy_transformed": true
     },
     {
@@ -1079,9 +1085,9 @@
     },
     {
       "path": "knowledge-ui/src/pages/PlatformWorkbench.tsx",
-      "source_sha256": "b943ce4ca781532cc0211d907366a1f351a06b418d5e401f963da48bb20ff43c",
-      "published_sha256": "807aa793cdc665b8442f0e35386d58a0c408705104d543601b0dd7d832e05c33",
-      "privacy_transformed": true
+      "source_sha256": "9077649ad689d55ddab250a4ca6e3d9b314058a18914c40106df85d54ed3d968",
+      "published_sha256": "9077649ad689d55ddab250a4ca6e3d9b314058a18914c40106df85d54ed3d968",
+      "privacy_transformed": false
     },
     {
       "path": "knowledge-ui/src/pages/SearchResults.tsx",
@@ -1265,8 +1271,8 @@
     },
     {
       "path": "scripts/start_concise_trial.ps1",
-      "source_sha256": "d774a62d883fef1b0bab8daf418f09f53cd258c06259df68973a0ecc0b1b7c64",
-      "published_sha256": "d774a62d883fef1b0bab8daf418f09f53cd258c06259df68973a0ecc0b1b7c64",
+      "source_sha256": "75d3e149df88227e0992cc90a77c56d006ed8e2daf39ae1b3ebb2b72cc0044f9",
+      "published_sha256": "75d3e149df88227e0992cc90a77c56d006ed8e2daf39ae1b3ebb2b72cc0044f9",
       "privacy_transformed": false
     },
     {
@@ -1351,6 +1357,12 @@
       "path": "tests/test_concise_trial.py",
       "source_sha256": "eccfc7ec6f9eee634d39eeb5e4cb1d5a377bb427f222bf16e3c262c3cec70fb2",
       "published_sha256": "eccfc7ec6f9eee634d39eeb5e4cb1d5a377bb427f222bf16e3c262c3cec70fb2",
+      "privacy_transformed": false
+    },
+    {
+      "path": "tests/test_daily_answers.py",
+      "source_sha256": "4e5804525d7809f89653b6c5496120ea41699a5758d01067f200bce9975bacf2",
+      "published_sha256": "4e5804525d7809f89653b6c5496120ea41699a5758d01067f200bce9975bacf2",
       "privacy_transformed": false
     },
     {

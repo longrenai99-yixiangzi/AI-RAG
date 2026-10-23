@@ -11,4 +11,4 @@ if ($retrieval.candidate_hash -ne $prepared.candidate_hash -or $retrieval.model_
 $launch = Start-Process -FilePath (Join-Path $repoPath '.venv/Scripts/python.exe') -ArgumentList @('-m','uvicorn','app.trial.concise_trial:trial_app','--factory','--host','127.0.0.1','--port','8897','--workers','1') -WorkingDirectory $repoPath -WindowStyle Hidden -RedirectStandardOutput (Join-Path $trialPath 'server.stdout.log') -RedirectStandardError (Join-Path $trialPath 'server.stderr.log') -PassThru
 @{launcher_pid=$launch.Id;started_at=(Get-Date).ToString('o');module='app.trial.concise_trial:trial_app';port=8897;repo=$repoPath} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $trialPath 'launcher.json') -Encoding UTF8
 Write-Output '独立试用启动中：http://127.0.0.1:8897/manage?tab=query'
-Write-Output '新入口关闭模型执行；8896、8894、8010保持，不启动或切换8000。'
+Write-Output '逐题模型执行保持关闭；日常模型仅按已批准的限额策略运行。其他已有服务不变，不启动或切换8000。'

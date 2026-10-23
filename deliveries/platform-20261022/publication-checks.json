@@ -1,8 +1,8 @@
 {
-  "date": "2026-10-22",
-  "source_files": 258,
+  "date": "2026-10-23",
+  "source_files": 260,
   "backend_tests": {
-    "passed": 459,
+    "passed": 493,
     "failed": 0,
     "warnings": 3
   },
@@ -69,5 +69,22 @@
       8897
     ],
     "generation_execution_enabled": false
+  },
+  "daily_model_policy": {
+    "status": "PENDING_EXPLICIT_APPROVAL",
+    "new_model_http_calls": 0,
+    "synthetic_tests": 34,
+    "typescript": "PASS",
+    "platform_build": "PASS",
+    "served_ui_bundle": true,
+    "unapproved_request_blocked_403": true,
+    "used_requests": 0,
+    "reserved_cny": 0,
+    "existing_history_preserved": true,
+    "original_workbench_state_preserved": true,
+    "backup_does_not_rewind_budget": true,
+    "browser_ui_verified": false,
+    "browser_ui_blocker": "CURRENT_URL_NOT_CONFIDENTLY_IDENTIFIED",
+    "real_model_new_topic_acceptance": false
   }
 }

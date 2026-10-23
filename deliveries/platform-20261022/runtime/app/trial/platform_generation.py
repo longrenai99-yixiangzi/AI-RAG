@@ -23,7 +23,7 @@ def selection_packet(question, citations):
             if not part.strip():
                 continue
             units.append({"unit_id": f"U{len(units)+1}", "source_id": citation["citation_id"], "text": part.strip(),
-                          "file_name": citation["file_name"], "location": citation.get("display_location", "位置见原文"), "context_unit_id": context_id})
+                          "file_name": citation.get("display_file_name") or citation["file_name"], "location": citation.get("display_location", "位置见原文"), "context_unit_id": context_id})
             if index == 0 and len(parts)>1 and not re.match(r'第[一二三四五六七八九十]+[，、]',part):
                 context_id = units[-1]['unit_id']
     if not units or len(units) > 40 or sum(len(u["text"]) for u in units) > 20000:
@@ -77,10 +77,11 @@ def file_hash(path):
 
 
 class GenerationWorkflow:
-    def __init__(self, store, source_current, provider_factory=None):
+    def __init__(self, store, source_current, provider_factory=None, *, clock=None):
         self.store, self.source_current = store, source_current
         self.root = store.path.parent / 'runtime' / 'generation'
         self.provider_factory = provider_factory
+        self.clock=clock or (lambda:datetime.now(timezone.utc))
         self.root.mkdir(parents=True,exist_ok=True)
         self.pricing_path=self.root/'pricing.json'
         if not self.pricing_path.exists():
@@ -90,7 +91,7 @@ class GenerationWorkflow:
         return {**json.loads(self.pricing_path.read_text(encoding='utf-8')),'version':file_hash(self.pricing_path)}
 
     def update_pricing(self, values, actor):
-        policy={**values,'checked_on':datetime.now(timezone(timedelta(hours=8))).date().isoformat(),'source':'https://api-docs.deepseek.com/quick_start/pricing/'}
+        policy={**values,'checked_on':self.clock().astimezone(timezone(timedelta(hours=8))).date().isoformat(),'source':'https://api-docs.deepseek.com/quick_start/pricing/'}
         def action(state):
             temp=self.pricing_path.with_suffix('.tmp')
             temp.write_text(json.dumps(policy,ensure_ascii=False),encoding='utf-8');temp.replace(self.pricing_path)
@@ -98,11 +99,12 @@ class GenerationWorkflow:
         self.store._mutate(action)
         return self.pricing()
 
-    def prepare(self, run_id, protocol='SOURCE_UNITS'):
+    def prepare(self, run_id, protocol='SOURCE_UNITS', *, primary_only=False):
         if protocol not in {'SOURCE_UNITS','CONCISE_V1'}:raise ValueError('不支持的答复协议。')
         run=self.store.query_run(run_id)
         if not run or run['status']!='COMPLETED':raise ValueError('问题尚未成功完成检索。')
         citations=run.get('result',{}).get('citations',[])
+        if primary_only:citations=[c for c in citations if c.get('answer_usage')=='PRIMARY']
         if any(not self.source_current(c) for c in citations if c.get('answer_usage')=='PRIMARY'):
             raise ValueError('来源版本已变化，请重新检索后再建立预览。')
         body,units=selection_packet(run['question'],citations)
@@ -110,7 +112,7 @@ class GenerationWorkflow:
             from app.answer_engine.llm.grounded_concise import concise_packet
             body=concise_packet(run['question'],units,body)
         pricing=self.pricing()
-        cost=(len(wire(body).encode())*pricing['input_usd_per_million']+4096*pricing['output_usd_per_million'])/1_000_000*pricing['fx_ceiling']
+        cost=((len(wire(body).encode())+1024)*pricing['input_usd_per_million']+4096*pricing['output_usd_per_million'])/1_000_000*pricing['fx_ceiling']
         if cost>=1:raise ValueError('保守估算超过1元，未建立请求。')
         key=uuid.uuid4().hex
         folder=self.root/'previews'/key;folder.mkdir(parents=True)
@@ -118,24 +120,29 @@ class GenerationWorkflow:
         packet=folder/'packet.json';packet.write_text(json.dumps(tasks,ensure_ascii=False,indent=2),encoding='utf-8')
         row={'preview_id':key,'question':run['question'],'original_run_id':run_id,'protocol':protocol,'packet_sha256':file_hash(packet),'body':body,'units':units,'citations':citations,
              'estimated_ceiling_cny':cost,'max_budget_cny':1,'pricing_checked_on':pricing['checked_on'],'pricing_source':pricing['source'],'pricing_version':pricing['version'],
-             'status':'AWAITING_APPROVAL','created_at':datetime.now(timezone.utc).isoformat()}
+             'status':'AWAITING_APPROVAL','created_at':self.clock().isoformat()}
         self.store._mutate(lambda state:state['generations'].__setitem__(key,row))
         return row
 
-    def run(self, key, packet_hash, actor):
+    def run(self, key, packet_hash, actor, *, query_run_id=None, before_send=None):
         folder=self.root/'previews'/key;packet=folder/'packet.json'
         if file_hash(packet)!=packet_hash:raise ValueError('外发请求文件已变化。')
         def reserve(state):
             row=state['generations'][key]
             if row['status']!='AWAITING_APPROVAL' or row['packet_sha256']!=packet_hash:raise ValueError('本批请求已执行、状态已变或审查内容不一致。')
             if row.get('pricing_version')!=self.pricing()['version']:raise ValueError('核价配置已变化，请重新建立外发预览。')
-            if not self.provider_factory and datetime.now(timezone(timedelta(hours=8))).date().isoformat()!=row['pricing_checked_on']:raise ValueError('本批价格核对已跨日，需重新核价后再执行，未外发资料。')
+            if not self.provider_factory and self.clock().astimezone(timezone(timedelta(hours=8))).date().isoformat()!=row['pricing_checked_on']:raise ValueError('本批价格核对已跨日，需重新核价后再执行，未外发资料。')
             if any(not self.source_current(c) for c in row['citations'] if c.get('answer_usage')=='PRIMARY'):raise ValueError('证据版本已变，未发送模型请求。')
             row.update(status='EXECUTING',actor=actor)
             return copy.deepcopy(row)
         row=self.store._mutate(reserve)
-        query,created=self.store.begin_run(key,row['question'],actor)
-        if not created:raise ValueError('生成问题记录已经存在，不重复调用。')
+        if query_run_id is None:
+            query,created=self.store.begin_run(key,row['question'],actor)
+            if not created:raise ValueError('生成问题记录已经存在，不重复调用。')
+        else:
+            if query_run_id!=row['original_run_id']:raise ValueError('生成与原问题不匹配。')
+            query=self.store.query_run(query_run_id)
+        attempted=False
         try:
             if file_hash(packet)!=packet_hash:raise ValueError('外发请求文件已变化。')
             approval=folder/'approval.json'
@@ -146,6 +153,8 @@ class GenerationWorkflow:
                 from app.answer_engine.llm.reviewed_packet_provider import ReviewedPacketProvider
                 provider=ReviewedPacketProvider(packet,approval,self.root/'execution'/key,max_requests=1)
             messages=row['body']['messages']
+            if before_send:before_send(row)
+            attempted=True
             generated=provider.generate(messages[0]['content'],messages[1]['content'],temperature=.1,max_tokens=4096)
             (folder/'model_response.json').write_text(json.dumps({'content':generated.content},ensure_ascii=False),encoding='utf-8')
             if row.get('protocol')=='CONCISE_V1':
@@ -171,6 +180,6 @@ class GenerationWorkflow:
                                   status_label='模型未通过 · 回退本地原文要点 · 待核对',generation_mode='LOCAL_FALLBACK_AFTER_MODEL_FAILURE')
             result['notice']='本次生成或验证失败，不是原文不存在。有效引用可继续核对；不自动追加模型调用，计次以调用账本为准。'
             saved=self.store.finish_run(query['query_run_id'],result,error=True)
-            status='FAILED_SPENT'
+            status='FAILED_SPENT' if attempted else 'FAILED_NOT_SENT'
         self.store._mutate(lambda state:state['generations'][key].update(status=status,query_run_id=query['query_run_id']))
         return saved

@@ -17,6 +17,7 @@
 - [两题业务确认与独立试用](OWNER_CONFIRMED_TRIAL.md)
 - [项目金额字段与引用修复](PROJECT_MONEY_PRECISION.md)
 - [试用覆盖检查与面积范围保护](TRIAL_COVERAGE_REVIEW.md)
+- [限额日常模型答复（待批准）](DAILY_MODEL_POLICY.md)
 - [公开源码清单及校验值](source-manifest.json)
 - [本机处理产物的脱敏索引](processing-ledger.json)
 - [本次交付验证](VALIDATION.md)
@@ -43,3 +44,5 @@ npx vite build --config vite.platform.config.ts --outDir ../evaluation/platform_
 公开副本包含仅有合成示例的分类快照，只供编译与演示；它不表示已经装配真实知识库。演示入口 `python -m uvicorn app.trial.platform_app:demo_app --factory --host 127.0.0.1 --port 8896 --workers 1` 仅在该端口空闲时手动使用，生成独立演示数据。合成演示不能证明真实来源的问答效果。
 
 真实模式还需要私有固定候选索引、同型号模型权重、来源版本映射、分类契约、工作台状态及本机环境。`live_app` / `unified_preview` 中的固定目录来自受控本机装配，不是公共克隆一键运行承诺。不要直接运行附带的既有资料启动脚本，直到这些依赖和端口归属逐一核对。真实数据接回前核对路径、哈希、向量维度及引用版本，不重建或切换现有索引。首次源码导出没有切换在线服务；随后建立独立试用入口，并在金额修复时仅重启8897，既有检索、工作台与正式服务边界保持。
+
+2026-10-23追加：日常模型策略已接入独立试用，保持待批准；需要本机私有资料版本清单及明确费用授权。通用实现与未完成验证见[限额日常模型](DAILY_MODEL_POLICY.md)。

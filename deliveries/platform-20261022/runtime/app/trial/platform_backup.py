@@ -110,6 +110,10 @@ def restore_backup(store, backup_id, expected_hash, actor):
             if job['status'] in {'PROCESSING','QUEUED'}:job.update(status='INTERRUPTED',error='从备份恢复，需人工重试。')
         for run in restored['query_runs'].values():
             if run.get('status')=='RUNNING':run.update(status='INTERRUPTED')
+        # A content backup must neither rewind spending nor restore an old external-call approval.
+        restored.pop('daily_answer_policy',None)
+        if 'daily_answer_policy' in current:
+            restored['daily_answer_policy']=copy.deepcopy(current['daily_answer_policy'])
         current.clear();current.update(restored)
         store._event(current,'平台备份恢复',backup_id,actor,'恢复前安全快照：'+safety['backup_id'])
         return {'restored':True,'safety_backup_id':safety['backup_id'],'safety_missing_files':safety['missing_files'],'paid_call_ledgers_restored':False}

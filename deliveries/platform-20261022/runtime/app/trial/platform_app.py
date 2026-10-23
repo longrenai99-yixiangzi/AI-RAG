@@ -120,6 +120,12 @@ class RunGeneration(Input):
     max_budget_cny: Literal[1] = 1
 
 
+class DailyPolicyAction(Input):
+    action: Literal['approve','pause']
+    policy_sha256: str = Field(pattern=r'^[a-f0-9]{64}$')
+    confirmed: bool = False
+
+
 class PricingInput(Input):
     confirmed:bool=False
     input_usd_per_million:float=Field(gt=0,le=10000,allow_inf_nan=False)
@@ -143,7 +149,7 @@ def load_definitions(contract_path: Path | None) -> dict:
 
 
 def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Path | None = None, existing=None, provider_factory=None,
-               generation_execution_enabled: bool = True) -> FastAPI:
+               generation_execution_enabled: bool = True, daily_policy: dict | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(instance):
         try:yield
@@ -155,6 +161,7 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
     definitions = load_definitions(contract_path)
     lifecycle = None
     generation = None
+    daily = None
     if existing:
         from .platform_lifecycle import PlatformLifecycle
         from .platform_generation import GenerationWorkflow
@@ -169,6 +176,10 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
                 if not source or source[0]['status']!='ACTIVE':return False
             return existing.version_current({'source_path':c.get('source_path'),'current_hash':c.get('source_version')})
         generation=GenerationWorkflow(store,citation_current,provider_factory)
+        if daily_policy is not None:
+            from .daily_answers import DailyAnswers
+            daily=DailyAnswers(store,generation,existing,daily_policy)
+            app.state.daily_answers=daily
 
     def check_metadata(value) -> None:
         if hasattr(value, "action_id") and value.action_id and value.action_id not in {a["id"] for a in definitions["actions"]}:
@@ -225,7 +236,9 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
         return {**store.snapshot(), "definitions": definitions, "mode": "ISOLATED_MANAGEMENT", "notice": "独立功能工作台：仅保存本工作台录入内容，共用分类定义只读；未连接现有资料、检索索引或模型。",
                 **({"mode": "EXISTING_CONTENT_TRIAL", "runtime": runtime_info, "notice": "现有资料工作版：复用已有索引，支持原文摘录、数值换算和经人工审核的知识检索。模型整理需逐次审批，未开启连续调用；发布和撤回仅作用于本地试用知识层。"} if existing else {}),
                 **({'notice':'独立试用：模型执行已关闭；可检索与准备外发预览。已核对记录是历史响应的离线回放，不是本次新生成；本入口记录与原工作台分开。'} if existing and not generation_execution_enabled else {}),
+                **({'daily_model':daily.status(),'notice':'日常模型是否启用及预占额度见问答页策略。原有逐题执行入口仍关闭；白名单限制模型外发，本地资料检索仍复用现有索引。'} if daily else {}),
                 "capabilities": {"source_io": bool(existing), "existing_index_read": bool(existing), "incremental_index": bool(existing), "generation_requires_per_request_approval":bool(existing),
+                                 "daily_model_configured":daily is not None,
                                  "generation_execution_enabled":bool(existing) and generation_execution_enabled,
                                  "parsing": bool(existing), "real_index": False, "public_model": False, "formal_publish": False}}
 
@@ -377,7 +390,8 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
                     result=source_extract(base,value.question)
                     if any(c.get('evidence_kind')=='REVIEWED_KNOWLEDGE' and c.get('answer_usage')=='PRIMARY' for c in cards):
                         result.update(status_label='原文与已审核知识检索结果 · 待核对适用范围',notice='本题同时检索原有资料与已审核知识；审核知识是经审查的派生内容，原件引用用于追溯。')
-                return store.finish_run(row["query_run_id"], result, error=result.get("answer_status") == "PIPELINE_ERROR")
+                saved=store.finish_run(row["query_run_id"], result, error=result.get("answer_status") == "PIPELINE_ERROR")
+                return daily.apply(saved['query_run_id']) if daily and saved['status']=='COMPLETED' else saved
             except Exception as error:
                 return store.finish_run(row["query_run_id"], {"answer_status": "PIPELINE_ERROR", "answer": "本次检索未完成，问题已保存。可刷新记录查看状态；没有自动重试或调用公网模型。", "citations": [], "error_type": type(error).__name__}, error=True)
 
@@ -419,6 +433,14 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
 
         @app.post('/api/platform/generation-preview')
         def prepare_generation(value:PrepareGeneration):return generation.prepare(value.query_run_id,value.protocol)
+
+        if daily:
+            @app.post('/api/platform/daily-model-policy')
+            def daily_policy_action(value:DailyPolicyAction):
+                if value.policy_sha256!=daily.policy_hash:raise ValueError('策略内容已变化，请重新阅读。')
+                if value.action=='pause':return daily.pause(value.actor)
+                if not value.confirmed:raise HTTPException(403,'需明确批准所列资料外发范围、期限、次数和预算。')
+                return daily.approve(value.policy_sha256,value.actor)
 
         @app.get('/api/platform/generation-pricing')
         def generation_pricing():return generation.pricing()

@@ -20,7 +20,7 @@ def source_kind(citation):
 
 def enforce_applicability(question,result):
     if not question.strip():return result
-    if result.get('answer_status') in {'PIPELINE_ERROR','REVIEW_CONFLICT','SOURCE_VERSION_UNCONFIRMED'}:return result
+    if result.get('answer_status') in {'PIPELINE_ERROR','REVIEW_CONFLICT','SOURCE_VERSION_UNCONFIRMED','TABLE_SCHEMA_UNVERIFIED'}:return result
     cards=[dict(c) for c in result.get('citations',[])]
     primary=[c for c in cards if c.get('answer_usage') in {'PRIMARY','UNCLASSIFIED',None}]
     if not primary and result.get('answer_status')=='SCOPE_CLARIFICATION_REQUIRED' and result.get('evidence_scope_audit'):return result

@@ -114,12 +114,16 @@ def run_flow(data,retrieve,generator,save,resolved_question=None):
         yield {'type':'status','stage':'retrieval','msg':'正在检索已有知识库。','query_run_id':run_id}
         bundle=retrieve(resolved_question,source_versions=data.source_versions) if data.source_versions is not None else retrieve(resolved_question)
         evidence,cards=assemble(bundle,resolved_question,include_background=data.mode=='sources')
-        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','retrieval_source_filter','coverage_audit','topic_coverage','chapter_coverage','facet_coverage','table_association_audit','intent_audit','personnel_scope_audit','complete_list_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
+        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','retrieval_source_filter','coverage_audit','topic_coverage','chapter_coverage','facet_coverage','table_association_audit','intent_audit','personnel_scope_audit','complete_list_audit','table_schema_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
         result=enforce_applicability(data.question,result);cards=result['citations']
         yield {'type':'sources','sources':cards,'query_run_id':run_id}
         if bundle.get('reference_resolution'):result['source_resolution_note']='本题由登记卡关联到同版原件；引用来自原件，登记卡未被补写为正文，内容与适用范围仍待核对。'
         blocked=bundle.get('bundle_status') in {'SOURCE_SCOPE_MISSING','LINEAGE_BLOCKED','CONFLICTING_EVIDENCE'}
-        if result.get('answer_status')=='SCOPE_CLARIFICATION_REQUIRED':pass
+        if bundle.get('table_schema_audit'):
+            from app.retrieval.table_schema import enforce_schema
+            result['table_schema_audit']=bundle['table_schema_audit']
+            result=enforce_schema(data.question,result)
+        elif result.get('answer_status')=='SCOPE_CLARIFICATION_REQUIRED':pass
         elif bundle.get('complete_list_audit'):
             from app.retrieval.complete_lists import enforce_complete_list
             result['complete_list_audit']=bundle['complete_list_audit']

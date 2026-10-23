@@ -192,6 +192,10 @@ class UnifiedCandidate:
             return {'candidate_evidence':[{**self.records[i],'role':'DIRECT','answer_usage':'BACKGROUND'} for i in sorted(reference_rows)[:8]],'bundle_status':'SOURCE_SCOPE_MISSING','candidate_hash':self.candidate_hash,
                     'selection_notes':['所指定资料只有来源链接，或片段解析质量尚未通过核对；本候选没有可用的正文证据。仍可查阅来源线索，不能据此认定原件不存在。']}
         mask=[i for i in mask if i not in reference_rows]
+        from app.retrieval.table_schema import schema_bundle
+        schema=schema_bundle(question,[self.records[i] for i in mask],self.complete_lists)
+        if schema is not None:return {**schema,'candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,**reference_meta,
+                                     'retrieval_audit':{'method':'NATIVE_PDF_HEADER_GEOMETRY','new_document_embeddings':0,'total_ms':round((time.perf_counter()-start)*1000,2)}}
         from app.retrieval.complete_lists import list_bundle
         complete=list_bundle(question,self.complete_lists,{self.records[i]['evidence_id'] for i in mask})
         if complete is not None:

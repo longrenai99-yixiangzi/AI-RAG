@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 import httpx
@@ -332,6 +332,24 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
             if not existing.version_current(source):
                 raise PlatformConflict("原件当前版本与索引不同或不可读取，已停止打开旧版引用。")
             return FileResponse(source["source_path"])
+
+        @app.get("/api/platform/library/{source_id}/pages/{page_number}")
+        def existing_page(source_id: str, page_number: int):
+            source = lifecycle.catalog(source_id)[0] if source_id.startswith('INC_') and lifecycle.catalog(source_id) else existing.catalog_source(source_id)
+            if Path(source['source_path']).suffix.lower()!='.pdf' or not 1<=page_number<=10000:
+                raise HTTPException(422,'原页预览需要PDF和有效页码。')
+            if not existing.version_current(source):raise PlatformConflict('原件版本已变化，未显示旧版预览。')
+            import pymupdf
+            from app.retrieval.table_schema import PDF_READ_LOCK
+            try:
+                with PDF_READ_LOCK,pymupdf.open(source['source_path']) as document:
+                    if page_number>len(document):raise HTTPException(404,'原件没有该页。')
+                    page=document[page_number-1]
+                    scale=min(1.5,2400/max(page.rect.width,page.rect.height))
+                    content=page.get_pixmap(matrix=pymupdf.Matrix(scale,scale),alpha=False).tobytes('png')
+            except (RuntimeError,ValueError,ZeroDivisionError):raise HTTPException(422,'原件页面暂时无法生成预览。')
+            if not existing.version_current(source):raise PlatformConflict('预览期间原件版本变化，已停止显示。')
+            return Response(content,media_type='image/png',headers={'Cache-Control':'no-store'})
 
         @app.get("/api/platform/runs/{run_id}")
         def query_run(run_id: str):

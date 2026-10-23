@@ -137,6 +137,9 @@ def render_list(audit,cards,question):
 
 
 def enforce_complete_list(question,result):
+    if result.get('table_schema_audit') or result.get('debug',{}).get('table_schema_audit'):
+        from .table_schema import enforce_schema
+        return enforce_schema(question,result)
     if not list_request(question) or result.get('answer_status') in {'PIPELINE_ERROR','REVIEW_CONFLICT'}:return result
     audit=result.get('complete_list_audit') or result.get('debug',{}).get('complete_list_audit') or {}
     verified=render_list(audit,result.get('citations',[]),question)

@@ -14,7 +14,7 @@ from app.answer_engine.llm.reviewed_packet_provider import wire
 from .platform_generation import file_hash
 
 PRICE_URL='https://api-docs.deepseek.com/quick_start/pricing/'
-DIRECT_MODES={'HUMAN_REVIEWED_EXACT_QUESTION','VERIFIED_SCALAR_NO_MODEL',
+DIRECT_MODES={'HUMAN_REVIEWED_EXACT_QUESTION','VERIFIED_SCALAR_NO_MODEL','VERIFIED_TABLE_SCHEMA_NO_MODEL',
               'LOCAL_PROJECT_AREA_FIELD_NO_MODEL','LOCAL_PROJECT_MONEY_FIELD_NO_MODEL','VERIFIED_COMPLETE_LIST_NO_MODEL'}
 
 

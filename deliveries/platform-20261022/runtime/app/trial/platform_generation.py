@@ -103,6 +103,8 @@ class GenerationWorkflow:
         if protocol not in {'SOURCE_UNITS','CONCISE_V1'}:raise ValueError('不支持的答复协议。')
         run=self.store.query_run(run_id)
         if not run or run['status']!='COMPLETED':raise ValueError('问题尚未成功完成检索。')
+        from app.retrieval.table_schema import schema_request
+        if schema_request(run['question']):raise ValueError('原表栏目查询只作本地核对，不能用表头让模型填写项目值。')
         citations=run.get('result',{}).get('citations',[])
         if primary_only:citations=[c for c in citations if c.get('answer_usage')=='PRIMARY']
         if any(not self.source_current(c) for c in citations if c.get('answer_usage')=='PRIMARY'):
@@ -136,6 +138,8 @@ class GenerationWorkflow:
         if file_hash(packet)!=packet_hash:raise ValueError('外发请求文件已变化。')
         def reserve(state):
             row=state['generations'][key]
+            from app.retrieval.table_schema import schema_request
+            if schema_request(row['question']):raise ValueError('原表栏目查询只作本地核对，旧预览不能执行填报。')
             if row['status']!='AWAITING_APPROVAL' or row['packet_sha256']!=packet_hash:raise ValueError('本批请求已执行、状态已变或审查内容不一致。')
             if row.get('pricing_version')!=self.pricing()['version']:raise ValueError('核价配置已变化，请重新建立外发预览。')
             if not self.provider_factory and self.clock().astimezone(timezone(timedelta(hours=8))).date().isoformat()!=row['pricing_checked_on']:raise ValueError('本批价格核对已跨日，需重新核价后再执行，未外发资料。')

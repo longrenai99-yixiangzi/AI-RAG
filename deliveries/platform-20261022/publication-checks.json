@@ -1,8 +1,8 @@
 {
   "date": "2026-10-23",
-  "source_files": 273,
+  "source_files": 275,
   "backend_tests": {
-    "passed": 646,
+    "passed": 671,
     "failed": 0,
     "warnings": 3
   },
@@ -404,7 +404,7 @@
     "business_knowledge_auto_published": false,
     "overall_owner_acceptance": false
   },
-  "latest_readiness_status": "LOCAL_LIMITED_USE_UNSUPPORTED_VERSION_TOPIC_REFUSES_SUBSTITUTION",
+  "latest_readiness_status": "LOCAL_LIMITED_USE_COLUMNS_AND_NATIVE_PAGE_PREVIEW",
   "appendix_outline": {
     "status": "APPENDIX_OUTLINE_LIVE_DETAILS_PARTIAL",
     "backend_passed": 627,
@@ -535,5 +535,64 @@
     "new_ingestion_or_reindex": 0,
     "readonly_original_audit_performed": true,
     "error_reproduced_in_sources_only_mode": true
+  },
+  "last_verified_on": "2026-10-24",
+  "native_table_schema": {
+    "status": "NATIVE_HEADER_LOOKUP_AND_ORIGINAL_PAGE_PREVIEW_LIVE",
+    "completed_on": "2026-10-24",
+    "backend_passed": 671,
+    "backend_warnings": 3,
+    "new_tests": 25,
+    "source_files": 275,
+    "native_header_columns": 8,
+    "native_pdf_page": 55,
+    "native_paper_page": 49,
+    "layout_pages_targeted": [
+      55
+    ],
+    "full_corpus_reparse": false,
+    "document_embeddings_changed": false,
+    "single_unmerged_serial_number_header_only": true,
+    "merged_or_multilevel_headers_verified": false,
+    "template_example_values_used_as_project_facts": false,
+    "project_fill_values_verified": false,
+    "new_and_old_model_previews_reject_schema_fill": true,
+    "live_question_variants": 11,
+    "final_page_locator_checks": 2,
+    "final_page_preview_canaries": 2,
+    "old_queries_preserved": 116,
+    "new_technical_query_records": 16,
+    "old_generation_workflows_preserved": 10,
+    "policy_and_expiry_unchanged": true,
+    "original_source_hashes_checked": 9,
+    "old_8896_state_unchanged": true,
+    "new_model_http_calls": 0,
+    "used_requests": 9,
+    "reserved_cny": 0.6,
+    "remaining_requests": 11,
+    "pricing_checked_on": "2026-10-24",
+    "official_price_page_matches_approved_snapshot": true,
+    "reboot_recovery_verified": true,
+    "reboot_initiated_by_assistant": false,
+    "frontend_typescript": "PASS",
+    "frontend_build": "PASS",
+    "served_assets_match": true,
+    "browser": "Edge headless",
+    "original_page_image_visually_verified": true,
+    "pdf_plugin_render_verified": false,
+    "legacy_word_link_preserved": true,
+    "business_knowledge_published": 0,
+    "business_owner_acceptance": false,
+    "runtime_restarted_ports": [
+      8894,
+      8897
+    ],
+    "8000_changed": false,
+    "8010_started_by_this_phase": false,
+    "long_duration_stability_verified": false,
+    "full_disaster_recovery_verified": false,
+    "initial_browser_harness_failures_preserved": 2,
+    "final_extra_requirement_canaries": 3,
+    "mandatory_excluded_and_instruction_requests_not_treated_as_labels": true
   }
 }

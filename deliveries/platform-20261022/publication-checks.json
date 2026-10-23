@@ -250,7 +250,7 @@
     "legacy_generation_gap_test": true
   },
   "limited_release_closeout": {
-    "status": "READY_FOR_OWNER_REVIEW",
+    "status": "BUSINESS_SCOPE_CORRECTED_TEMPLATE_PENDING",
     "new_tests": 16,
     "source_regressions": 14,
     "real_platform_no_model_cases": 3,
@@ -272,6 +272,25 @@
     "owner_acceptance": false,
     "long_duration_verified": false,
     "source_inputs_changed": false,
-    "formal_service_changed": false
+    "formal_service_changed": false,
+    "original_model_probe_business_accepted": false,
+    "excluded_original_business_questions": 2
+  },
+  "owner_scope_review": {
+    "new_model_http_calls": 0,
+    "excluded_original_business_questions": 2,
+    "old_raw_results_and_spending_preserved": true,
+    "source_scoped_replays": 2,
+    "project_case_scope_retained": true,
+    "handbook_template_not_verified": true,
+    "manual_in_existing_index": true,
+    "manual_in_model_approval": false,
+    "owner_confirmed_insufficient_evidence": 1,
+    "local_feedback_records_added": 3,
+    "runtime_code_changed": false,
+    "tests_rerun": false,
+    "source_inputs_changed": false,
+    "budget_and_expiry_changed": false,
+    "overall_owner_acceptance": false
   }
 }

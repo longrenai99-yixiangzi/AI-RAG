@@ -62,3 +62,5 @@ npx vite build --config vite.platform.config.ts --outDir ../evaluation/platform_
 同节表格关联和明确并列子问覆盖已修复；原题自动形成有据部分答复及缺口，实际1次模型请求通过，见[表格与子问修复](SECTION_TABLE_FACETS.md)。
 
 现有资料限用版收尾：统一8897日常入口、显式续批与历史账本保护，修复内容清单旁及主题和谓语省略拆问。最终566项后端检查通过；一次模型技术对照及三项无模型边界检查完成，业务和界面交互确认仍待收口，见[限用版收尾](LIMITED_RELEASE_CLOSEOUT.md)。
+
+业务负责人后续否定上轮两题的依据/适用范围：旧题不计业务通过，已限定项目并改按手册模板出题，证据不足项获确认；本轮无新增模型调用，见[业务范围修订](OWNER_SCOPE_REVIEW.md)。

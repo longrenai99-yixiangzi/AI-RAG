@@ -24,7 +24,7 @@
       "matches": 0
     }
   },
-  "new_model_http_calls": 7,
+  "new_model_http_calls": 8,
   "private_content_uploaded": false,
   "concise_protocol": "APPROVED_DAILY_CONCISE_EVIDENCE_BOUND_TRIAL",
   "original_online_validation_passes": 0,
@@ -72,13 +72,13 @@
   },
   "daily_model_policy": {
     "status": "APPROVED_ACTIVE_BOUNDED_TRIAL",
-    "new_model_http_calls": 5,
+    "new_model_http_calls": 6,
     "synthetic_tests": 34,
     "typescript": "PASS",
     "platform_build": "PASS",
     "served_ui_bundle": true,
     "unapproved_request_blocked_403": true,
-    "used_requests": 5,
+    "used_requests": 6,
     "existing_history_preserved": true,
     "original_workbench_state_preserved": true,
     "backup_does_not_rewind_budget": true,
@@ -87,7 +87,7 @@
     "real_model_new_topic_acceptance": false,
     "implementation_new_model_http_calls": 0,
     "activation_model_http_calls": 1,
-    "real_model_probe_path_passes": 5,
+    "real_model_probe_path_passes": 6,
     "exact_quote_check": "PASS",
     "source_original_http_and_hash": "PASS",
     "local_route_probes": 2,
@@ -95,9 +95,10 @@
     "topic_model_http_calls": 1,
     "section_repair_model_http_calls": 1,
     "approved_scope_model_http_calls": 1,
-    "new_topic_probe_model_http_calls": 1
+    "new_topic_probe_model_http_calls": 1,
+    "frozen_review_model_http_calls": 1
   },
-  "model_http_call_count_scope": "Two historical concise-validation calls and five daily probes across activation, topics, section repair, approved scope, and new-topic repair; excludes earlier project stages. Quote matches are not full-question or business acceptance.",
+  "model_http_call_count_scope": "Two historical concise-validation calls and six daily probes across activation, topics, section repair, approved scope, new-topic repair, and frozen-version review; excludes earlier project stages. Technical citation checks are not Owner acceptance.",
   "legacy_per_request_execution_enabled": false,
   "daily_topic_checks": {
     "frozen_cases": 6,
@@ -188,5 +189,31 @@
     "restarted_ports": [
       8894
     ]
+  },
+  "frozen_version_review": {
+    "runtime_baseline_commit": "239691a8631f60f9c09a4fb5ee4ac64cb55ce146",
+    "frozen_questions": 4,
+    "core_files_hashed": 70,
+    "core_hashes_unchanged": true,
+    "code_changed": false,
+    "questions_changed": false,
+    "tests_rerun_this_phase": false,
+    "source_supported_technical_answers": 1,
+    "matched_quotes": 6,
+    "key_non_linear_qualification_retained": true,
+    "automatic_time_scope_guard": 1,
+    "manual_preflight_failures_not_submitted": 2,
+    "manual_failures_not_automatic_guard_passes": true,
+    "new_model_http_calls": 1,
+    "retries": 0,
+    "offline_repairs": 0,
+    "owner_acceptance": false,
+    "strict_owner_blind_acceptance": false,
+    "runtime_candidate_unchanged": true,
+    "listener_processes_unchanged": true,
+    "policy_used_requests": 6,
+    "reserved_cny": 0.41,
+    "remaining_requests": 14,
+    "remaining_source_bundle_and_coverage_issues": true
   }
 }

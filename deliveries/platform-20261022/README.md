@@ -56,3 +56,5 @@ npx vite build --config vite.platform.config.ts --outDir ../evaluation/platform_
 已补齐日常策略有效时按批准版本优先检索，并对实际模型漏答子问做离线保护；实际结果为部分答复，见[范围与缺口修复](APPROVED_SCOPE_RETRIEVAL.md)。
 
 后续5题技术检查发现并修复主题错配，只对1题执行模型，4题仍未答或受限；结果不计作独立业务验收，见[新问题检查](NEW_QUESTION_TOPIC_CHECKS.md)。
+
+新增固定版本的新问句复核：1项流程答复核对通过、1项时间保护、2项人工预检失败，代码与进程保持不变。计数及剩余缺口见[冻结版本复核](FROZEN_VERSION_REVIEW.md)。

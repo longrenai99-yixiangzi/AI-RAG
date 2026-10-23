@@ -391,5 +391,18 @@
     "known_content_limitations": 3,
     "overall_owner_acceptance": false,
     "initial_harness_failures_preserved": 2
-  }
+  },
+  "owner_answer_acceptance": {
+    "status": "LOCAL_LIMITED_USE_TWO_ANSWERS_OWNER_CONFIRMED",
+    "accepted_reviewed_answers": 2,
+    "pending_reviewed_answers": 0,
+    "exact_review_snapshot_and_source_hashes_bound": true,
+    "known_content_limitations": 3,
+    "new_model_http_calls": 0,
+    "source_parsing": 0,
+    "runtime_changed": false,
+    "business_knowledge_auto_published": false,
+    "overall_owner_acceptance": false
+  },
+  "latest_readiness_status": "LOCAL_LIMITED_USE_TWO_ANSWERS_OWNER_CONFIRMED"
 }

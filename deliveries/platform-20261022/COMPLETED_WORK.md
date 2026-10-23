@@ -56,3 +56,5 @@
 后续已分开默认本地检索和模型外发白名单，并在生成前核对完整清单；原问题本地直接答复，原文版本校验保留。最终615项后端通过，本轮模型请求0次，见[本地范围与清单修复](LOCAL_RETRIEVAL_COMPLETE_LIST.md)。
 
 Current limited-trial UI, backup/restore and runtime readiness checks: [verification and limits](LIMITED_READINESS_VERIFICATION.md). Backend baseline unchanged; no new model HTTP calls.
+
+Owner follow-up: both reviewed historical answers and their sources are accepted, within their stated lecture context. See [two-answer acceptance scope](OWNER_ANSWER_ACCEPTANCE.md); three content limitations remain.

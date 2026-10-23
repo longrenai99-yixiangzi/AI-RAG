@@ -1,8 +1,8 @@
 {
   "date": "2026-10-23",
-  "source_files": 263,
+  "source_files": 265,
   "backend_tests": {
-    "passed": 533,
+    "passed": 550,
     "failed": 0,
     "warnings": 3
   },
@@ -24,7 +24,7 @@
       "matches": 0
     }
   },
-  "new_model_http_calls": 8,
+  "new_model_http_calls": 9,
   "private_content_uploaded": false,
   "concise_protocol": "APPROVED_DAILY_CONCISE_EVIDENCE_BOUND_TRIAL",
   "original_online_validation_passes": 0,
@@ -72,13 +72,13 @@
   },
   "daily_model_policy": {
     "status": "APPROVED_ACTIVE_BOUNDED_TRIAL",
-    "new_model_http_calls": 6,
+    "new_model_http_calls": 7,
     "synthetic_tests": 34,
     "typescript": "PASS",
     "platform_build": "PASS",
     "served_ui_bundle": true,
     "unapproved_request_blocked_403": true,
-    "used_requests": 6,
+    "used_requests": 7,
     "existing_history_preserved": true,
     "original_workbench_state_preserved": true,
     "backup_does_not_rewind_budget": true,
@@ -87,7 +87,7 @@
     "real_model_new_topic_acceptance": false,
     "implementation_new_model_http_calls": 0,
     "activation_model_http_calls": 1,
-    "real_model_probe_path_passes": 6,
+    "real_model_probe_path_passes": 7,
     "exact_quote_check": "PASS",
     "source_original_http_and_hash": "PASS",
     "local_route_probes": 2,
@@ -96,9 +96,10 @@
     "section_repair_model_http_calls": 1,
     "approved_scope_model_http_calls": 1,
     "new_topic_probe_model_http_calls": 1,
-    "frozen_review_model_http_calls": 1
+    "frozen_review_model_http_calls": 1,
+    "table_facets_model_http_calls": 1
   },
-  "model_http_call_count_scope": "Two historical concise-validation calls and six daily probes across activation, topics, section repair, approved scope, new-topic repair, and frozen-version review; excludes earlier project stages. Technical citation checks are not Owner acceptance.",
+  "model_http_call_count_scope": "Two historical concise-validation calls and seven daily probes through table/facet repair; excludes earlier project stages. A partial answer is not a whole-question or Owner acceptance pass.",
   "legacy_per_request_execution_enabled": false,
   "daily_topic_checks": {
     "frozen_cases": 6,
@@ -215,5 +216,36 @@
     "reserved_cny": 0.41,
     "remaining_requests": 14,
     "remaining_source_bundle_and_coverage_issues": true
+  },
+  "section_table_facets": {
+    "new_tests": 17,
+    "source_regressions": 7,
+    "new_model_http_calls": 1,
+    "raw_model_status": "PARTIAL",
+    "automatic_partial_answer_verified": true,
+    "whole_question_answered": false,
+    "complete_header_and_row_quote_verified": true,
+    "case_context_and_conditions_preserved": true,
+    "same_path_version_section_link": true,
+    "header_and_invalid_rows_rejected": true,
+    "missing_or_unused_facet_reported": true,
+    "failure_fallback_keeps_partial_fields": true,
+    "manual_gap_feedback_recorded": true,
+    "knowledge_candidate_or_publication_created": false,
+    "old_history_knowledge_sources_and_policy_preserved": true,
+    "candidate_hash_unchanged": true,
+    "policy_used_requests": 7,
+    "reserved_cny": 0.47,
+    "remaining_requests": 13,
+    "automatic_retries": 0,
+    "owner_acceptance": false,
+    "unseen_acceptance": false,
+    "browser_verified": false,
+    "frontend_changed": false,
+    "restarted_ports": [
+      8894,
+      8897
+    ],
+    "legacy_generation_gap_test": true
   }
 }

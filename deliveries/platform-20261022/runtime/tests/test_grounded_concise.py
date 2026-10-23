@@ -261,6 +261,18 @@ def test_changed_source_removes_stale_answer_and_citations(workflow):
     assert result['result']['generation_mode'] == 'MODEL_FAILED_NO_ANSWER' and len(calls) == 1
 
 
+def test_failed_model_keeps_local_partial_coverage_without_retry(workflow):
+    flow,store,run,provider,calls,_=workflow
+    original=store.query_run(run)['result']
+    original.update(answer_completeness='PARTIAL',coverage_gaps=['另一子问尚未核定'],facet_coverage={'status':'PARTIAL'})
+    store.finish_run(run,original);provider.failed=True
+    preview=flow.prepare(run,'CONCISE_V1')
+    result=flow.run(preview['preview_id'],preview['packet_sha256'],'test')['result']
+    assert result['answer_status']=='MODEL_FAILED_LOCAL_FALLBACK' and len(calls)==1
+    assert result['answer_completeness']=='PARTIAL' and result['coverage_gaps']==original['coverage_gaps']
+    assert result['facet_coverage']==original['facet_coverage']
+
+
 @pytest.mark.parametrize('native', [False, True])
 def test_failure_never_presents_full_chapter_as_answer_but_keeps_native_field(workflow, native):
     flow, store, run, provider, _, _ = workflow

@@ -178,6 +178,8 @@ class GenerationWorkflow:
                         or original.get('support_check')=='EXACT_NATIVE_UNIT'):
                     result.update(answer=original['answer'],answer_status='MODEL_FAILED_LOCAL_FALLBACK',
                                   status_label='模型未通过 · 回退本地原文要点 · 待核对',generation_mode='LOCAL_FALLBACK_AFTER_MODEL_FAILURE')
+                    for field in ('facet_coverage','coverage_gaps','answer_completeness'):
+                        if field in original:result[field]=copy.deepcopy(original[field])
             result['notice']='本次生成或验证失败，不是原文不存在。有效引用可继续核对；不自动追加模型调用，计次以调用账本为准。'
             saved=self.store.finish_run(query['query_run_id'],result,error=True)
             status='FAILED_SPENT' if attempted else 'FAILED_NOT_SENT'

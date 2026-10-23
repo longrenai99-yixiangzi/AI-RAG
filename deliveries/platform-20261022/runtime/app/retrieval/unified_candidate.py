@@ -214,6 +214,7 @@ class UnifiedCandidate:
                           retrieval_audit={'method':'EXISTING_VERSIONED_TEXT_SCALAR','eligible_rows':len(mask),'recalled_ids':[r['evidence_id'] for r in recalled],'new_document_embeddings':0,'total_ms':round((time.perf_counter()-start)*1000,2)})
             return bundle
         bundle=self.focused.rank(routed,recalled,allowed_versions=allowed_versions)
+        if bundle.get('facet_coverage'):bundle['facet_coverage']['question_sha256']=hashlib.sha256(question.encode()).hexdigest()
         if uncovered:
             bundle.update(bundle_status='SOURCE_SCOPE_MISSING',personnel_scope_audit=scoped['personnel_scope_audit'],selection_notes=scoped['selection_notes'])
             for r in bundle['candidate_evidence']:r['answer_usage']='BACKGROUND'

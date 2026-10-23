@@ -92,6 +92,8 @@ def assemble(bundle,question=None,include_background=False):
         cards.append({'citation_id':sid,'evidence_id':candidate['evidence_id'],'source_id':candidate.get('source_id') or candidate['document_id'],
                       'source_version':version,'file_name':path.name,'source_path':str(path),'location':item.location,'display_location':candidate.get('display_location') or candidate.get('heading_path') or '位置见原文','excerpt':text,'answer_usage':candidate.get('answer_usage','UNCLASSIFIED')})
         if candidate.get('chapter_coverage'):cards[-1]['chapter_coverage']=candidate['chapter_coverage']
+        for key in ('table_evidence','table_association','facet_coverage'):
+            if candidate.get(key):cards[-1][key]=candidate[key]
         if len(items)==8:break
     return EvidenceBundle(items=items,status='EVIDENCE_READY' if items else 'NO_EVIDENCE'),cards
 
@@ -112,12 +114,16 @@ def run_flow(data,retrieve,generator,save,resolved_question=None):
         bundle=retrieve(resolved_question,source_versions=data.source_versions) if data.source_versions is not None else retrieve(resolved_question)
         evidence,cards=assemble(bundle,resolved_question,include_background=data.mode=='sources')
         yield {'type':'sources','sources':cards,'query_run_id':run_id}
-        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','retrieval_source_filter','coverage_audit','topic_coverage','chapter_coverage','intent_audit','personnel_scope_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
+        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','retrieval_source_filter','coverage_audit','topic_coverage','chapter_coverage','facet_coverage','table_association_audit','intent_audit','personnel_scope_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
         if bundle.get('reference_resolution'):result['source_resolution_note']='本题由登记卡关联到同版原件；引用来自原件，登记卡未被补写为正文，内容与适用范围仍待核对。'
         blocked=bundle.get('bundle_status') in {'SOURCE_SCOPE_MISSING','LINEAGE_BLOCKED','CONFLICTING_EVIDENCE'}
         if not evidence.items or blocked:
             result.update(answer_status='EVIDENCE_INSUFFICIENT',status_label='证据范围不足',answer='本次没有取得足以组织回答的同版证据。已返回的片段仅供查阅，不能据此认定原库没有资料。')
             if bundle.get('selection_notes'):result['failure_message']='；'.join(bundle['selection_notes'])
+            if bundle.get('facet_coverage'):
+                from app.retrieval.section_tables import facet_gaps
+                gaps=facet_gaps(bundle['facet_coverage']);result['coverage_gaps']=gaps
+                if gaps:result['answer']+='\n尚未核定：'+'；'.join(gaps)
         elif bundle.get('scalar_answer') is not None:
             scalar=bundle['scalar_answer']
             ids={c['evidence_id']:c['citation_id'] for c in cards}
@@ -178,6 +184,13 @@ def run_flow(data,retrieve,generator,save,resolved_question=None):
             if v2_valid:
                 result.update(answer_contract_version='MINIMAL_ANSWER_V2_DRAFT',unverified_model_notes=list(v2_body['scope_notes']),unresolved_aspects=list(v2_body['evidence_insufficient']))
         result['latency']={'total_ms':round((time.perf_counter()-started)*1000,3)}
+        if bundle.get('facet_coverage') and result.get('answer_status') in {'MODEL_DRAFT','MODEL_PARTIAL_DRAFT','MODEL_DRAFT_PROTOCOL_WARNING'}:
+            from app.retrieval.section_tables import facet_gaps
+            used={sid for claim in result.get('claims',[]) for sid in claim.get('evidence_ids',[])}
+            ids={c['evidence_id'] for c in cards if c['citation_id'] in used}
+            gaps=facet_gaps(bundle['facet_coverage'],ids)
+            result.update(facet_coverage=bundle['facet_coverage'],coverage_gaps=gaps)
+            if gaps:result.update(answer=result['answer']+'\n\n尚未核定：'+'；'.join(gaps),answer_completeness='PARTIAL')
         save(run_id,{**state,'status':'COMPLETE','answer_status':result['answer_status'],'result':result})
         finished=True
         yield {'type':'result','result':result}

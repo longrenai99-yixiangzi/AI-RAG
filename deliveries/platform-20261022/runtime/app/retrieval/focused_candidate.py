@@ -12,6 +12,7 @@ from app.retrieval.anchored_sections import expand_candidates,ANCHOR
 from app.retrieval.section_scope import mark_scope
 from app.retrieval.named_source_scope import resolve_named_scope,path_key,ranking_question
 from app.retrieval.section_overview import comparison_required,collect_overview,topic_key
+from app.retrieval.section_tables import parallel_facets,associate_section
 
 
 def explicit_topic_coverage(question,candidate):
@@ -126,7 +127,9 @@ class FocusedCandidate:
         broad=bool(re.search(r'全流程|全部资料|跨专业|跨项目|综合汇总',question) or len(source_scope.get('bindings',[]))>1)
         temporal=bool(re.search(r'(?<!\d)(?:19|20)\d{2}(?!\d)|今年|去年|截至',task_question)) and chosen[0]['scope'].get('year')!='MATCH'
         comparison=comparison_required(task_question)
-        blocked=broad or temporal or comparison or topic_blocked or coverage['status']=='COMPOUND_COVERAGE_UNVERIFIED'
+        facets=parallel_facets(task_question)
+        if facets:topic_blocked=False
+        blocked=broad or temporal or comparison or topic_blocked or (coverage['status']=='COMPOUND_COVERAGE_UNVERIFIED' and not facets)
         for i,c in enumerate(chosen):c['answer_usage']='PRIMARY' if i==0 and not blocked else 'BACKGROUND'
         chapter={'status':'NOT_PARENT_OVERVIEW'}
         if not blocked:
@@ -139,10 +142,23 @@ class FocusedCandidate:
             elif chapter['status']=='PARENT_COVERAGE_UNVERIFIED':
                 blocked=True
                 for c in chosen:c['answer_usage']='BACKGROUND'
+        table_audit={'status':'NOT_APPLICABLE'};facet_audit=None
+        if not blocked and not re.search(r'多少|几人|人数|合计|统计|计算|占比|金额|费用|差额',task_question):
+            seed=chosen[0]
+            selected,table_audit,facet_audit=associate_section(task_question,seed,chosen,self.records_by_source.get((path_key(seed['source_path']),seed['source_version']),()))
+            if selected is not None:
+                for c in chosen:c['answer_usage']='BACKGROUND'
+                ids={c['evidence_id'] for c in selected}
+                chosen=selected+[c for c in chosen if c['evidence_id'] not in ids]
+                blocked=not selected
+            if facet_audit:facet_audit['question_sha256']=hashlib.sha256(question.encode()).hexdigest()
         if temporal:notes=['所问年度或截止时间尚无明确范围证据，不能将通用原文直接认定为该时期的规定或变化。']
         elif comparison:notes=['本题需要比较或变化分析，单个主证据的排序结果不能证明比较完整。']
         elif broad:notes=['本题要求跨资料或整体汇总，尚未验证完整覆盖。']
         elif topic_blocked:notes=['候选尚未明确涵盖所问主题，只提供相关线索，不用相似段落代答；不能据此认定原件或整库没有答案。']
+        elif table_audit['status'] in {'TABLE_CONTEXT_LIMIT_EXCEEDED','EVIDENCE_CONTEXT_LIMIT_EXCEEDED','TOO_MANY_FACETS'}:notes=['子问数量或同节证据超过完整引用上限，未截断表格或据此计算，请缩小问题或查阅原表。']
+        elif facet_audit and facet_audit['status']=='PARTIAL':notes=['并列子问只有部分取得明确线索，未定位的部分将单列缺口。']
+        elif table_audit['status']=='NO_MATCHING_SECTION_ROW' and blocked:notes=['当前导语或候选不足以回答所问内容，未把“如下”或表头当作业务规则。']
         elif chapter['status']=='PARENT_COVERAGE_UNVERIFIED':notes=['父章节的子节说明尚未完整取得，或本题要求清单、统计及限定范围；未用单个子节代答。']
         elif blocked:notes=['同一主证据尚未覆盖每个子问题的主题词，或包含尚未验证的推理问题。']
         elif chapter['status']=='PARENT_NARRATIVES_COLLECTED':notes=['已汇聚同资料同版本的子节说明；附表未逐行核对，业务完整性仍待验收。']
@@ -150,8 +166,9 @@ class FocusedCandidate:
         else:notes=['仅使用一份主证据；多问句主题词匹配不等于业务答案完整性已验收。']
         return {'candidate_evidence':chosen,'bundle_status':'SOURCE_SCOPE_MISSING' if blocked else 'PRIMARY_SECTION_CANDIDATE',
                 'source_scope':source_scope,
-                'topic_coverage':explicit_topic_coverage(task_question,chosen[0]),
+                'topic_coverage':{'status':'PARALLEL_TOPICS_CHECKED_SEPARATELY'} if facets else explicit_topic_coverage(task_question,chosen[0]),
                 'intent_audit':{'comparison_required':comparison},'chapter_coverage':chapter,
                 'coverage_audit':coverage,
+                'table_association_audit':table_audit,'facet_coverage':facet_audit,
                 'selection_notes':notes,
-                'ranking_audit':{'union_candidates':len(marked),'scope_eligible':len(eligible),'ranked_candidates':len(chosen),'max_pair_tokens':max_tokens,'candidate_limit':12,'probe_token_limit':256,'coverage_not_proven':True}}
+                'ranking_audit':{'union_candidates':len(marked),'scope_eligible':len(eligible),'ranked_candidates':len(keys),'returned_candidates':len(chosen),'max_pair_tokens':max_tokens,'candidate_limit':12,'probe_token_limit':256,'coverage_not_proven':True}}

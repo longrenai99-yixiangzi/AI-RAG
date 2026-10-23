@@ -94,3 +94,16 @@ def test_existing_v2_exposes_retrieval_before_rule_rendering():
     from app.trial.v2 import V2TrialEngine
     source=inspect.getsource(V2TrialEngine.answer)
     assert source.index('if retrieve_only:')<source.index('answer = render(bundle)')
+
+
+def test_legacy_model_keeps_parallel_gap_after_generation(tmp_path):
+    bundle,_,_=fixture(tmp_path);provider=Provider();store=TrialKnowledgeStore(tmp_path/'state.json')
+    question='交付要求和归档期限有哪些内容？'
+    audit={'question_sha256':hashlib.sha256(question.encode()).hexdigest(),'status':'PARTIAL','facets':[
+        {'question':'交付要求有哪些内容？','topic':'交付要求','status':'TOPIC_LOCATED','evidence_ids':['e1']},
+        {'question':'归档期限有哪些内容？','topic':'归档期限','status':'NOT_LOCATED','evidence_ids':[]}]}
+    bundle['facet_coverage']=audit;bundle['candidate_evidence'][0]['facet_coverage']=audit
+    events=list(flow.run_flow(flow.AssistedQuery(question=question),lambda _:bundle,ShadowAnswerGenerator(provider),store.record_query))
+    result=events[-2]['result']
+    assert result['answer_status']=='MODEL_DRAFT' and result['answer_completeness']=='PARTIAL'
+    assert '归档期限' in result['coverage_gaps'][0] and provider.calls==1

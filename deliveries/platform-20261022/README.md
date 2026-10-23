@@ -58,3 +58,5 @@ npx vite build --config vite.platform.config.ts --outDir ../evaluation/platform_
 后续5题技术检查发现并修复主题错配，只对1题执行模型，4题仍未答或受限；结果不计作独立业务验收，见[新问题检查](NEW_QUESTION_TOPIC_CHECKS.md)。
 
 新增固定版本的新问句复核：1项流程答复核对通过、1项时间保护、2项人工预检失败，代码与进程保持不变。计数及剩余缺口见[冻结版本复核](FROZEN_VERSION_REVIEW.md)。
+
+同节表格关联和明确并列子问覆盖已修复；原题自动形成有据部分答复及缺口，实际1次模型请求通过，见[表格与子问修复](SECTION_TABLE_FACETS.md)。

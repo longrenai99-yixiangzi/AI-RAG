@@ -1,8 +1,8 @@
 {
   "date": "2026-10-23",
-  "source_files": 268,
+  "source_files": 270,
   "backend_tests": {
-    "passed": 593,
+    "passed": 615,
     "failed": 0,
     "warnings": 3
   },
@@ -24,7 +24,7 @@
       "matches": 0
     }
   },
-  "new_model_http_calls": 10,
+  "new_model_http_calls": 11,
   "private_content_uploaded": false,
   "concise_protocol": "APPROVED_DAILY_CONCISE_EVIDENCE_BOUND_TRIAL",
   "original_online_validation_passes": 0,
@@ -72,13 +72,13 @@
   },
   "daily_model_policy": {
     "status": "APPROVED_ACTIVE_BOUNDED_TRIAL",
-    "new_model_http_calls": 8,
+    "new_model_http_calls": 9,
     "synthetic_tests": 34,
     "typescript": "PASS",
     "platform_build": "PASS",
     "served_ui_bundle": true,
     "unapproved_request_blocked_403": true,
-    "used_requests": 8,
+    "used_requests": 9,
     "existing_history_preserved": true,
     "original_workbench_state_preserved": true,
     "backup_does_not_rewind_budget": true,
@@ -98,9 +98,10 @@
     "new_topic_probe_model_http_calls": 1,
     "frozen_review_model_http_calls": 1,
     "table_facets_model_http_calls": 1,
-    "closeout_model_http_calls": 1
+    "closeout_model_http_calls": 1,
+    "user_incomplete_list_requests": 1
   },
-  "model_http_call_count_scope": "Two historical concise-validation calls and eight approved daily probes through limited-release closeout; excludes earlier stages. Owner acceptance and browser interaction remain pending.",
+  "model_http_call_count_scope": "Two historical concise-validation calls and nine daily requests, including the user-triggered pre-fix incomplete-list request. This repair adds zero model HTTP calls; counts do not indicate business passes.",
   "legacy_per_request_execution_enabled": false,
   "daily_topic_checks": {
     "frozen_cases": 6,
@@ -319,5 +320,30 @@
     "new_real_model_generation_verified": false,
     "owner_template_acceptance": false,
     "old_8896_generation_reloaded": false
+  },
+  "complete_list_scope": {
+    "status": "FIXED_IN_8897_TRIAL",
+    "new_tests_added": 23,
+    "obsolete_coupling_test_removed": 1,
+    "live_platform_cases": 7,
+    "legacy_source_cases": 10,
+    "final_api_canaries": 4,
+    "new_model_http_calls": 0,
+    "default_local_scope_separate_from_outbound_policy": true,
+    "same_source_version_and_location_lists_only": true,
+    "source_declaration_count_and_all_names_checked": true,
+    "cross_chunk_list_context_preserved": true,
+    "old_preview_and_stale_complete_flags_rechecked": true,
+    "business_answer_not_hardcoded": true,
+    "canonical_index_path_reuse_not_content_hash_cache": true,
+    "policy_used_requests": 9,
+    "reserved_cny": 0.6,
+    "remaining_requests": 11,
+    "original_policy_and_records_preserved": true,
+    "source_inputs_changed": false,
+    "new_document_embeddings": 0,
+    "frontend_changed": false,
+    "browser_interaction_verified": false,
+    "overall_owner_acceptance": false
   }
 }

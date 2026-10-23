@@ -259,21 +259,8 @@ def test_api_requires_exact_confirmation_and_preserves_per_request_shutdown(dail
         assert client.post('/api/platform/daily-model-policy',headers=HEADERS,json={**payload,'confirmed':True}).status_code==200
         key=uuid.uuid4().hex;a=ask(client,request_id=key);b=ask(client,request_id=key)
         assert a==b and len(calls)==1 and len(app.state.platform_store._read()['query_runs'])==1
-        assert existing.last_source_versions=={s['source_id']:s['source_version'] for s in policy['sources']}
+        assert existing.last_source_versions is None
         assert not client.get('/api/platform/state').json()['capabilities']['generation_execution_enabled']
-
-
-def test_retrieval_scope_only_while_approved_active_without_resetting_budget(daily):
-    service,_,store,_,policy,_,_,now,_,_=daily
-    assert service.retrieval_scope() is None
-    approve(daily);ledger=copy.deepcopy(store._read()['daily_answer_policy'])
-    scope=service.retrieval_scope()
-    assert scope=={s['source_id']:s['source_version'] for s in policy['sources']}
-    scope.clear()
-    assert service.retrieval_scope() and store._read()['daily_answer_policy']==ledger
-    service.pause('test');assert service.retrieval_scope() is None
-    approve(daily);now[0]+=timedelta(days=8)
-    assert service.retrieval_scope() is None
 
 
 def replacement(daily):

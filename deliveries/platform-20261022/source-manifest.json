@@ -442,6 +442,12 @@
       "privacy_transformed": false
     },
     {
+      "path": "app/retrieval/complete_lists.py",
+      "source_sha256": "fc26708a2fc1c48fd245117404a6be225e76a08c4b9372ab6311cdb1465a1c75",
+      "published_sha256": "fc26708a2fc1c48fd245117404a6be225e76a08c4b9372ab6311cdb1465a1c75",
+      "privacy_transformed": false
+    },
+    {
       "path": "app/retrieval/context_builder.py",
       "source_sha256": "554488ef9be94d476b1b318a253414377a039954d35e83fe2833363fd29fdd09",
       "published_sha256": "554488ef9be94d476b1b318a253414377a039954d35e83fe2833363fd29fdd09",
@@ -575,8 +581,8 @@
     },
     {
       "path": "app/retrieval/unified_candidate.py",
-      "source_sha256": "a68285adb6963d69f9a16bb77d389a5dd5e4b36bbe345178d3952491192a46ae",
-      "published_sha256": "a68285adb6963d69f9a16bb77d389a5dd5e4b36bbe345178d3952491192a46ae",
+      "source_sha256": "60b75d2141512e2b11d424b4cd5a20636827c2a83ae0be4adabf21490b121f9a",
+      "published_sha256": "60b75d2141512e2b11d424b4cd5a20636827c2a83ae0be4adabf21490b121f9a",
       "privacy_transformed": false
     },
     {
@@ -623,8 +629,8 @@
     },
     {
       "path": "app/trial/assisted_chat.py",
-      "source_sha256": "e569d7d800ada61ad7166caede59529da15a71765d3e6914400e8033536e0317",
-      "published_sha256": "e569d7d800ada61ad7166caede59529da15a71765d3e6914400e8033536e0317",
+      "source_sha256": "8e6bb3d04fdc38544d728fcf2b61d2d144dcdda11ef188ad3e1fa2ef3b6b3c93",
+      "published_sha256": "8e6bb3d04fdc38544d728fcf2b61d2d144dcdda11ef188ad3e1fa2ef3b6b3c93",
       "privacy_transformed": false
     },
     {
@@ -653,8 +659,8 @@
     },
     {
       "path": "app/trial/daily_answers.py",
-      "source_sha256": "27ff55ebb15111abc3b9452ea3dc134e9c3799e5cce3a6d2fed8249efee708ae",
-      "published_sha256": "27ff55ebb15111abc3b9452ea3dc134e9c3799e5cce3a6d2fed8249efee708ae",
+      "source_sha256": "cfcadd6579138aaf492ac5bc90c288f8709873cd0f1dcc0bae30160ea1436291",
+      "published_sha256": "cfcadd6579138aaf492ac5bc90c288f8709873cd0f1dcc0bae30160ea1436291",
       "privacy_transformed": false
     },
     {
@@ -707,8 +713,8 @@
     },
     {
       "path": "app/trial/platform_app.py",
-      "source_sha256": "4014598d4f9a01d7f7c0422f9dda3299892c2cb146d337bfc6ff25793883aa57",
-      "published_sha256": "d322310cbc0d95e323c3c36a207de7870d678ecbae93c7946859aeaa6043a4b8",
+      "source_sha256": "4e4321c64e4b6311d402dd79637726011a8b072d734e74bc51d12db18b589fd2",
+      "published_sha256": "15cc7648ba8504e5b110cf01831b1b21f9a5d905026eca27ccd8f57071855b27",
       "privacy_transformed": true
     },
     {
@@ -719,14 +725,14 @@
     },
     {
       "path": "app/trial/platform_existing.py",
-      "source_sha256": "43df5fb51414c5f30869f411a35ab58f64323c1f67584bbd871dbc66940cb8e8",
-      "published_sha256": "43df5fb51414c5f30869f411a35ab58f64323c1f67584bbd871dbc66940cb8e8",
+      "source_sha256": "dbb192237455ec60f299ac2cf8987c1f319655d36179264f2ccf2f77b2743d23",
+      "published_sha256": "dbb192237455ec60f299ac2cf8987c1f319655d36179264f2ccf2f77b2743d23",
       "privacy_transformed": false
     },
     {
       "path": "app/trial/platform_generation.py",
-      "source_sha256": "1440d9438fc0ad80f2f193b7546bf363b74ae300eae9a7e611f9cdefbd067366",
-      "published_sha256": "1440d9438fc0ad80f2f193b7546bf363b74ae300eae9a7e611f9cdefbd067366",
+      "source_sha256": "e3891f5ed4bdf0ca4b9dafb01bb1cef235a67bcfb1b17c76c8a908e68aa04296",
+      "published_sha256": "e3891f5ed4bdf0ca4b9dafb01bb1cef235a67bcfb1b17c76c8a908e68aa04296",
       "privacy_transformed": false
     },
     {
@@ -1372,6 +1378,12 @@
       "privacy_transformed": false
     },
     {
+      "path": "tests/test_complete_lists.py",
+      "source_sha256": "94df5ceedd6fe3540a2e35d045b0bb166f7d98a053368bcb56ee1c8db452be5b",
+      "published_sha256": "94df5ceedd6fe3540a2e35d045b0bb166f7d98a053368bcb56ee1c8db452be5b",
+      "privacy_transformed": false
+    },
+    {
       "path": "tests/test_concise_extract.py",
       "source_sha256": "78dc70b2eb212c505219213727050c3b17d5d6e3a3e036f87d16f574c5915eb0",
       "published_sha256": "78dc70b2eb212c505219213727050c3b17d5d6e3a3e036f87d16f574c5915eb0",
@@ -1391,8 +1403,8 @@
     },
     {
       "path": "tests/test_daily_answers.py",
-      "source_sha256": "700b94ae260cda023a97a65bfc85eff5909d232efa2c94ea5e111e02b7a274a1",
-      "published_sha256": "700b94ae260cda023a97a65bfc85eff5909d232efa2c94ea5e111e02b7a274a1",
+      "source_sha256": "83475db860b7c1afd8d184482e2be87b0f510ecab6b25a8c50ba45f2c3516855",
+      "published_sha256": "83475db860b7c1afd8d184482e2be87b0f510ecab6b25a8c50ba45f2c3516855",
       "privacy_transformed": false
     },
     {
@@ -1577,8 +1589,8 @@
     },
     {
       "path": "tests/test_unified_candidate.py",
-      "source_sha256": "28cf207252bd2ec26691d0bdd31900fef60ea28ce31f30ce3faa49a295a60bb9",
-      "published_sha256": "28cf207252bd2ec26691d0bdd31900fef60ea28ce31f30ce3faa49a295a60bb9",
+      "source_sha256": "6598e40eceff711a28148cdedae67f38f006f98d28a5320e4f0460013c90fd91",
+      "published_sha256": "6598e40eceff711a28148cdedae67f38f006f98d28a5320e4f0460013c90fd91",
       "privacy_transformed": false
     },
     {

@@ -357,14 +357,11 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
                               "citations": [knowledge["origin_citation"]], "knowledge_id": knowledge["knowledge_id"], "knowledge_version": knowledge["version"],
                               "applicability": knowledge["applicability"], "generation_mode": "HUMAN_REVIEWED_EXACT_QUESTION"}
                 else:
-                    source_versions=daily.retrieval_scope() if daily else None
-                    base=existing.retrieve(value.question,value.request_id,source_versions=source_versions) if source_versions is not None else existing.retrieve(value.question,value.request_id)
+                    base=existing.retrieve(value.question,value.request_id)
                     cards=base.get('citations',[])
                     disabled={s['source_id'] for s in store.snapshot()['sources'] if s.get('status')!='REGISTERED'}
                     cards=[c for c in cards if c['source_id'] not in disabled]
                     added=lifecycle.retrieve(value.question) if hasattr(existing,'features') else []
-                    if source_versions is not None:
-                        added=[r for r in added if source_versions.get(r['source_id'])==r['source_version']]
                     route=base.get('debug',{}).get('scope_resolution',{})
                     if route.get('status') in {'AMBIGUOUS_PROJECT_SELECTOR','CONFLICTING_EVIDENCE'}:
                         added=[]
@@ -394,6 +391,8 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
                     result=source_extract(base,value.question)
                     if any(c.get('evidence_kind')=='REVIEWED_KNOWLEDGE' and c.get('answer_usage')=='PRIMARY' for c in cards):
                         result.update(status_label='原文与已审核知识检索结果 · 待核对适用范围',notice='本题同时检索原有资料与已审核知识；审核知识是经审查的派生内容，原件引用用于追溯。')
+                from app.retrieval.complete_lists import enforce_complete_list
+                result=enforce_complete_list(value.question,result)
                 from app.retrieval.evidence_applicability import enforce_applicability
                 result=enforce_applicability(value.question,result)
                 saved=store.finish_run(row["query_run_id"], result, error=result.get("answer_status") == "PIPELINE_ERROR")

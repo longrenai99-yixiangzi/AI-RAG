@@ -68,6 +68,7 @@ class UnifiedCandidate:
         if ids!=sparse['chunk_ids'] or len(set(ids))!=len(ids):raise ValueError('Evidence/BM25 row identity mismatch')
         if self.vectors.shape!=(len(ids),1024) or not np.isfinite(self.vectors).all() or not np.allclose(np.linalg.norm(self.vectors,axis=1),1,atol=.003):raise ValueError('Invalid vector alignment or normalization')
         paths={p:path_key(p) for p in {r['source_path'] for r in self.records}|{d['source_path'] for d in docs}}
+        self.record_paths=[paths[r['source_path']] for r in self.records]
         versions={did:(paths[d['source_path']],declared_version(d)) for did,d in self.documents.items()}
         for r in self.records:
             if (paths[r['source_path']],r['source_version'])!=versions[r['document_id']]:raise ValueError('Evidence and catalog versions disagree')
@@ -124,6 +125,8 @@ class UnifiedCandidate:
             if not any((path_key(p),version) in source_ids for p,version in pairs):raise ValueError('Scalar scope is outside the admitted candidate')
         self.focused=FocusedCandidate(sections,SectionTitleIndex(sections),reranker,documents=self.scope_documents,
             records=[r for r in self.records if path_key(r['source_path']) not in self.reference_only and r['evidence_id'] not in self.quality_exclusions])
+        from app.retrieval.complete_lists import build_catalog
+        self.complete_lists=build_catalog([r for r in self.records if path_key(r['source_path']) not in self.reference_only and r['evidence_id'] not in self.quality_exclusions])
         self.load_ms=round((time.perf_counter()-started)*1000,2)
 
     def sources(self,query='',file_type='',offset=0,limit=50):
@@ -184,16 +187,21 @@ class UnifiedCandidate:
                         'selection_notes':['本题指定资料不在当前批准的资料范围内，未改用其他项目或文件代答。']}
         mask=list(range(len(self.records))) if allowed is None else sorted({i for p in allowed for i in self.by_path.get(p,[])})
         if not mask:return {'candidate_evidence':[],'bundle_status':'SOURCE_SCOPE_MISSING','candidate_hash':self.candidate_hash}
-        reference_rows={i for i in mask if path_key(self.records[i]['source_path']) in self.reference_only or self.records[i]['evidence_id'] in self.quality_exclusions}
+        reference_rows={i for i in mask if self.record_paths[i] in self.reference_only or self.records[i]['evidence_id'] in self.quality_exclusions}
         if len(reference_rows)==len(mask):
             return {'candidate_evidence':[{**self.records[i],'role':'DIRECT','answer_usage':'BACKGROUND'} for i in sorted(reference_rows)[:8]],'bundle_status':'SOURCE_SCOPE_MISSING','candidate_hash':self.candidate_hash,
                     'selection_notes':['所指定资料只有来源链接，或片段解析质量尚未通过核对；本候选没有可用的正文证据。仍可查阅来源线索，不能据此认定原件不存在。']}
         mask=[i for i in mask if i not in reference_rows]
+        from app.retrieval.complete_lists import list_bundle
+        complete=list_bundle(question,self.complete_lists,{self.records[i]['evidence_id'] for i in mask})
+        if complete is not None:
+            return {**complete,'candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,**reference_meta,
+                    'retrieval_audit':{'method':'VERSIONED_EXPLICIT_GROUPED_LIST','new_document_embeddings':0,'total_ms':round((time.perf_counter()-start)*1000,2)}}
         from app.retrieval.scalar_bridge import matching_links,scope_paths,scalar_bundle
         scalar_links=matching_links(question,self.scalar_links)
         if scalar_links:
             scalar_paths=scope_paths(scalar_links)
-            mask=[i for i in mask if path_key(self.records[i]['source_path']) in scalar_paths]
+            mask=[i for i in mask if self.record_paths[i] in scalar_paths]
             if not mask:return {'candidate_evidence':[],'bundle_status':'SOURCE_SCOPE_MISSING','candidate_hash':self.candidate_hash}
         task=ranking_question(routed,self.scope_documents)
         scoped=self.personnel.lookup(task,allowed) if self.personnel else None

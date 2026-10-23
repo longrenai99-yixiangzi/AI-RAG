@@ -109,6 +109,9 @@ class GenerationWorkflow:
             raise ValueError('来源版本已变化，请重新检索后再建立预览。')
         from app.retrieval.evidence_applicability import require_applicable
         require_applicable(run['question'],citations)
+        from app.retrieval.complete_lists import list_request,render_list
+        audit=run.get('result',{}).get('complete_list_audit') or run.get('result',{}).get('debug',{}).get('complete_list_audit') or {}
+        if list_request(run['question']) and not render_list(audit,citations,run['question']):raise ValueError('完整清单尚未核齐，未建立模型请求。')
         body,units=selection_packet(run['question'],citations)
         if protocol=='CONCISE_V1':
             from app.answer_engine.llm.grounded_concise import concise_packet
@@ -123,6 +126,7 @@ class GenerationWorkflow:
         row={'preview_id':key,'question':run['question'],'original_run_id':run_id,'protocol':protocol,'packet_sha256':file_hash(packet),'body':body,'units':units,'citations':citations,
              'estimated_ceiling_cny':cost,'max_budget_cny':1,'pricing_checked_on':pricing['checked_on'],'pricing_source':pricing['source'],'pricing_version':pricing['version'],
              'status':'AWAITING_APPROVAL','created_at':self.clock().isoformat()}
+        if audit:row['complete_list_audit']=copy.deepcopy(audit)
         self.store._mutate(lambda state:state['generations'].__setitem__(key,row))
         return row
 
@@ -137,6 +141,8 @@ class GenerationWorkflow:
             if any(not self.source_current(c) for c in row['citations'] if c.get('answer_usage')=='PRIMARY'):raise ValueError('证据版本已变，未发送模型请求。')
             from app.retrieval.evidence_applicability import require_applicable
             require_applicable(row['question'],row['citations'])
+            from app.retrieval.complete_lists import list_request,render_list
+            if list_request(row['question']) and not render_list(row.get('complete_list_audit',{}),row['citations'],row['question']):raise ValueError('完整清单尚未核齐，旧预览不能执行模型请求。')
             row.update(status='EXECUTING',actor=actor)
             return copy.deepcopy(row)
         row=self.store._mutate(reserve)

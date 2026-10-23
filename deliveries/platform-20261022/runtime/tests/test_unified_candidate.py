@@ -176,3 +176,11 @@ def test_invalid_reference_bindings_cannot_admit_unbound_sources(tmp_path,fault)
     else:entry[fault]='f'*64
     path.write_text(json.dumps(policy))
     with pytest.raises(ValueError,match='Reference|Duplicate'):UnifiedCandidate(pack,encoder,Reranker(),quality_folder=folder)
+
+
+def test_unqualified_query_does_not_resolve_every_indexed_path_again(tmp_path,monkeypatch):
+    from app.retrieval import unified_candidate as module
+    c,_,_,_=candidate(tmp_path)
+    def forbidden(_):raise AssertionError('canonical index paths are already bound; do not repeat filesystem resolution per row')
+    monkeypatch.setattr(module,'path_key',forbidden)
+    assert c.retrieve('查找标记是什么？')['candidate_evidence']

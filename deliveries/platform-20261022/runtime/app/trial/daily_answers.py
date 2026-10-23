@@ -15,7 +15,7 @@ from .platform_generation import file_hash
 
 PRICE_URL='https://api-docs.deepseek.com/quick_start/pricing/'
 DIRECT_MODES={'HUMAN_REVIEWED_EXACT_QUESTION','VERIFIED_SCALAR_NO_MODEL',
-              'LOCAL_PROJECT_AREA_FIELD_NO_MODEL','LOCAL_PROJECT_MONEY_FIELD_NO_MODEL'}
+              'LOCAL_PROJECT_AREA_FIELD_NO_MODEL','LOCAL_PROJECT_MONEY_FIELD_NO_MODEL','VERIFIED_COMPLETE_LIST_NO_MODEL'}
 
 
 class DailyAnswers:
@@ -59,9 +59,6 @@ class DailyAnswers:
 
     def _active(self,row):
         return bool(row.get('approved') and not row.get('paused') and self.clock()<datetime.fromisoformat(row['expires_at']))
-
-    def retrieval_scope(self):
-        return {sid:s['source_version'] for sid,s in self.sources.items()} if self._active(self._record()) else None
 
     def status(self):
         state=self.store._read();row=self._record();used=row.get('reservations',{})
@@ -147,6 +144,10 @@ class DailyAnswers:
         if any(run_id in h.get('reservations',{}) for h in [self.store._read().get('daily_answer_policy',{}),*self.store._read().get('daily_answer_policy_history',{}).values()]):return run
         def local(route,notice):
             return self.store.finish_run(run_id,{**result,'daily_model':{'route':route,'notice':notice}},error=run['status']=='ERROR' or route=='OUTCOME_UNKNOWN')
+        from app.retrieval.complete_lists import enforce_complete_list
+        result=enforce_complete_list(run['question'],result)
+        if result.get('answer_status')=='LIST_COVERAGE_REQUIRED':
+            return local('LIST_COVERAGE_REQUIRED','完整清单尚未核齐，本次不调用模型。')
         from app.retrieval.evidence_applicability import enforce_applicability
         checked=enforce_applicability(run['question'],result)
         if checked.get('answer_status')=='SCOPE_CLARIFICATION_REQUIRED':

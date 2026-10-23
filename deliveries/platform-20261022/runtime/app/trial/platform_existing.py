@@ -109,7 +109,9 @@ def source_extract(result: dict, question: str = '') -> dict:
     from app.retrieval.evidence_applicability import enforce_applicability
     cards = readable_citations(result.get("citations", []))
     query=question or result.get('question','')
-    result=enforce_applicability(query,{**result,'citations':cards});cards=result['citations']
+    from app.retrieval.complete_lists import enforce_complete_list
+    result=enforce_complete_list(query,{**result,'citations':cards})
+    result=enforce_applicability(query,result);cards=result['citations']
     if result.get("answer_status") != "SOURCES_ONLY" or not cards:
         return {**result, "generation_mode": result.get('generation_mode', "NO_GENERATION")}
     primary = [c for c in cards if c.get("answer_usage") == "PRIMARY"]

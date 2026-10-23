@@ -144,4 +144,4 @@ def source_extract(result: dict, question: str = '') -> dict:
             **({'facet_coverage':facets,'coverage_gaps':gaps,'answer_completeness':'PARTIAL' if gaps else 'TOPICS_LOCATED_NOT_SEMANTICALLY_VERIFIED'} if facets else {}),
             "generation_mode": "LOCAL_EXTRACTIVE_SUMMARY_NO_MODEL" if shortened else "VERBATIM_SOURCE_EXTRACT",
             "summary_audit":[{'citation_id':c['citation_id'],'method':method,'source_chars':len(c['excerpt']),'display_chars':len(text)} for c,text,method in extracts],
-            "notice": "本地按原文结构提取要点或展示原表字段；条件或结构不清时保留全文，完整证据见下方引用。未运行生成模型，未自动业务审核；是否完整回答问题仍需核对。"})
+            "notice": "本地按原文结构提取要点或展示原表字段；条件或结构不清时保留全文，完整证据见下方引用。未运行生成模型，未自动业务审核；是否完整回答问题仍需核对。"+(' 本次摘录所引清单的说明条款，不代表已逐项核对表格全部字段。' if any(c.get('explanation_block') for c in primary) else '')})

@@ -60,3 +60,5 @@ Current limited-trial UI, backup/restore and runtime readiness checks: [verifica
 Owner follow-up: both reviewed historical answers and their sources are accepted, within their stated lecture context. See [two-answer acceptance scope](OWNER_ANSWER_ACCEPTANCE.md); three content limitations remain.
 
 Explicit appendix outline retrieval is live, with detailed-content gaps kept partial and local: [behavior and validation](APPENDIX_OUTLINE.md). Final backend: 627 checks; this phase added no real model calls.
+
+Titled numbered PDF explanations are now selectable as bounded primary evidence, preserving the existing topic and source guards: [implementation and validation](PDF_NUMBERED_NOTES.md). Final backend: 639 checks; no new real model HTTP calls.

@@ -93,7 +93,7 @@ def assemble(bundle,question=None,include_background=False):
         cards.append({'citation_id':sid,'evidence_id':candidate['evidence_id'],'source_id':candidate.get('source_id') or candidate['document_id'],
                       'source_version':version,'file_name':path.name,'source_path':str(path),'location':item.location,'display_location':candidate.get('display_location') or candidate.get('heading_path') or '位置见原文','excerpt':text,'answer_usage':candidate.get('answer_usage','UNCLASSIFIED')})
         if candidate.get('chapter_coverage'):cards[-1]['chapter_coverage']=candidate['chapter_coverage']
-        for key in ('table_evidence','table_association','facet_coverage'):
+        for key in ('table_evidence','table_association','facet_coverage','explanation_block'):
             if candidate.get(key):cards[-1][key]=candidate[key]
         if len(items)==8:break
     return EvidenceBundle(items=items,status='EVIDENCE_READY' if items else 'NO_EVIDENCE'),cards

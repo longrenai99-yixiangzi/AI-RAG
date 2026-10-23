@@ -12,6 +12,31 @@ ANCHOR = re.compile(r'^\[/body/p\[@paraId=([A-Fa-f0-9]+)\]\]\s*', re.M)
 NUMBERED = re.compile(r'^(\d+(?:\.\d+)+)\s*([^\d].*)$')
 
 
+def pdf_explanation_blocks(candidate):
+    """Recover explicit numbered notes already present in one native PDF chunk."""
+    if Path(candidate.get('source_path','')).suffix.lower()!='.pdf':return []
+    text=candidate.get('text') or '';result=[]
+    titles=list(re.finditer(r'^《([^》\n]{2,60})》说明[：:]\s*$',text,re.M))
+    for title in titles:
+        boundary=re.search(r'^(?:第[一二三四五六七八九十\d]+章[^\n]+|附件\s*\d+[：:][^\n]+|《[^》\n]+》说明[：:])',text[title.end():],re.M)
+        # shortcut: require an explicit following boundary in this same chunk; cross-chunk notes stay unverified.
+        if not boundary:continue
+        stop=title.end()+boundary.start();body=text[title.end():stop].strip()
+        markers=list(re.finditer(r'^(\d{1,2})[）)]\s*',body,re.M))
+        if len(markers)<2 or [int(m[1]) for m in markers]!=list(range(1,len(markers)+1)):continue
+        if body[:markers[0].start()].strip():continue
+        items=[body[m.start():markers[i+1].start() if i+1<len(markers) else len(body)].strip() for i,m in enumerate(markers)]
+        if any(not item.endswith(('。','；',';')) for item in items):continue
+        quote=text[title.start():stop].strip();heading=(candidate.get('heading_path') or '原文位置')+' > 《'+title[1]+'》说明'
+        key=hashlib.sha256((candidate['source_path']+candidate['source_version']+quote).encode()).hexdigest()
+        result.append({**candidate,'evidence_id':'pdf-note-'+key,'text':quote,'heading_path':heading,
+                       'display_location':heading+f' > 原文第1—{len(items)}点',
+                       'location':{**(candidate.get('location') or {}),'section':heading,'char_start':title.start(),'char_end':stop},
+                       'retrieved_child_ids':[candidate['evidence_id']],
+                       'explanation_block':{'title':title[1],'item_count':len(items),'kind':'EXPLICIT_NUMBERED_NOTE','full_table_fields_verified':False}})
+    return result
+
+
 def effective_outline(paragraph):
     # Reused from the 20261014 structure trial's docx_outline.effective_outline.
     chain, seen = [], set()
@@ -91,6 +116,7 @@ def expand_candidates(candidates, sections):
     lookup={(s['source_path'],s['source_version'],a):s for s in sections for a in s['paragraph_anchors']}
     result=[];seen=set()
     for c in candidates:
+        result.extend(pdf_explanation_blocks(c))
         found={}
         for anchor in ANCHOR.finditer(c.get('text') or ''):
             section=lookup.get((c.get('source_path'),c.get('source_version'),anchor[1]))

@@ -1,8 +1,8 @@
 {
   "date": "2026-10-23",
-  "source_files": 272,
+  "source_files": 273,
   "backend_tests": {
-    "passed": 627,
+    "passed": 639,
     "failed": 0,
     "warnings": 3
   },
@@ -404,7 +404,7 @@
     "business_knowledge_auto_published": false,
     "overall_owner_acceptance": false
   },
-  "latest_readiness_status": "LOCAL_LIMITED_USE_APPENDIX_OUTLINE_DETAILS_PARTIAL",
+  "latest_readiness_status": "LOCAL_LIMITED_USE_NUMBERED_NOTES_RETRIEVED",
   "appendix_outline": {
     "status": "APPENDIX_OUTLINE_LIVE_DETAILS_PARTIAL",
     "backend_passed": 627,
@@ -454,5 +454,43 @@
     "frontend_changed": false,
     "business_knowledge_published": 0,
     "overall_owner_acceptance": false
+  },
+  "pdf_numbered_notes": {
+    "status": "PLANNING_NOTE_RETRIEVAL_FIXED_LOCAL_EXTRACT",
+    "backend_passed": 639,
+    "backend_warnings": 3,
+    "new_tests": 12,
+    "source_files": 273,
+    "source_preflights": 4,
+    "live_question_variants": 8,
+    "new_model_http_calls": 0,
+    "used_requests": 9,
+    "reserved_cny": 0.6,
+    "remaining_requests": 11,
+    "policy_and_expiry_unchanged": true,
+    "old_queries_preserved": 101,
+    "generation_records_preserved": 10,
+    "old_8896_state_unchanged": true,
+    "original_source_hashes_checked": 9,
+    "source_inputs_changed": false,
+    "new_source_parsing": 0,
+    "new_document_embeddings": 0,
+    "new_business_publications": 0,
+    "retrieval_primary_is_bounded_note": true,
+    "real_note_points": 4,
+    "joint_venture_condition_preserved": true,
+    "unrelated_table_and_next_chapter_excluded": true,
+    "source_page": 56,
+    "full_table_fields_verified": false,
+    "whole_library_business_acceptance": false,
+    "new_answer_owner_acceptance": false,
+    "runtime_restarted_ports": [
+      8894,
+      8897
+    ],
+    "8000_changed": false,
+    "8010_restarted": false,
+    "frontend_changed": false,
+    "browser": "Edge headless"
   }
 }

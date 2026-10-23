@@ -394,6 +394,8 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
                     result=source_extract(base,value.question)
                     if any(c.get('evidence_kind')=='REVIEWED_KNOWLEDGE' and c.get('answer_usage')=='PRIMARY' for c in cards):
                         result.update(status_label='原文与已审核知识检索结果 · 待核对适用范围',notice='本题同时检索原有资料与已审核知识；审核知识是经审查的派生内容，原件引用用于追溯。')
+                from app.retrieval.evidence_applicability import enforce_applicability
+                result=enforce_applicability(value.question,result)
                 saved=store.finish_run(row["query_run_id"], result, error=result.get("answer_status") == "PIPELINE_ERROR")
                 return daily.apply(saved['query_run_id']) if daily and saved['status']=='COMPLETED' else saved
             except Exception as error:

@@ -21,6 +21,7 @@ from app.answer_engine.llm.llm_provider import UnavailableLLMProvider
 from app.answer_engine.llm.boundary_note_recovery import recover_body,project_partial_body
 from app.answer_engine.llm.claim_validator import check_source_units
 from app.answer_engine.question_scope import question_scope
+from app.retrieval.evidence_applicability import enforce_applicability
 from app.retrieval.section_scope import mark_scope
 from app.retrieval.personnel_scope import extract_answer
 
@@ -113,11 +114,13 @@ def run_flow(data,retrieve,generator,save,resolved_question=None):
         yield {'type':'status','stage':'retrieval','msg':'正在检索已有知识库。','query_run_id':run_id}
         bundle=retrieve(resolved_question,source_versions=data.source_versions) if data.source_versions is not None else retrieve(resolved_question)
         evidence,cards=assemble(bundle,resolved_question,include_background=data.mode=='sources')
-        yield {'type':'sources','sources':cards,'query_run_id':run_id}
         result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','retrieval_source_filter','coverage_audit','topic_coverage','chapter_coverage','facet_coverage','table_association_audit','intent_audit','personnel_scope_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
+        result=enforce_applicability(data.question,result);cards=result['citations']
+        yield {'type':'sources','sources':cards,'query_run_id':run_id}
         if bundle.get('reference_resolution'):result['source_resolution_note']='本题由登记卡关联到同版原件；引用来自原件，登记卡未被补写为正文，内容与适用范围仍待核对。'
         blocked=bundle.get('bundle_status') in {'SOURCE_SCOPE_MISSING','LINEAGE_BLOCKED','CONFLICTING_EVIDENCE'}
-        if not evidence.items or blocked:
+        if result.get('answer_status')=='SCOPE_CLARIFICATION_REQUIRED':pass
+        elif not evidence.items or blocked:
             result.update(answer_status='EVIDENCE_INSUFFICIENT',status_label='证据范围不足',answer='本次没有取得足以组织回答的同版证据。已返回的片段仅供查阅，不能据此认定原库没有资料。')
             if bundle.get('selection_notes'):result['failure_message']='；'.join(bundle['selection_notes'])
             if bundle.get('facet_coverage'):
@@ -191,6 +194,7 @@ def run_flow(data,retrieve,generator,save,resolved_question=None):
             gaps=facet_gaps(bundle['facet_coverage'],ids)
             result.update(facet_coverage=bundle['facet_coverage'],coverage_gaps=gaps)
             if gaps:result.update(answer=result['answer']+'\n\n尚未核定：'+'；'.join(gaps),answer_completeness='PARTIAL')
+        result=enforce_applicability(data.question,result)
         save(run_id,{**state,'status':'COMPLETE','answer_status':result['answer_status'],'result':result})
         finished=True
         yield {'type':'result','result':result}

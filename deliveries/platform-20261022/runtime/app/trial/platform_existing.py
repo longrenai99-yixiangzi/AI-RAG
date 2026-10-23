@@ -106,8 +106,10 @@ class ExistingKnowledge:
 
 def source_extract(result: dict, question: str = '') -> dict:
     from .concise_extract import concise_text,readable_citations
+    from app.retrieval.evidence_applicability import enforce_applicability
     cards = readable_citations(result.get("citations", []))
-    result={**result,'citations':cards}
+    query=question or result.get('question','')
+    result=enforce_applicability(query,{**result,'citations':cards});cards=result['citations']
     if result.get("answer_status") != "SOURCES_ONLY" or not cards:
         return {**result, "generation_mode": result.get('generation_mode', "NO_GENERATION")}
     primary = [c for c in cards if c.get("answer_usage") == "PRIMARY"]
@@ -115,9 +117,9 @@ def source_extract(result: dict, question: str = '') -> dict:
         return {**result, "answer_status": "SOURCES_ONLY", "answer": "本次只返回相关原文线索，尚未取得可用于本题答复的主证据。", "generation_mode": "NO_GENERATION"}
     from .source_field_answer import area_answer,money_answer,subject
     money=money_answer(result,question or result.get('question',''))
-    if money is not None:return {**result,**money}
+    if money is not None:return enforce_applicability(query,{**result,**money})
     field=area_answer(result,question or result.get('question',''))
-    if field is not None:return {**result,**field}
+    if field is not None:return enforce_applicability(query,{**result,**field})
     target=result.get('debug',{}).get('personnel_scope_audit',{}).get('target','')
     from app.retrieval.section_tables import table_fields_text,citation_facets,facet_gaps,case_notice
     extracts=[(c,table_fields_text(c['table_evidence']),'ASSOCIATED_TABLE_ROW_FIELDS') if c.get('table_evidence')
@@ -136,8 +138,8 @@ def source_extract(result: dict, question: str = '') -> dict:
     if any(c.get('chapter_coverage',{}).get('table_rows_not_selected') for c in primary):
         answer+='\n\n以上汇聚同章说明文字；附表明细未逐行核对，不作为完整清单或人数统计。'
     shortened=any(method!='FULL_SOURCE_FALLBACK' for _,_,method in extracts)
-    return {**result, "answer_status": "SOURCE_EXTRACT", "status_label": "部分原文要点 · 并列子问待核定" if gaps else "简明原文要点 · 待核对" if shortened else "原文摘录答复 · 待核对", "answer": answer,
+    return enforce_applicability(query,{**result, "answer_status": "SOURCE_EXTRACT", "status_label": "部分原文要点 · 并列子问待核定" if gaps else "简明原文要点 · 待核对" if shortened else "原文摘录答复 · 待核对", "answer": answer,
             **({'facet_coverage':facets,'coverage_gaps':gaps,'answer_completeness':'PARTIAL' if gaps else 'TOPICS_LOCATED_NOT_SEMANTICALLY_VERIFIED'} if facets else {}),
             "generation_mode": "LOCAL_EXTRACTIVE_SUMMARY_NO_MODEL" if shortened else "VERBATIM_SOURCE_EXTRACT",
             "summary_audit":[{'citation_id':c['citation_id'],'method':method,'source_chars':len(c['excerpt']),'display_chars':len(text)} for c,text,method in extracts],
-            "notice": "本地按原文结构提取要点或展示原表字段；条件或结构不清时保留全文，完整证据见下方引用。未运行生成模型，未自动业务审核；是否完整回答问题仍需核对。"}
+            "notice": "本地按原文结构提取要点或展示原表字段；条件或结构不清时保留全文，完整证据见下方引用。未运行生成模型，未自动业务审核；是否完整回答问题仍需核对。"})

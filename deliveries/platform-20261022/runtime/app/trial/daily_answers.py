@@ -147,6 +147,11 @@ class DailyAnswers:
         if any(run_id in h.get('reservations',{}) for h in [self.store._read().get('daily_answer_policy',{}),*self.store._read().get('daily_answer_policy_history',{}).values()]):return run
         def local(route,notice):
             return self.store.finish_run(run_id,{**result,'daily_model':{'route':route,'notice':notice}},error=run['status']=='ERROR' or route=='OUTCOME_UNKNOWN')
+        from app.retrieval.evidence_applicability import enforce_applicability
+        checked=enforce_applicability(run['question'],result)
+        if checked.get('answer_status')=='SCOPE_CLARIFICATION_REQUIRED':
+            result=checked
+            return local('SCOPE_CLARIFICATION_REQUIRED','需要先明确资料依据或项目范围，本次未调用模型。')
         native=result.get('summary_audit',[])
         if (result.get('generation_mode') in DIRECT_MODES or result.get('support_check')=='EXACT_NATIVE_UNIT'
                 or native and all(x.get('method') in {'NATIVE_ROLE_COUNT_CLAUSE','NATIVE_SINGLE_ROW_FIELDS'} for x in native)):

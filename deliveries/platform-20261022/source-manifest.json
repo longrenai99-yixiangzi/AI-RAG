@@ -454,6 +454,12 @@
       "privacy_transformed": false
     },
     {
+      "path": "app/retrieval/evidence_applicability.py",
+      "source_sha256": "b47fadd72f3c4769151569ce4994db07da06dc00582eb4d8651b366692c73f7d",
+      "published_sha256": "b47fadd72f3c4769151569ce4994db07da06dc00582eb4d8651b366692c73f7d",
+      "privacy_transformed": false
+    },
+    {
       "path": "app/retrieval/failure_taxonomy.py",
       "source_sha256": "94bf52d1198ed6c9a76f7b6e43b90179f0b9a449da335c8b99c903687faaf69b",
       "published_sha256": "94bf52d1198ed6c9a76f7b6e43b90179f0b9a449da335c8b99c903687faaf69b",
@@ -617,8 +623,8 @@
     },
     {
       "path": "app/trial/assisted_chat.py",
-      "source_sha256": "c932e2ec56846ee59a05a93a2bb08c4c70ad3286ee1794ab9fb111586369b4fa",
-      "published_sha256": "c932e2ec56846ee59a05a93a2bb08c4c70ad3286ee1794ab9fb111586369b4fa",
+      "source_sha256": "e569d7d800ada61ad7166caede59529da15a71765d3e6914400e8033536e0317",
+      "published_sha256": "e569d7d800ada61ad7166caede59529da15a71765d3e6914400e8033536e0317",
       "privacy_transformed": false
     },
     {
@@ -647,8 +653,8 @@
     },
     {
       "path": "app/trial/daily_answers.py",
-      "source_sha256": "2258c784db013be0f93157924440bc1119e64e6a42d2541d816b56a5642c5e64",
-      "published_sha256": "2258c784db013be0f93157924440bc1119e64e6a42d2541d816b56a5642c5e64",
+      "source_sha256": "27ff55ebb15111abc3b9452ea3dc134e9c3799e5cce3a6d2fed8249efee708ae",
+      "published_sha256": "27ff55ebb15111abc3b9452ea3dc134e9c3799e5cce3a6d2fed8249efee708ae",
       "privacy_transformed": false
     },
     {
@@ -701,8 +707,8 @@
     },
     {
       "path": "app/trial/platform_app.py",
-      "source_sha256": "604bc1cfa7e50d9965b5d399e213a4780e190d773736abc5e4ccb36f8113c89f",
-      "published_sha256": "e4e24d3eefd8eddc25e7a4c65ee4bdf6499cb4264d5916a8d7f4cd57d8ee0828",
+      "source_sha256": "4014598d4f9a01d7f7c0422f9dda3299892c2cb146d337bfc6ff25793883aa57",
+      "published_sha256": "d322310cbc0d95e323c3c36a207de7870d678ecbae93c7946859aeaa6043a4b8",
       "privacy_transformed": true
     },
     {
@@ -713,14 +719,14 @@
     },
     {
       "path": "app/trial/platform_existing.py",
-      "source_sha256": "9deb317238038df9b424b1e50b49bdbc0ac1935e53045a3a669fc20c828cb5f6",
-      "published_sha256": "9deb317238038df9b424b1e50b49bdbc0ac1935e53045a3a669fc20c828cb5f6",
+      "source_sha256": "43df5fb51414c5f30869f411a35ab58f64323c1f67584bbd871dbc66940cb8e8",
+      "published_sha256": "43df5fb51414c5f30869f411a35ab58f64323c1f67584bbd871dbc66940cb8e8",
       "privacy_transformed": false
     },
     {
       "path": "app/trial/platform_generation.py",
-      "source_sha256": "f2821f1ee0e716ab2715f5e88ff86a8aaa2734aacfaf53adf4cf805999a4e4e5",
-      "published_sha256": "f2821f1ee0e716ab2715f5e88ff86a8aaa2734aacfaf53adf4cf805999a4e4e5",
+      "source_sha256": "1440d9438fc0ad80f2f193b7546bf363b74ae300eae9a7e611f9cdefbd067366",
+      "published_sha256": "1440d9438fc0ad80f2f193b7546bf363b74ae300eae9a7e611f9cdefbd067366",
       "privacy_transformed": false
     },
     {
@@ -1402,6 +1408,12 @@
       "privacy_transformed": false
     },
     {
+      "path": "tests/test_evidence_applicability.py",
+      "source_sha256": "46ad8d81bc20c12a7e6497fe1bcad9ae4b5e0972554cbbede88ac435910549bd",
+      "published_sha256": "46ad8d81bc20c12a7e6497fe1bcad9ae4b5e0972554cbbede88ac435910549bd",
+      "privacy_transformed": false
+    },
+    {
       "path": "tests/test_existing_citation_binding.py",
       "source_sha256": "1be3199bac93d3a32fd593c204698340eaa86d06a59bd9e6230de4d1e7bef0a5",
       "published_sha256": "1be3199bac93d3a32fd593c204698340eaa86d06a59bd9e6230de4d1e7bef0a5",
@@ -1535,8 +1547,8 @@
     },
     {
       "path": "tests/test_section_tables.py",
-      "source_sha256": "10ef42c5f80e8c1c60e43b442dc5a8d07ffb7ddfdf9a8c8393a4d2ba5d0df161",
-      "published_sha256": "8f094a43759a67d03fa080eb60a3ac726289460d31186c4bba53cce636186705",
+      "source_sha256": "a2e5dcfdf6e93c90bbec3d5678315a3b660d0326be3c14faaaa8717a68c329b7",
+      "published_sha256": "c4c9d00af38e903e475f6ce932b96b38c67225d141125718bec3ad368545189c",
       "privacy_transformed": true
     },
     {

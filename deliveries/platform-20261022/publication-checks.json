@@ -1,8 +1,8 @@
 {
   "date": "2026-10-23",
-  "source_files": 266,
+  "source_files": 268,
   "backend_tests": {
-    "passed": 566,
+    "passed": 593,
     "failed": 0,
     "warnings": 3
   },
@@ -292,5 +292,32 @@
     "source_inputs_changed": false,
     "budget_and_expiry_changed": false,
     "overall_owner_acceptance": false
+  },
+  "evidence_applicability": {
+    "status": "ENFORCED_IN_8897_TRIAL",
+    "new_tests": 27,
+    "source_live_cases": 11,
+    "daily_api_cases": 8,
+    "final_api_canaries": 3,
+    "final_source_canaries": 1,
+    "new_model_http_calls": 0,
+    "generic_document_basis_and_project_case_guards": true,
+    "reviewed_and_native_routes_guarded": true,
+    "old_preview_guard_before_provider_and_reservation": true,
+    "bound_reference_alias_compatibility": true,
+    "scalar_qualifiers_preserved": true,
+    "source_kind_is_title_based_not_validity_review": true,
+    "old_records_and_policy_preserved": true,
+    "source_inputs_changed": false,
+    "new_embeddings": 0,
+    "policy_used_requests": 8,
+    "reserved_cny": 0.53,
+    "remaining_requests": 12,
+    "formal_service_changed": false,
+    "frontend_changed": false,
+    "browser_interaction_verified": false,
+    "new_real_model_generation_verified": false,
+    "owner_template_acceptance": false,
+    "old_8896_generation_reloaded": false
   }
 }

@@ -107,6 +107,8 @@ class GenerationWorkflow:
         if primary_only:citations=[c for c in citations if c.get('answer_usage')=='PRIMARY']
         if any(not self.source_current(c) for c in citations if c.get('answer_usage')=='PRIMARY'):
             raise ValueError('来源版本已变化，请重新检索后再建立预览。')
+        from app.retrieval.evidence_applicability import require_applicable
+        require_applicable(run['question'],citations)
         body,units=selection_packet(run['question'],citations)
         if protocol=='CONCISE_V1':
             from app.answer_engine.llm.grounded_concise import concise_packet
@@ -133,6 +135,8 @@ class GenerationWorkflow:
             if row.get('pricing_version')!=self.pricing()['version']:raise ValueError('核价配置已变化，请重新建立外发预览。')
             if not self.provider_factory and self.clock().astimezone(timezone(timedelta(hours=8))).date().isoformat()!=row['pricing_checked_on']:raise ValueError('本批价格核对已跨日，需重新核价后再执行，未外发资料。')
             if any(not self.source_current(c) for c in row['citations'] if c.get('answer_usage')=='PRIMARY'):raise ValueError('证据版本已变，未发送模型请求。')
+            from app.retrieval.evidence_applicability import require_applicable
+            require_applicable(row['question'],row['citations'])
             row.update(status='EXECUTING',actor=actor)
             return copy.deepcopy(row)
         row=self.store._mutate(reserve)
@@ -164,6 +168,8 @@ class GenerationWorkflow:
                 result=render_concise(generated.content,row['units'],row['citations'],row['question'])
             else:result=render_selection(generated.content,row['units'],row['citations'])
             if any(not self.source_current(c) for c in result['citations']):raise ValueError('生成期间来源版本已变化，结果未启用。')
+            from app.retrieval.evidence_applicability import enforce_applicability
+            result=enforce_applicability(row['question'],result)
             saved=self.store.finish_run(query['query_run_id'],result)
             status='COMPLETED'
         except Exception as error:
@@ -181,6 +187,8 @@ class GenerationWorkflow:
                     for field in ('facet_coverage','coverage_gaps','answer_completeness'):
                         if field in original:result[field]=copy.deepcopy(original[field])
             result['notice']='本次生成或验证失败，不是原文不存在。有效引用可继续核对；不自动追加模型调用，计次以调用账本为准。'
+            from app.retrieval.evidence_applicability import enforce_applicability
+            result=enforce_applicability(row['question'],result)
             saved=self.store.finish_run(query['query_run_id'],result,error=True)
             status='FAILED_SPENT' if attempted else 'FAILED_NOT_SENT'
         self.store._mutate(lambda state:state['generations'][key].update(status=status,query_run_id=query['query_run_id']))

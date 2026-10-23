@@ -32,7 +32,7 @@ def rank(tmp_path,question='文档的收发及版本管理有哪些要求？',ex
 
 
 def test_intro_links_real_row_with_readable_locator_preserves_columns_and_marks_missing_aspect(tmp_path):
-    question='文档的收发及版本管理有哪些要求？';result,cards,row=rank(tmp_path,question)
+    question='演示项目的文档的收发及版本管理有哪些要求？';result,cards,row=rank(tmp_path,question)
     assert cards[0]['evidence_id']=='row' and cards[0]['answer_usage']=='PRIMARY'
     assert cards[1]['evidence_id']=='intro' and cards[1]['answer_usage']=='BACKGROUND'
     assert '原件第2表' in cards[0]['display_location'] and '沟通形式=文件收发' in cards[0]['display_location']
@@ -42,7 +42,7 @@ def test_intro_links_real_row_with_readable_locator_preserves_columns_and_marks_
     assert [p['status'] for p in result['facet_coverage']['facets']]==['TOPIC_LOCATED','NOT_LOCATED']
     extracted=source_extract({'answer_status':'SOURCES_ONLY','citations':cards},question)
     assert extracted['answer_completeness']=='PARTIAL' and '版本管理' in extracted['coverage_gaps'][0]
-    assert '项目复盘' in extracted['answer'] and '电子件不得作为验收依据' in extracted['answer']
+    assert '演示项目' in extracted['answer'] and '不作为其他项目' in extracted['answer'] and '电子件不得作为验收依据' in extracted['answer']
 
 
 @pytest.mark.parametrize('change',['path','version','section','stage'])

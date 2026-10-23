@@ -1061,9 +1061,9 @@
     },
     {
       "path": "knowledge-ui/src/pages/PlatformContent.tsx",
-      "source_sha256": "81e35c58f69392801111d60f828d4cec33400c0952eb40ad67c7364bec209d8d",
-      "published_sha256": "2b2d20418af89b5130ab424a20e96033787589c50e7be93356395302136e51e2",
-      "privacy_transformed": true
+      "source_sha256": "4240fca93227c26c96150a0911aa498978d365ef5271d95c647fdc7cfbe2e0ec",
+      "published_sha256": "4240fca93227c26c96150a0911aa498978d365ef5271d95c647fdc7cfbe2e0ec",
+      "privacy_transformed": false
     },
     {
       "path": "knowledge-ui/src/pages/PlatformOperations.tsx",

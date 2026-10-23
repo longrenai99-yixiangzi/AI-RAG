@@ -24,9 +24,9 @@
       "matches": 0
     }
   },
-  "new_model_http_calls": 2,
+  "new_model_http_calls": 3,
   "private_content_uploaded": false,
-  "concise_protocol": "OWNER_CONFIRMED_HISTORY_IN_ISOLATED_TRIAL_MODEL_EXECUTION_DISABLED",
+  "concise_protocol": "APPROVED_DAILY_CONCISE_EVIDENCE_BOUND_TRIAL",
   "original_online_validation_passes": 0,
   "original_online_validation_failures": 2,
   "offline_original_response_replay_passes": 2,
@@ -71,20 +71,28 @@
     "generation_execution_enabled": false
   },
   "daily_model_policy": {
-    "status": "PENDING_EXPLICIT_APPROVAL",
-    "new_model_http_calls": 0,
+    "status": "APPROVED_ACTIVE_BOUNDED_TRIAL",
+    "new_model_http_calls": 1,
     "synthetic_tests": 34,
     "typescript": "PASS",
     "platform_build": "PASS",
     "served_ui_bundle": true,
     "unapproved_request_blocked_403": true,
-    "used_requests": 0,
-    "reserved_cny": 0,
+    "used_requests": 1,
     "existing_history_preserved": true,
     "original_workbench_state_preserved": true,
     "backup_does_not_rewind_budget": true,
     "browser_ui_verified": false,
     "browser_ui_blocker": "CURRENT_URL_NOT_CONFIDENTLY_IDENTIFIED",
-    "real_model_new_topic_acceptance": false
-  }
+    "real_model_new_topic_acceptance": false,
+    "implementation_new_model_http_calls": 0,
+    "activation_model_http_calls": 1,
+    "real_model_probe_path_passes": 1,
+    "exact_quote_check": "PASS",
+    "source_original_http_and_hash": "PASS",
+    "local_route_probes": 2,
+    "local_route_additional_model_calls": 0
+  },
+  "model_http_call_count_scope": "Two historical concise-validation calls plus one daily-activation probe; excludes earlier project stages.",
+  "legacy_per_request_execution_enabled": false
 }

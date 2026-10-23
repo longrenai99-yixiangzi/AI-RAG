@@ -1,0 +1,15 @@
+# Accepted-answer lifecycle drill with existing content
+
+Completed on 2026-10-24. No runtime code was changed. One previously owner-confirmed answer and its existing historical primary citation were exercised in a separate copy of the current platform registry. This is an API integration drill, not a new business approval, a new independent accuracy question or a live publication.
+
+Eleven assertion groups passed. Feedback created a draft without publishing, and duplicate feedback did not create another candidate. Publication without review and review without explicit confirmation were rejected. Isolated submission, approval and publication succeeded. Repeating the exact original question returned the reviewed answer, original citation and applicability without calling the retrieval service. Opening the cited converted file returned bytes matching the admitted source version.
+
+After withdrawal, the answer stopped being reused and the question fell back to original-source retrieval. Source retrieval may still answer a question; withdrawing derived knowledge does not delete its original evidence. Restoring an active knowledge version created a new version and restored reuse while keeping history.
+
+The initial drill attempted to update the version label of a bound indexed source. The platform correctly rejected that edit. This was a harness assumption, not a failed source-identity protection. The initial copy and failure record were retained. The final drill used supported source withdrawal, which moved the derived knowledge to review-required and blocked restoration of the old answer. Actual source-byte changes were not re-exercised in this phase.
+
+A local backup's internal manifest was verified. Restoring that backup inside the same isolated directory restored the knowledge and preserved paid-call reservations. The isolated knowledge was withdrawn again at the end. Live registry, policy and prepared-runtime files remained byte-identical; original and converted source hashes still matched the previous owner-confirmation record. Zero new real model HTTP calls; live business-knowledge publications remain zero. The isolated app had no daily policy loaded, generation execution disabled, a rejecting provider factory and an HTTP request hook allowing only the local retrieval service.
+
+The private handoff documents the actual candidate, review, publication, reuse and withdrawal workflow. It distinguishes the existing correction-to-candidate UI from positive feedback: marking an answer useful is not publication. Approval and publication remain separate operations, and source conditions must remain visible when reusing an answer.
+
+The prior 671-check exported backend result is retained, not rerun or added to the eleven drill checks. No new frontend build or browser-click acceptance was needed or claimed. Multi-day stability, physical source-byte mutation in this drill, full-machine/off-disk disaster recovery, merged/scanned tables and whole-library business quality remain outside the results of this phase. Private source names, question text, state files, screenshots and backups are not published here.

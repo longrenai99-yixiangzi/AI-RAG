@@ -404,7 +404,7 @@
     "business_knowledge_auto_published": false,
     "overall_owner_acceptance": false
   },
-  "latest_readiness_status": "LOCAL_LIMITED_USE_COLUMNS_AND_NATIVE_PAGE_PREVIEW",
+  "latest_readiness_status": "LOCAL_LIMITED_USE_REAL_CONTENT_LIFECYCLE_DRILL_PASSED",
   "appendix_outline": {
     "status": "APPENDIX_OUTLINE_LIVE_DETAILS_PARTIAL",
     "backend_passed": 627,
@@ -594,5 +594,25 @@
     "initial_browser_harness_failures_preserved": 2,
     "final_extra_requirement_canaries": 3,
     "mandatory_excluded_and_instruction_requests_not_treated_as_labels": true
+  },
+  "reviewed_knowledge_lifecycle": {
+    "completed_on": "2026-10-24",
+    "assertion_groups_passed": 11,
+    "existing_accepted_answers_exercised": 1,
+    "isolated_publications": 1,
+    "live_business_knowledge_published": 0,
+    "new_owner_acceptance": false,
+    "live_registry_policy_and_prepared_bytes_unchanged": true,
+    "original_source_versions_unchanged": true,
+    "exact_question_reviewed_answer_reused": true,
+    "withdrawal_and_source_suspension_verified": true,
+    "backup_manifest_verified": true,
+    "new_model_http_calls": 0,
+    "runtime_code_changed": false,
+    "new_browser_acceptance": false,
+    "backend_result_retained_not_rerun": 671,
+    "first_harness_assumption_failure_preserved": true,
+    "multi_day_stability_verified": false,
+    "full_machine_disaster_recovery_verified": false
   }
 }

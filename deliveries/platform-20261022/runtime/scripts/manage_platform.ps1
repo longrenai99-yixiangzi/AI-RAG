@@ -22,6 +22,17 @@ function Get-OwnedProcesses {
     return $processes
 }
 
+function Save-StatusRecord($Record) {
+    try {
+        $folder = Join-Path $trialPath 'health'
+        [void][IO.Directory]::CreateDirectory($folder)
+        $recordPath = Join-Path $folder ((Get-Date).ToString('yyyyMMdd_HHmmss_fff') + '_' + [guid]::NewGuid().ToString('N') + '.json')
+        [IO.File]::WriteAllText($recordPath, ($Record | ConvertTo-Json -Depth 4))
+    } catch {
+        Write-Warning '本次检查记录未能保存；服务检查结论保持原状，请核对磁盘与目录权限。'
+    }
+}
+
 if ($Action -eq 'Start') {
     & (Join-Path $repoPath 'scripts/start_daily_system.ps1')
 }
@@ -55,6 +66,7 @@ if ($Action -eq 'Stop') {
     exit 0
 }
 
+$statusRecord = @{schema_version=1; checked_at=(Get-Date).ToString('o'); result='NOT_READY'}
 try {
     $owned = @(Get-OwnedProcesses)
     foreach ($listener in @(Get-NetTCPConnection -State Listen -LocalPort 8897 -ErrorAction SilentlyContinue)) {
@@ -67,8 +79,14 @@ try {
         -not $state.daily_model -or $state.capabilities.generation_execution_enabled) {
         throw '服务索引身份或运行模式不符合交付约定。'
     }
+    $statusRecord['result'] = 'READY'
+    $statusRecord['candidate_hash'] = $retrieval.candidate_hash
+    $statusRecord['sources'] = $retrieval.sources
+    $statusRecord['records'] = $retrieval.records
+    $statusRecord['recent_questions_shown'] = $state.runs.Count
+    $statusRecord['daily_model'] = @{active=$state.daily_model.active; policy_sha256=$state.daily_model.policy_sha256; used_requests=$state.daily_model.used_requests; reserved_cny=$state.daily_model.reserved_cny; expires_at=$state.daily_model.expires_at}
     Write-Output "工作版正常：$baseUrl/manage"
-    Write-Output "现有来源 $($retrieval.sources)，索引片段 $($retrieval.records)，问题记录 $($state.runs.Count)。"
+    Write-Output "现有来源 $($retrieval.sources)，索引片段 $($retrieval.records)，最近问题记录 $($state.runs.Count) 条（最多显示50条，不是历史总数）。"
     Write-Output "日常模型批准资料 $($state.daily_model.material_count) 份；本期已用 $($state.daily_model.used_requests)/$($state.daily_model.max_requests) 次，预占 $($state.daily_model.reserved_cny)/$($state.daily_model.max_budget_cny) 元（不是实际账单）。"
     if ($state.daily_model.active) {
         $expires = [DateTimeOffset]::Parse($state.daily_model.expires_at).ToOffset([TimeSpan]::FromHours(8)).ToString('yyyy-MM-dd HH:mm:ss')
@@ -76,5 +94,8 @@ try {
     }
     else { Write-Output '日常模型未启用、暂停或已到期；本地检索可用，不自动续费。' }
 } catch {
+    $statusRecord['failure_kind'] = $_.Exception.GetType().FullName
     throw "工作版未就绪：$($_.Exception.Message) 请双击启动知识库；若仍失败，查看使用交接中的日志位置。"
+} finally {
+    Save-StatusRecord $statusRecord
 }

@@ -1241,8 +1241,8 @@
     },
     {
       "path": "scripts/manage_platform.ps1",
-      "source_sha256": "84bfb477e5f44bfc3942aa9a845153674cce27c0cf70281b72faa27d2dd961df",
-      "published_sha256": "84bfb477e5f44bfc3942aa9a845153674cce27c0cf70281b72faa27d2dd961df",
+      "source_sha256": "4938046adbd870a92403b5f3e1b62d96886095054fbfcf68d62516d4eb2440aa",
+      "published_sha256": "4938046adbd870a92403b5f3e1b62d96886095054fbfcf68d62516d4eb2440aa",
       "privacy_transformed": false
     },
     {
@@ -1531,6 +1531,12 @@
       "path": "tests/test_platform_existing_content.py",
       "source_sha256": "b8781a5e86f401af2ec9148c609b8ecafa2109dc3325dbc740d7ebd94ec6a28b",
       "published_sha256": "b8781a5e86f401af2ec9148c609b8ecafa2109dc3325dbc740d7ebd94ec6a28b",
+      "privacy_transformed": false
+    },
+    {
+      "path": "tests/test_platform_status_snapshots.py",
+      "source_sha256": "c60508337b110f15ddef343f7cd8fc053a5b24b01c8e69a9eef3d3c325b18d4d",
+      "published_sha256": "c60508337b110f15ddef343f7cd8fc053a5b24b01c8e69a9eef3d3c325b18d4d",
       "privacy_transformed": false
     },
     {

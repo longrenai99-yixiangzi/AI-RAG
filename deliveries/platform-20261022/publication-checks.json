@@ -1,8 +1,8 @@
 {
   "date": "2026-10-24",
-  "source_files": 275,
+  "source_files": 276,
   "backend_tests": {
-    "passed": 673,
+    "passed": 675,
     "failed": 0,
     "warnings": 3
   },
@@ -404,7 +404,7 @@
     "business_knowledge_auto_published": false,
     "overall_owner_acceptance": false
   },
-  "latest_readiness_status": "DEPENDENCY_AUDIT_DONE_BACKUP_COPY_USER_DEFERRED",
+  "latest_readiness_status": "SHORT_WINDOW_PASS_OPERATION_CHECKPOINTS_ENABLED_MULTI_DAY_PENDING",
   "appendix_outline": {
     "status": "APPENDIX_OUTLINE_LIVE_DETAILS_PARTIAL",
     "backend_passed": 627,
@@ -729,5 +729,40 @@
     "runtime_restarted": false,
     "live_business_knowledge_published": 0,
     "new_business_owner_acceptance": false
+  },
+  "bounded_stability": {
+    "status": "SHORT_WINDOW_PASS_MULTI_DAY_PENDING",
+    "duration_seconds": 903.81,
+    "target_seconds": 900,
+    "health_samples": 61,
+    "failed_health_samples": 0,
+    "health_pair_latency_ms": {
+      "p50": 281.0,
+      "p95_nearest_rank": 312.0,
+      "max": 328.0
+    },
+    "maximum_sample_gap_seconds": 15.01305,
+    "local_source_probe_calls": 16,
+    "historical_question_variants": 6,
+    "new_independent_business_topics": 0,
+    "runtime_restarted": false,
+    "new_model_http_calls": 0,
+    "used_requests": 9,
+    "reserved_cny": 0.6,
+    "remaining_requests": 11,
+    "live_state_policy_and_prepared_byte_identical": true,
+    "new_real_status_snapshots": 2,
+    "status_snapshot_tests_passed": 2,
+    "backend_passed": 675,
+    "backend_warnings": 3,
+    "source_files": 276,
+    "frontend_changed": false,
+    "new_business_owner_acceptance": false,
+    "live_business_knowledge_published": 0,
+    "new_backup_created_or_copied": false,
+    "restoration_performed": false,
+    "multi_day_stability_verified": false,
+    "continuous_24_hour_monitor_installed": false,
+    "memory_leak_absence_proven": false
   }
 }

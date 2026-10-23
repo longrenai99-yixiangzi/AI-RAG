@@ -76,3 +76,5 @@ Existing accepted-answer lifecycle: [isolated real-content drill and boundaries]
 Browser lifecycle and readable source-name propagation: [interaction evidence and scope](BROWSER_REVIEW_LIFECYCLE.md). Eight browser check groups and final exported backend 673 checks passed. Only the daily workbench restarted; no live business publication or new model call.
 
 Recovery dependency audit: [read-only inventory and deferred backup scope](RECOVERY_DEPENDENCIES.md). Startup and cataloged sources exist; 15 non-admitted reference targets require separate follow-up. Backup copying was deferred by the owner; no copy or restore was performed. Runtime and prior backend result remain unchanged.
+
+Bounded live observation and operation-time checkpoint records: [results and limits](BOUNDED_STABILITY.md). Sixty-one samples and sixteen source-only probes passed over about fifteen minutes. Final exported backend: 675 checks. No service restart, new public-model call or backup copy; multi-day and owner acceptance remain pending.

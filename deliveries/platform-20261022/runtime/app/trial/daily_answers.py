@@ -15,7 +15,7 @@ from .platform_generation import file_hash
 
 PRICE_URL='https://api-docs.deepseek.com/quick_start/pricing/'
 DIRECT_MODES={'HUMAN_REVIEWED_EXACT_QUESTION','VERIFIED_SCALAR_NO_MODEL','VERIFIED_TABLE_SCHEMA_NO_MODEL',
-              'LOCAL_PROJECT_AREA_FIELD_NO_MODEL','LOCAL_PROJECT_MONEY_FIELD_NO_MODEL','VERIFIED_COMPLETE_LIST_NO_MODEL'}
+              'LOCAL_PROJECT_AREA_FIELD_NO_MODEL','LOCAL_PROJECT_MONEY_FIELD_NO_MODEL','VERIFIED_COMPLETE_LIST_NO_MODEL','REVIEWED_TABLE_FIELDS_NO_MODEL','NATIVE_FLOW_RELATION_NO_MODEL','SOURCE_BOUND_SPAN_NO_MODEL','REVIEWED_NATIVE_CLAUSE_NO_MODEL'}
 
 
 class DailyAnswers:
@@ -44,6 +44,8 @@ class DailyAnswers:
             if not value.is_finite() or value<=0:raise ValueError('日常模型核价不正确。')
         self.policy_hash=hashlib.sha256(json.dumps(policy,ensure_ascii=False,sort_keys=True).encode()).hexdigest()
         self.clock=clock or (lambda:datetime.now(timezone.utc))
+        self.expires_at_limit=datetime.fromisoformat(policy['expires_at_limit']) if policy.get('expires_at_limit') else None
+        if self.expires_at_limit is not None and self.expires_at_limit.tzinfo is None:raise ValueError('策略截止时间必须包含时区。')
         self.price_reader=price_reader or self._price_page
         self.price_lock=threading.Lock()
         self.verified_day=None
@@ -58,7 +60,8 @@ class DailyAnswers:
         return row if row.get('policy_sha256')==self.policy_hash else {}
 
     def _active(self,row):
-        return bool(row.get('approved') and not row.get('paused') and self.clock()<datetime.fromisoformat(row['expires_at']))
+        return bool(row.get('approved') and not row.get('paused') and self.clock()<datetime.fromisoformat(row['expires_at'])
+                    and (self.expires_at_limit is None or self.clock()<self.expires_at_limit))
 
     def status(self):
         state=self.store._read();row=self._record();used=row.get('reservations',{})
@@ -103,6 +106,7 @@ class DailyAnswers:
 
     def approve(self,policy_hash,actor,*,previous_policy_hash=None):
         if policy_hash!=self.policy_hash:raise ValueError('策略内容已变化，请重新阅读。')
+        if self.expires_at_limit is not None and self.clock()>=self.expires_at_limit:raise ValueError('策略限定截止时间已到，不能重新启用。')
         self._versions();self._price()
         def action(state):
             old=state.get('daily_answer_policy',{})
@@ -123,8 +127,10 @@ class DailyAnswers:
                 if self.clock()>=datetime.fromisoformat(old['expires_at']):raise ValueError('策略已到期，不能恢复并重置额度。')
                 old['paused']=False
             else:
+                expiry=self.clock()+timedelta(days=self.policy['valid_days'])
+                if self.expires_at_limit is not None:expiry=min(expiry,self.expires_at_limit)
                 old={'policy_sha256':self.policy_hash,'approved':True,'paused':False,'approved_at':self.clock().isoformat(),
-                     'expires_at':(self.clock()+timedelta(days=self.policy['valid_days'])).isoformat(),'actor':actor,'reservations':{},
+                     'expires_at':expiry.isoformat(),'actor':actor,'reservations':{},
                      'limits':{k:self.policy[k] for k in ['policy_id','max_requests','max_budget_cents','max_request_cents','valid_days']}}
             state['daily_answer_policy']=old
             self.store._event(state,'续批限额日常模型' if replacing else '批准或恢复限额日常模型',self.policy_hash,actor)

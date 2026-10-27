@@ -15,7 +15,29 @@ import { GoldReview } from './pages/GoldReview'
 import { ExistingMaterials } from './pages/ExistingMaterials'
 import { PlatformWorkbench } from './pages/PlatformWorkbench'
 
+import { LOCAL_PLATFORM } from './localPlatform'
+import { LocalAsk, LocalDashboard, LocalLibrary, LocalKnowledgeSearch, LocalScopeNotice, LocalUnavailable } from './pages/LocalPlatformPages'
+
 export default function App() {
+  if (LOCAL_PLATFORM) return <AppErrorBoundary><Routes>
+    <Route path="/manage" element={<PlatformWorkbench />} />
+    <Route element={<AppLayout />}>
+      <Route path="/" element={<LocalDashboard />} />
+      <Route path="/knowledge-os" element={<LocalDashboard />} />
+      <Route path="/framework" element={<><LocalScopeNotice /><KnowledgeFramework /></>} />
+      <Route path="/catalog" element={<ExistingMaterials />} />
+      <Route path="/knowledge/:id" element={<KnowledgeSpace />} />
+      <Route path="/node/:id" element={<KnowledgeNode />} />
+      <Route path="/materials" element={<LocalLibrary />} />
+      <Route path="/sources" element={<LocalLibrary />} />
+      <Route path="/ai" element={<LocalAsk />} />
+      <Route path="/search" element={<LocalKnowledgeSearch />} />
+      <Route path="/projects" element={<Navigate to="/manage?tab=projects" replace />} />
+      <Route path="/favorites" element={<Navigate to="/manage?tab=favorites" replace />} />
+      <Route path="/recent" element={<Navigate to="/manage?tab=recent" replace />} />
+      <Route path="*" element={<LocalUnavailable />} />
+    </Route>
+  </Routes></AppErrorBoundary>
   return <AppErrorBoundary><Routes>
     <Route path="/manage" element={<PlatformWorkbench />} />
     <Route element={<AppLayout />}>

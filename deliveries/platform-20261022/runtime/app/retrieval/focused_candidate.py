@@ -57,6 +57,7 @@ class FocusedCandidate:
         self.documents=documents
         self.records_by_source={}
         for r in records:
+            if r.get('native_flow_node') or r.get('native_flow_header'):continue
             self.records_by_source.setdefault((path_key(r['source_path']),r['source_version']),[]).append(r)
         by_source={}
         for s in sections:
@@ -78,7 +79,18 @@ class FocusedCandidate:
             candidates=[c for c in candidates if path_key(c.get('source_path','')) in allowed]
         if allowed_versions is not None:
             candidates=[c for c in candidates if (path_key(c['source_path']),c['source_version']) in allowed_versions]
-        rows=expand_candidates(candidates,self.sections)
+        from app.retrieval.responsibility_scope import responsibility_action,responsibility_quotes,responsibility_key
+        action=responsibility_action(question)
+        responsibility_hits=[]
+        if action and allowed is not None and len(source_scope.get('bindings',[]))==1:
+            for (path,version),records in self.records_by_source.items():
+                if path not in allowed or (allowed_versions is not None and (path,version) not in allowed_versions):continue
+                responsibility_hits.extend({**r,'role':'DIRECT','retrieval_origin':'NAMED_SOURCE_RESPONSIBILITY_PREDICATE'}
+                                           for r in records if responsibility_quotes(action,r['text']))
+            # Bounded same-source recovery, never a new search over the entire corpus.
+            if len(responsibility_hits)<=8:candidates=responsibility_hits+list(candidates)
+        from app.retrieval.native_context import retain_timed_heading
+        rows=[retain_timed_heading(r) for r in expand_candidates(candidates,self.sections)]
         unique=[];seen=set()
         for c in rows:
             identity=(path_key(c['source_path']),c.get('source_version'),c.get('heading_path'),c['text'])
@@ -128,6 +140,12 @@ class FocusedCandidate:
         chosen.sort(key=lambda c:(-c['reranker_score'],c['evidence_id']))
         for c in chosen:c['topic_coverage']=explicit_topic_coverage(task_question,c)
         topical=[c for c in chosen if c['topic_coverage']['status'] not in {'TOPIC_NOT_FOUND','RELATED_MENTION_ONLY'}]
+        from app.retrieval.native_pdf_tables import purpose_supported
+        topical=[c for c in topical if purpose_supported(question,c)]
+        if action:
+            topical=[c for c in topical if responsibility_quotes(action,c['text'])]
+            statements={responsibility_key(action,quote) for c in responsibility_hits or topical for quote in responsibility_quotes(action,c['text'])}
+            if len(statements)!=1:topical=[]
         topic_blocked=not topical
         if topical:chosen=topical+[c for c in chosen if c['topic_coverage']['status'] in {'TOPIC_NOT_FOUND','RELATED_MENTION_ONLY'}]
         # COUNT/LIST/"方案" are weak intent hints, not proof that several sources are required.
@@ -151,7 +169,7 @@ class FocusedCandidate:
                 blocked=True
                 for c in chosen:c['answer_usage']='BACKGROUND'
         table_audit={'status':'NOT_APPLICABLE'};facet_audit=None
-        if not blocked and not re.search(r'多少|几人|人数|合计|统计|计算|占比|金额|费用|差额',task_question):
+        if not blocked and not chosen[0].get('native_pdf_table') and not re.search(r'多少|几人|人数|合计|统计|计算|占比|金额|费用|差额',task_question):
             seed=chosen[0]
             selected,table_audit,facet_audit=associate_section(task_question,seed,chosen,self.records_by_source.get((path_key(seed['source_path']),seed['source_version']),()))
             if selected is not None:
@@ -175,7 +193,7 @@ class FocusedCandidate:
         return {'candidate_evidence':chosen,'bundle_status':'SOURCE_SCOPE_MISSING' if blocked else 'PRIMARY_SECTION_CANDIDATE',
                 'source_scope':source_scope,
                 'topic_coverage':{'status':'PARALLEL_TOPICS_CHECKED_SEPARATELY'} if facets else explicit_topic_coverage(task_question,chosen[0]),
-                'intent_audit':{'comparison_required':comparison},'chapter_coverage':chapter,
+                'intent_audit':{'comparison_required':comparison,**({'responsibility_action':action,'matching_statements':len(statements),'predicate_required':True} if action else {})},'chapter_coverage':chapter,
                 'coverage_audit':coverage,
                 'table_association_audit':table_audit,'facet_coverage':facet_audit,
                 'selection_notes':notes,

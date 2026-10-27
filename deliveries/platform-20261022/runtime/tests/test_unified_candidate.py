@@ -125,9 +125,9 @@ def test_opt_in_personnel_rows_are_browsable_and_skip_query_encoding(tmp_path):
     assert not assemble(uncovered)[0].items and assemble(uncovered,include_background=True)[0].items
 
 
-def reference_candidate(tmp_path):
+def reference_candidate(tmp_path,caption='**来源**：'):
     c,pack,encoder,docs=candidate(tmp_path);body=Path(docs[1]['source_path']);linked=tmp_path/'原件副本.docx';linked.write_bytes(body.read_bytes())
-    note=tmp_path/'《制度登记》.md';note.write_text('# 制度登记\n**来源**：[原件]('+linked.as_uri()+')\n## 关联内容\n- [[制度导航]]',encoding='utf-8')
+    note=tmp_path/'《制度登记》.md';note.write_text('# 制度登记\n'+caption+'[原件]('+linked.as_uri()+')\n## 关联内容\n- [[制度导航]]',encoding='utf-8')
     for name in ['documents.jsonl','evidence.jsonl']:
         file=pack/name;rows=[json.loads(line) for line in file.read_text(encoding='utf-8').splitlines()]
         rows[0].update(source_path=str(note),file_name=note.name,source_version=file_sha(note),file_type='.md')
@@ -156,6 +156,14 @@ def test_reference_selects_existing_body_and_preserves_actual_citation(tmp_path)
     from app.answer_engine.llm.llm_provider import UnavailableLLMProvider
     answer=list(run_flow(AssistedQuery(question=q,mode='sources'),c.retrieve,ShadowAnswerGenerator(UnavailableLLMProvider('offline')),lambda *a:None))[-2]['result']
     assert answer['answer_status']=='SOURCES_ONLY' and answer['source_resolution_note'] and answer['debug']['reference_resolution']
+
+
+def test_bare_link_note_selects_only_the_verified_body_and_keeps_its_citation(tmp_path):
+    c,_,_,_,binding=reference_candidate(tmp_path,caption='')
+    question='《《制度登记》.md》中查找标记是什么？'
+    result=c.retrieve(question);evidence,cards=assemble(result,question)
+    assert len(evidence.items)==1 and cards[0]['source_path']==binding['body_path']
+    assert cards[0]['source_path']!=binding['note_path'] and cards[0]['source_version']==binding['body_version']
 
 
 @pytest.mark.parametrize('changed',['note_path','linked_path','body_path'])

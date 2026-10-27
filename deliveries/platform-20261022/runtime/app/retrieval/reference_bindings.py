@@ -1,13 +1,14 @@
 """A reference note can select an admitted body, but cannot become its evidence."""
-import hashlib,re
+import hashlib
 from pathlib import Path
 from urllib.parse import unquote
+from app.ingestion.normalization.markdown_links import primary_source_link
 
 
 def linked_path(text):
-    links=re.findall(r'^\s*\*\*来源\*\*\s*[:：]\s*\[.*\]\((.*)\)\s*$',text,re.M)
-    if len(links)!=1:return None
-    value=unquote(links[0]).removeprefix('file:///')
+    link=primary_source_link(text)
+    if not link or not link['complete']:return None
+    value=unquote(link['target']).removeprefix('file:///')
     if value.startswith(('\\\\','//')) or not Path(value).is_absolute():return None
     return Path(value)
 

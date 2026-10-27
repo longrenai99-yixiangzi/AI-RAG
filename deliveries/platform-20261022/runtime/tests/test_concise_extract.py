@@ -56,6 +56,45 @@ def test_unknown_or_incomplete_structure_has_no_hard_character_cutoff():
     assert concise_text(text,'有哪些要求？')[0]==text
 
 
+def test_unique_letter_labelled_block_keeps_its_conditions_and_full_citation():
+    first='（c) 专家评审\n在施工前由总承包单位组织专家，审查通过后才能实施。'
+    selected='（d） 专题协调会\n根据实际情况，专题会议可由任意一方组织，但紧急事项须在3天内核实。'
+    text=first+'\n'+selected
+    excerpt,method=concise_text(text,'专题会议针对什么情况，可由哪些单位组织？')
+    assert (excerpt,method)==(selected,'EXPLICIT_SIBLING_BLOCK')
+    card={'citation_id':'S1','answer_usage':'PRIMARY','excerpt':text}
+    result=source_extract({'answer_status':'SOURCES_ONLY','citations':[card]},'专题会议针对什么情况，可由哪些单位组织？')
+    assert '专家评审' not in result['answer'] and '3天内' in result['answer'] and result['citations'][0]['excerpt']==text
+
+
+@pytest.mark.parametrize('question,prefix,suffix',[
+    ('专家评审和专题会议有哪些要求？','',''),
+    ('会议有哪些要求？','',''),
+    ('专题会议需要多少人？','',''),
+    ('2025年专题会议有哪些要求？','',''),
+    ('专题会议有哪些要求？','本规定仅适用于改造项目。\n',''),
+    ('专题会议有哪些要求？','','\n但上述条款仅适用于改造项目。'),
+])
+def test_sibling_selection_does_not_drop_global_scope_or_choose_ambiguous_topic(question,prefix,suffix):
+    text=prefix+'（c） 专家评审\n组织专家评审。\n（d） 专题会议\n安排专题会议。'+suffix
+    assert concise_text(text,question)==(text,'FULL_SOURCE_FALLBACK')
+
+
+def test_numbered_peer_item_is_complete_and_mixed_or_skipped_labels_stay_unmodified():
+    first='1、选择设计院时，不应只看设计费，还需考察团队和概算编制能力；'
+    second='2、限额设计指标需结合实际情况，不是一定要达到，可能增加后期维修费用；'
+    text=first+'\n'+second
+    assert concise_text(text,'依据《演示资料09.pptx》，选择设计院时考察哪些因素？')==(first,'EXPLICIT_SIBLING_BLOCK')
+    assert concise_text(text,'限额设计指标是否一定要达到？')==(second,'EXPLICIT_SIBLING_BLOCK')
+    for malformed in [text.replace('2、','3、'),text.replace('2、','（b） ')]:
+        assert concise_text(malformed,'选择设计院时考察哪些因素？')==(malformed,'FULL_SOURCE_FALLBACK')
+
+
+def test_shared_generic_words_do_not_replace_the_requested_subject():
+    text='（a） 质量管理\n质量部门的主要工作是质量复核。\n（b） 专题会议\n专题会议按需召开。'
+    assert concise_text(text,'成本部门的主要工作是什么？')==(text,'FULL_SOURCE_FALLBACK')
+
+
 def test_source_extract_keeps_full_citations_and_never_summarizes_background():
     primary={'citation_id':'S1','excerpt':'第一，是建立边界。详细解释。第二，是控制风险。详细解释。','answer_usage':'PRIMARY'}
     background={'citation_id':'S2','excerpt':'背景金额100万元。','answer_usage':'BACKGROUND'}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import re
 import uuid
-from collections import defaultdict
+from collections import Counter, defaultdict
 from typing import Any, Iterable
 
 
@@ -87,6 +87,8 @@ def quality_for(raw_text: str, *, has_context: bool, is_table: bool = False) -> 
         score -= 55; reasons.append("NUMBERING_ONLY")
     if is_table and ("表头：" not in raw_text or "行：" not in raw_text):
         score -= 35; reasons.append("TABLE_CONTEXT_MISSING")
+    if is_table and len(raw_text) > MAX_CHARS:
+        score -= 35; reasons.append("TABLE_ROW_TOO_LONG")
     return max(score, 0), reasons
 
 
@@ -152,15 +154,83 @@ def build_structured_layer(documents: list[dict[str, Any]], sections: list[dict[
             for index, raw in enumerate(chunk_units(units), start=1):
                 _append_chunk(chunks, bindings, doc, source_id, source_version, section, path_value, raw, index, evidence_by_section[section_id], is_table=False)
             for table in tables_by_section[section_id]:
+                if doc.get("file_type") == ".xlsx" and table.get("sheet_state", "visible") != "visible":
+                    continue
                 header = " | ".join(str(item) for item in table.get("header") or [])
                 table_name = str(table.get("table_title") or table.get("title") or table.get("table_id") or "表格")
+                structure_review = False
+                if doc.get("file_type") == ".xlsx":
+                    # shortcut: unresolved columns quarantine the parsed region; split or review its headers before retrieval.
+                    for native_row in rows_by_table[str(table.get("table_id") or "")]:
+                        if native_row.get("is_header"):
+                            continue
+                        native_cells = native_row.get("cells") or []
+                        _, omitted = _xlsx_answer_cells(native_cells, table.get("header") or [])
+                        if any(field["reason"] in {"UNNAMED_HEADER", "AMBIGUOUS_HEADER"} for field in omitted):
+                            structure_review = True
+                            break
                 for row in rows_by_table[str(table.get("table_id") or "")]:
-                    values = " | ".join(str(item.get("value") or "") for item in row.get("cells") or [])
-                    raw = f"表名：{table_name}\n表头：{header}\n行：{values}"
-                    _append_chunk(chunks, bindings, doc, source_id, source_version, section, path_value, raw, int(row.get("row_number") or 0), evidence_by_section[section_id], is_table=True, table_id=str(table.get("table_id") or ""), row_location=row.get("source_location") or {})
+                    if row.get("is_header"):
+                        continue
+                    cells = row.get("cells") or []
+                    excluded = []
+                    row_header = header
+                    if doc.get("file_type") == ".xlsx":
+                        cells, excluded = _xlsx_answer_cells(cells, table.get("header") or [])
+                        if not cells:
+                            continue
+                        row_header = " | ".join(str(cell["header"]) for cell in cells)
+                    values = " | ".join(str(item.get("display_text", item["value"])) if item.get("value") is not None else "" for item in cells)
+                    raw = f"表名：{table_name}\n表头：{row_header}\n行：{values}"
+                    context = row.get("row_context") or []
+                    if context:
+                        raw += "\n行标识（原文）：" + " | ".join(f"{cell['cell_reference']}={cell.get('display_text',cell['value'])}" for cell in context if cell.get('value_status')=='NATIVE_VALUE' and (not cell.get('display_required') or cell.get('display_text')))
+                    _append_chunk(chunks, bindings, doc, source_id, source_version, section, path_value, raw, int(row.get("record_number", row.get("row_number")) or 0), evidence_by_section[section_id], is_table=True, table_id=str(table.get("table_id") or ""), row_location=row.get("source_location") or {})
+                    if doc.get("file_type") == ".xlsx":
+                        chunks[-1].update(source_cells=cells, excluded_fields=excluded, row_kind="SUMMARY_CANDIDATE" if row.get("is_summary") else "DATA_CANDIDATE")
+                        if table.get("context_id"):
+                            chunks[-1].update(parent_chunk_id=table['context_id'], context_evidence_ids=row.get('context_evidence_ids') or [], row_context=context)
+                        if table.get('source_table_id'):
+                            chunks[-1].update(source_table_id=table['source_table_id'],source_table_row_id=row['source_table_row_id'],field_group_index=table['field_group_index'],field_group_count=table['field_group_count'],requires_column_scope=table['requires_column_scope'])
+                        if any(cell.get('value_status')!='NATIVE_VALUE' or (cell.get('display_required') and not cell.get('display_text')) for cell in context):
+                            chunks[-1]["quality_reasons"].append("ROW_CONTEXT_UNRESOLVED")
+                            chunks[-1]["chunk_quality_score"] = 0
+                            chunks[-1]["structure_quality"]["score"] = 0
+                        if structure_review:
+                            chunks[-1]["quality_reasons"].append("XLSX_STRUCTURE_REVIEW_REQUIRED")
+                            chunks[-1]["chunk_quality_score"] = 0
+                            chunks[-1]["structure_quality"]["score"] = 0
     exact_duplicates(chunks)
     for chunk in chunks: chunk["index_status"] = "QUARANTINED" if int(chunk["chunk_quality_score"]) < 70 else "STAGING_CANDIDATE"
     return {"sources": sources, "documents": staged_docs, "sections": staged_sections, "semantic_chunks": chunks, "knowledge_node_bindings": bindings}
+
+
+def _xlsx_answer_cells(cells: list[dict[str, Any]], headers: list[str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    counts = Counter(headers)
+    selected, excluded = [], []
+    for cell in cells:
+        label = str(cell.get("header") or "")
+        reason = None
+        if not label or re.fullmatch(r"列\d+", label) or re.fullmatch(r"[\d.,%]+", label):
+            reason = "UNNAMED_HEADER"
+        elif counts[label] > 1:
+            reason = "AMBIGUOUS_HEADER"
+        elif any(term in label for term in ("身份证", "手机号", "联系电话")):
+            reason = "PERSONAL_IDENTIFIER"
+        elif cell.get("value_status") in {"FORMULA_CACHE_MISSING", "CELL_ERROR", "BODY_MERGE_CROSSES_FIELDS"}:
+            reason = cell["value_status"]
+        elif cell.get('display_required') and not cell.get('display_text'):
+            reason = 'DISPLAY_FORMAT_REVIEW_REQUIRED'
+        elif str(cell.get("formula") or "").startswith("=") and cell.get("cached_value") is None:
+            reason = "FORMULA_CACHE_MISSING"
+        elif str(cell.get("value") or "") in {"#REF!", "#DIV/0!", "#VALUE!", "#NAME?", "#N/A", "#NUM!", "#SPILL!", "#CALC!"}:
+            reason = "CELL_ERROR"
+        if reason:
+            if cell.get("value") not in (None, ""):
+                excluded.append({"column": cell.get("column"), "header": label, "reason": reason})
+        elif cell.get("value") not in (None, ""):
+            selected.append(cell)
+    return selected, excluded
 
 
 def _append_chunk(chunks: list[dict[str, Any]], bindings: list[dict[str, Any]], doc: dict[str, Any], source_id: str, source_version: str, section: dict[str, Any], section_path: str, raw_text: str, ordinal: int, evidence: list[dict[str, Any]], *, is_table: bool, table_id: str = "", row_location: dict[str, Any] | None = None) -> None:
@@ -177,7 +247,7 @@ def _append_chunk(chunks: list[dict[str, Any]], bindings: list[dict[str, Any]], 
             if item.get("table_id") != table_id:
                 continue
             item_location = item.get("location") or {}
-            if any(row_location.get(key) is not None and item_location.get(key) != row_location[key] for key in ("sheet_name", "table", "slide")):
+            if any(row_location.get(key) is not None and item_location.get(key) != row_location[key] for key in ("sheet_name", "table", "slide", "column_start", "column_end")):
                 continue
             item_index = next((item_location.get(key) for key in ("row_start", "line_start", "row") if item_location.get(key) is not None), None)
             if item_index == row_index:
@@ -188,4 +258,5 @@ def _append_chunk(chunks: list[dict[str, Any]], bindings: list[dict[str, Any]], 
     domain = profile.get("business_domain", {}).get("value") or "设计管理"
     token_count = len(re.findall(r"[\u4e00-\u9fff]|[A-Za-z0-9]+", raw_text))
     chunks.append({"schema_version": SCHEMA_VERSION, "chunk_id": chunk_id, "source_id": source_id, "source_version": source_version, "document_id": document_id, "section_id": section_id, "knowledge_domain": domain, "knowledge_nodes": ["design-management"], "section_path": section_path, "knowledge_type": {"value": infer_knowledge_type(raw_text), "classification": "RULE_INFERRED", "verified": False}, "raw_text": raw_text, "retrieval_text": retrieval_text(domain=domain, document_title=str(doc.get("structure", {}).get("title") or doc.get("file_name") or ""), section_path=section_path, raw_text=raw_text, project=profile.get("project", {}).get("value"), organization=profile.get("organization", {}).get("value"), specialty=profile.get("specialty", {}).get("value")), "parent_chunk_id": None, "atomic_evidence_ids": evidence_ids, "char_count": len(raw_text), "token_count": token_count, "structure_quality": {"score": score, "reasons": reasons}, "metadata_quality": doc.get("metadata_quality"), "chunk_quality_score": score, "quality_reasons": reasons, "table_id": table_id or None})
+    chunks[-1].update(file_name=doc.get("file_name"), source_path=doc.get("source_path"), source_location=row_location)
     bindings.append({"schema_version": SCHEMA_VERSION, "object_type": "SEMANTIC_CHUNK", "object_id": chunk_id, "knowledge_node_id": "design-management", "status": "BOUND", "method": "INHERITED_FROM_DOCUMENT", "evidence": document_id})

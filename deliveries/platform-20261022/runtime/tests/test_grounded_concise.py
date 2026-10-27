@@ -7,7 +7,7 @@ from threading import Event
 import pytest
 from fastapi.testclient import TestClient
 
-from app.answer_engine.llm.grounded_concise import concise_packet, render_concise
+from app.answer_engine.llm.grounded_concise import concise_packet, render_concise,collapse_source_quotes
 from app.answer_engine.llm.llm_provider import GenerationResult
 from app.trial.platform_generation import GenerationWorkflow, selection_packet
 from app.trial.platform_store import PlatformStore
@@ -43,6 +43,57 @@ def test_short_answer_preserves_full_citation_and_reports_coverage_limit():
     assert '培训会' not in result['answer'] and result['citations'][0]['excerpt'] == TEXT
     assert result['claims'][0]['check'] == 'SOURCE_TEXT_MATCHED'
     assert result['answer_completeness'] == 'NOT_INDEPENDENTLY_VERIFIED'
+
+
+def test_concise_preview_uses_exact_sibling_block_and_keeps_original_local_citation(tmp_path):
+    text='（c） 专家评审\n审查通过后才能施工。\n（d） 专题会议\n专题会议可由任意一方组织，但应保留确认记录。'
+    selected=text[text.index('（d）'):]
+    source=tmp_path/'会议资料.md';source.write_text(text,encoding='utf-8')
+    card={**cards()[0],'source_path':str(source),'file_name':source.name,'source_version':hashlib.sha256(source.read_bytes()).hexdigest(),'excerpt':text}
+    store=PlatformStore(tmp_path/'state.json');run,_=store.begin_run('b'*32,'专题会议可以由哪些单位组织？','测试')
+    store.finish_run(run['query_run_id'],{'answer_status':'SOURCE_EXTRACT','answer':selected,'citations':[card]})
+    flow=GenerationWorkflow(store,lambda c:hashlib.sha256(source.read_bytes()).hexdigest()==c['source_version'])
+    preview=flow.prepare(run['query_run_id'],'CONCISE_V1',primary_only=True)
+    assert preview['units'][0]['text']==selected and preview['citations'][0]['excerpt']==text
+    assert preview['evidence_compaction'][0]['start']==text.index('（d）')
+    assert '专家评审' not in preview['body']['messages'][1]['content']
+    legacy=flow.prepare(run['query_run_id'],'SOURCE_UNITS')
+    assert legacy['units'][0]['text']==text and 'evidence_compaction' not in legacy
+
+
+def test_offline_projection_removes_nested_claim_but_keeps_time_condition():
+    full='会后落实（24小时内完成）\n设计管理部编制会议纪要，经参会方确认后分发。'
+    evidence=[{**cards()[0],'excerpt':full}];_,units=selection_packet('时限和分发要求？',evidence)
+    value=response(full,full);value['claims'].append({'text':'经确认后分发','evidence_ids':['U1'],'support_quotes':[full.split('\n')[-1]]})
+    projected,audit=collapse_source_quotes(json.dumps(value,ensure_ascii=False),units)
+    result=render_concise(projected,units,evidence,'时限和分发要求？')
+    assert audit['removed_claims']==[2] and len(result['claims'])==1 and '24小时内完成' in result['answer']
+
+
+def test_offline_projection_does_not_restore_a_missing_condition_from_nowhere():
+    full='会后落实（24小时内完成）\n设计管理部编制会议纪要，经参会方确认后分发。'
+    evidence=[{**cards()[0],'excerpt':full}];_,units=selection_packet('时限和分发要求？',evidence)
+    partial=full.split('\n')[-1];value=response(partial,partial);value['claims']*=2
+    projected,_=collapse_source_quotes(json.dumps(value,ensure_ascii=False),units)
+    with pytest.raises(ValueError):render_concise(projected,units,evidence,'时限和分发要求？')
+
+
+def test_duplicate_quote_projection_keeps_the_full_quote_instead_of_one_partial_paraphrase():
+    full='纪要连续编号，与设计文件、变更文件关联，作为责任认定的依据。'
+    evidence=[{**cards()[0],'excerpt':full}];_,units=selection_packet('编号、关联和用途？',evidence)
+    value=response('纪要连续编号。',full);value['claims'].append({'text':'只需关联设计文件','evidence_ids':['U1'],'support_quotes':[full]})
+    projected,audit=collapse_source_quotes(json.dumps(value,ensure_ascii=False),units)
+    result=render_concise(projected,units,evidence,'编号、关联和用途？')
+    assert audit['removed_claims']==[2] and full in result['answer'] and '只需' not in result['answer']
+
+
+def test_projection_cannot_borrow_quotes_from_another_unit_or_merge_disjoint_quotes():
+    units=[{'unit_id':'U1','text':'甲原文。'},{'unit_id':'U2','text':'乙原文。'}]
+    bad=response('乙原文。','乙原文。')
+    with pytest.raises(ValueError):collapse_source_quotes(json.dumps(bad,ensure_ascii=False),units)
+    value=response('甲原文。','甲原文。');value['claims'].append({'text':'乙原文。','evidence_ids':['U2'],'support_quotes':['乙原文。']})
+    raw=json.dumps(value,ensure_ascii=False);projected,audit=collapse_source_quotes(raw,units)
+    assert projected==raw and audit['method']=='NO_PROJECTION'
 
 
 def test_selection_outcome_is_not_an_answer_to_requested_balance_criteria():
@@ -91,6 +142,7 @@ def test_invalid_model_contract_is_rejected(change):
     ('适用条件：仅在施工图阶段。协调会应记录责任人和期限。', '协调会应记录责任人和期限。'),
     ('协调会应记录责任人和期限。但不得替代专项审批。', '协调会应记录责任人和期限。'),
     ('配置至少2人。', '2人。'),
+    ('3. 会后落实（24 小时内完成）\n设计管理部编制会议纪要，经参会方确认后分发。', '设计管理部编制会议纪要，经参会方确认后分发。'),
 ])
 def test_short_quote_cannot_drop_conditions_exceptions_or_numeric_qualifiers(source, quote):
     evidence = cards(); evidence[0]['excerpt'] = source
@@ -236,6 +288,29 @@ def test_new_workflow_is_preview_only_then_one_call_and_preserves_old_runs(workf
     assert store.query_run(run)['result']['answer'] == '本地已核对要点。'
     with pytest.raises(ValueError): flow.run(preview['preview_id'], preview['packet_sha256'], 'again')
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize('missing_context',[False,True])
+def test_actual_workflow_can_collapse_nested_quotes_but_never_invent_time_context(workflow,missing_context):
+    flow,store,run,provider,calls,source=workflow
+    full='会后落实（24小时内完成）\n管理部编制纪要，经确认后分发。';body=full.split('\n')[-1]
+    source.write_text(full,encoding='utf-8');original=store.query_run(run)['result']
+    original.update(answer=full,generation_mode='VERBATIM_SOURCE_EXTRACT')
+    original['citations'][0].update(excerpt=full,source_version=hashlib.sha256(source.read_bytes()).hexdigest())
+    store.finish_run(run,original)
+    first=body if missing_context else full
+    provider.value=response(first,first);provider.value['claims'].append({'text':body,'evidence_ids':['U1'],'support_quotes':[body]})
+    preview=flow.prepare(run,'CONCISE_V1');result=flow.run(preview['preview_id'],preview['packet_sha256'],'测试')
+    assert len(calls)==1
+    if missing_context:
+        assert result['status']=='ERROR' and 'protocol_recovery' not in result['result']
+    else:
+        assert result['status']=='COMPLETED' and '24小时内完成' in result['result']['answer']
+        assert result['result']['protocol_recovery']=='CONTAINED_SOURCE_QUOTES_COLLAPSED'
+        assert result['result']['original_protocol_passed'] is False
+        folder=flow.root/'previews'/preview['preview_id']
+        assert json.loads((folder/'model_response.json').read_text(encoding='utf-8'))['content']==json.dumps(provider.value,ensure_ascii=False)
+        assert (folder/'source_quote_projection.json').exists()
 
 
 @pytest.mark.parametrize('failure', ['malformed', 'transport', 'truncated'])

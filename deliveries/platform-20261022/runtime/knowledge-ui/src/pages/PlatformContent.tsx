@@ -13,15 +13,16 @@ const originalHref = (citation: Citation) => `/api/platform/library/${citation.s
 
 const readable = (value: string) => value.replace(/\[\/body\/p\[@paraId=[A-Za-z0-9]+\]\]\s*/g, '')
 
-export function ExistingLibrary({ ask, stage }: { ask: (question: string) => void; stage?:(id:string)=>void }) {
-  const [query, setQuery] = useState('')
+export function ExistingLibrary({ ask, stage, seed = '' }: { ask: (question: string) => void; stage?:(id:string)=>void; seed?:string }) {
+  const [query, setQuery] = useState(seed)
+  useEffect(() => { setQuery(seed); setSearch(seed); setOffset(0) }, [seed])
   const [offset, setOffset] = useState(0)
   const [page, setPage] = useState<{ items: LibrarySource[]; total: number } | null>(null)
   const [selected, setSelected] = useState<LibrarySource | null>(null)
   const [evidence, setEvidence] = useState<{ items: { evidence_id: string; excerpt: string; heading_path?: string; location?: unknown; answer_exclusion_reason?: string }[]; failure_message?: string } | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(seed)
   const previewSequence = useRef(0)
   useEffect(() => { let active = true; setBusy(true); setError(''); api<typeof page>(`library?q=${encodeURIComponent(search)}&offset=${offset}&limit=30`).then(value => { if (active) setPage(value) }).catch(e => { if (active) { setError(e.message); setPage(null) } }).finally(() => { if (active) setBusy(false) }); return () => { active = false } }, [search, offset])
   async function preview(source: LibrarySource) { const sequence = ++previewSequence.current; setSelected(source); setEvidence(null); setError(''); try { const result = await api<NonNullable<typeof evidence>>(`library/${source.source_id}/evidence`); if (sequence === previewSequence.current) setEvidence(result) } catch (e) { if (sequence === previewSequence.current) setError(e instanceof Error ? e.message : '预览失败') } }

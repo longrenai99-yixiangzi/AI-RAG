@@ -115,7 +115,18 @@ class GenerationWorkflow:
         audit=run.get('result',{}).get('complete_list_audit') or run.get('result',{}).get('debug',{}).get('complete_list_audit') or {}
         if audit.get('kind')=='APPENDIX_OUTLINE':raise ValueError('附件章节仅作本地摘录，未核齐的详细内容不能交给模型补写。')
         if list_request(run['question']) and not render_list(audit,citations,run['question']):raise ValueError('完整清单尚未核齐，未建立模型请求。')
-        body,units=selection_packet(run['question'],citations)
+        prompt_citations=citations;compaction=[]
+        if protocol=='CONCISE_V1':
+            from .concise_extract import concise_text
+            prompt_citations=copy.deepcopy(citations)
+            for card in prompt_citations:
+                if card.get('answer_usage')!='PRIMARY':continue
+                excerpt,method=concise_text(card['excerpt'],run['question'])
+                if method=='EXPLICIT_SIBLING_BLOCK' and excerpt in card['excerpt']:
+                    start=card['excerpt'].index(excerpt)
+                    compaction.append({'citation_id':card['citation_id'],'method':method,'source_version':card['source_version'],'start':start,'end':start+len(excerpt),'source_chars':len(card['excerpt']),'prompt_chars':len(excerpt)})
+                    card['excerpt']=excerpt
+        body,units=selection_packet(run['question'],prompt_citations)
         if protocol=='CONCISE_V1':
             from app.answer_engine.llm.grounded_concise import concise_packet
             body=concise_packet(run['question'],units,body)
@@ -130,6 +141,7 @@ class GenerationWorkflow:
              'estimated_ceiling_cny':cost,'max_budget_cny':1,'pricing_checked_on':pricing['checked_on'],'pricing_source':pricing['source'],'pricing_version':pricing['version'],
              'status':'AWAITING_APPROVAL','created_at':self.clock().isoformat()}
         if audit:row['complete_list_audit']=copy.deepcopy(audit)
+        if compaction:row['evidence_compaction']=compaction
         self.store._mutate(lambda state:state['generations'].__setitem__(key,row))
         return row
 
@@ -176,8 +188,15 @@ class GenerationWorkflow:
             if row.get('protocol')=='CONCISE_V1':
                 if (generated.diagnostics or {}).get('finish_reason') in {'length','content_filter','tool_calls'}:
                     raise ValueError('模型未正常完成答复，未启用截断或过滤结果。')
-                from app.answer_engine.llm.grounded_concise import render_concise
-                result=render_concise(generated.content,row['units'],row['citations'],row['question'])
+                from app.answer_engine.llm.grounded_concise import render_concise,collapse_source_quotes
+                try:result=render_concise(generated.content,row['units'],row['citations'],row['question'])
+                except ValueError:
+                    projected,projection=collapse_source_quotes(generated.content,row['units'])
+                    if projected==generated.content:raise
+                    result=render_concise(projected,row['units'],row['citations'],row['question'])
+                    result.update(protocol_recovery=projection['method'],original_protocol_passed=False,
+                                  source_quote_projection=projection,status_label='模型返回 · 重复引文合并后通过 · 待业务核对')
+                    (folder/'source_quote_projection.json').write_text(json.dumps({'original_response_sha256':hashlib.sha256(generated.content.encode()).hexdigest(),'projection':projection,'projected':json.loads(projected),'new_model_calls':0},ensure_ascii=False,indent=2),encoding='utf-8')
             else:result=render_selection(generated.content,row['units'],row['citations'])
             if any(not self.source_current(c) for c in result['citations']):raise ValueError('生成期间来源版本已变化，结果未启用。')
             from app.retrieval.evidence_applicability import enforce_applicability

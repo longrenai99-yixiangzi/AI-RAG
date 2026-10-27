@@ -3,7 +3,7 @@ from pathlib import Path
 from pptx import Presentation
 from pptx.util import Inches
 
-from app.ingestion.layout_evidence import list_regions, slide_nodes, record
+from app.ingestion.layout_evidence import list_regions, slide_nodes, record,labeled_text_regions
 from app.layout_answers import layout_proposal, render_layout
 from app.retrieval.query_planner_v1 import plan_query
 from app.verified_answer_engine_v2 import render, validate, _explicit_list_item_count
@@ -46,6 +46,27 @@ def test_peer_columns_do_not_mix_items():
     nodes += [node(s,x,y) for s,x,y in [('甲模块',.1,.4),('乙模块',.3,.4),('丙模块',.1,.7),('丁模块',.3,.7),('错误栏目甲',.6,.4),('错误栏目乙',.6,.6)]]
     regions=list_regions(nodes);left=next(r for r in regions if r['label']=='四大模块')
     assert {i['text'] for i in left['items']}=={'甲模块','乙模块','丙模块','丁模块'}
+
+
+def test_labeled_problem_and_measure_columns_do_not_mix_full_paragraphs():
+    nodes=[node('【存在问题】',.1,.2),node('【改进措施】',.65,.2),node('原文问题及其条件。',.1,.4),node('原文改进措施及例外。',.65,.4)]
+    regions={r['label']:r for r in labeled_text_regions(nodes)}
+    assert regions['存在问题']['text']=='原文问题及其条件。'
+    assert regions['改进措施']['text']=='原文改进措施及例外。'
+
+
+def test_stacked_measure_panel_does_not_enter_the_problem_region():
+    nodes=[node('存在问题',.45,.15),node('问题一。',.45,.3),node('改进措施',.45,.55),node('完整措施。',.45,.7)]
+    regions={r['label']:r for r in labeled_text_regions(nodes)}
+    assert regions['存在问题']['text']=='问题一。' and regions['改进措施']['text']=='完整措施。'
+
+
+def test_cross_panel_text_is_held_instead_of_assigned_by_its_center_only():
+    nodes=[node('存在问题',.1,.2),node('改进措施',.65,.2)]
+    text=node('横跨两栏的文字',.1,.4);text['bbox']=[.1,.4,.9,.5];nodes.append(text)
+    regions=labeled_text_regions(nodes)
+    assert not any('横跨' in r['text'] for r in regions)
+    assert any(text['shape_id'] in r['cross_boundary_shape_ids'] for r in regions)
 
 
 def test_list_answers_use_the_requested_region_and_correct_count():

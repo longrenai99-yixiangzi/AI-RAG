@@ -45,10 +45,11 @@ def enforce_applicability(question,result):
     contents=bool(re.search(r'(?:策划书|任务书|计划书|报告|清单|表格).*(?:包括|包含|内容|章节|目录|格式|哪[一二三四五六七八九十几\d]+[个项])',question))
     lecture=bool(re.search(r'讲稿|课件|培训|授课',question)) and not re.search(r'不(?:要|能|按|用|以).*?(?:讲稿|课件)|局.*(?:手册|制度)|正式模板|统一模板',question)
     specified=bool(primary) and all(any(file_key(t)==file_key(c.get('file_name','')) for t in titles) for c in primary)
-    interpretation=lecture or specified and not template
-    cases=[s for s in sources if s['kind']=='PROJECT_CASE']
     intent_question=question
     for title in titles:intent_question=intent_question.replace('《'+title+'》','')
+    named_interpretation=specified and all(verified_selection(c) for c in primary) and '手册' in intent_question and not re.search(r'模板|示范文本|格式|制度|通用|统一|正式|全局|局.*手册|作为.*(?:依据|规定)',intent_question)
+    interpretation=lecture or specified and not template or named_interpretation
+    cases=[s for s in sources if s['kind']=='PROJECT_CASE']
     examples=bool(re.search(r'案例|经验|复盘|借鉴',intent_question)) and not re.search(r'不(?:要|能|按|用|以).*?(?:案例|经验|复盘)',intent_question)
     def project_excluded(source):
         p=source['project']
@@ -77,13 +78,20 @@ def enforce_applicability(question,result):
            'sources':sources,'source_kind_is_title_based_not_validity_review':True}
     output={**result,'citations':cards,'evidence_scope_audit':audit}
     if message:
+        table=result.get('debug',{}).get('reviewed_table_audit',{})
+        if table.get('status')=='CLARIFICATION' and table.get('message') and cards and all(c.get('reviewed_table_row') and c.get('answer_usage')=='BACKGROUND' for c in cards):message=table['message']
+        flow=result.get('debug',{}).get('native_flow_audit',{})
+        if flow.get('method')=='EXACT_NATIVE_FRAME_SCOPE' and flow.get('clarification_message') and cards and all(c.get('native_flow_header') and c.get('answer_usage')=='BACKGROUND' for c in cards):
+            message=flow['clarification_message']
+        if flow.get('method')=='REVIEWED_EXPLICIT_NATIVE_ARROWS' and not flow.get('relations_used') and flow.get('clarification_message') and all(c.get('answer_usage')=='BACKGROUND' and (c.get('native_flow_node') or c.get('native_flow_header')) for c in cards):
+            message=flow['clarification_message']
         for c in cards:c['answer_usage']='BACKGROUND'
         output.update(answer_status='SCOPE_CLARIFICATION_REQUIRED',status_label='需要明确依据或项目范围',answer=message,
                       claims=[],selected_units=[],answer_completeness='UNANSWERED',generation_mode='NO_GENERATION',applicability=message)
         output.pop('model_draft',None)
     elif notice:
         output['applicability']=notice.strip()
-        if output.get('answer') and not output['answer'].startswith(notice):
+        if output.get('answer') and output.get('generation_mode')!='HUMAN_REVIEWED_EXACT_QUESTION' and not output['answer'].startswith(notice):
             text=output['answer'].removeprefix('以下为所引项目复盘中的案例做法：\n')
             output['answer']=notice+text
     return output

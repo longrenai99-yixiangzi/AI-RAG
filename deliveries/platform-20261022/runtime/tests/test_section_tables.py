@@ -24,7 +24,7 @@ def rows(tmp_path):
     return intro,row,header,unrelated
 
 
-def rank(tmp_path,question='文档的收发及版本管理有哪些要求？',extra=()):
+def rank(tmp_path,question='设计文件的收发和版本管理有哪些要求？',extra=()):
     intro,row,header,other=rows(tmp_path)
     provider=FocusedCandidate([],Titles(),Reranker(),records=[intro,row,header,other,*extra])
     result=provider.rank(question,[intro]);_,cards=assemble(result,question,include_background=True)
@@ -32,7 +32,7 @@ def rank(tmp_path,question='文档的收发及版本管理有哪些要求？',ex
 
 
 def test_intro_links_real_row_with_readable_locator_preserves_columns_and_marks_missing_aspect(tmp_path):
-    question='演示项目的文档的收发及版本管理有哪些要求？';result,cards,row=rank(tmp_path,question)
+    question='演示项目的设计文件的收发和版本管理有哪些要求？';result,cards,row=rank(tmp_path,question)
     assert cards[0]['evidence_id']=='row' and cards[0]['answer_usage']=='PRIMARY'
     assert cards[1]['evidence_id']=='intro' and cards[1]['answer_usage']=='BACKGROUND'
     assert '原件第2表' in cards[0]['display_location'] and '沟通形式=文件收发' in cards[0]['display_location']
@@ -74,6 +74,11 @@ def test_parallel_lookup_does_not_relax_count_comparison_or_reasoning(q):
     assert parallel_facets(q)==[]
 
 
+def test_shared_subject_and_modal_predicate_are_not_independent_topics():
+    assert parallel_facets('专题会议针对什么情况，可以由哪些单位组织召开？')==[]
+    assert parallel_facets('设计例会讨论什么内容，应由哪些单位组织？')==[]
+
+
 def model_answer(cards,question,quotes=None):
     _,units=selection_packet(question,cards)
     claims=[{'text':'文件收发可按原表执行。','evidence_ids':[u['unit_id']],
@@ -82,7 +87,7 @@ def model_answer(cards,question,quotes=None):
 
 
 def test_model_cannot_claim_complete_or_hide_row_conditions_when_one_aspect_is_missing(tmp_path):
-    q='文档的收发及版本管理有哪些要求？';_,cards,_=rank(tmp_path,q)
+    q='设计文件的收发和版本管理有哪些要求？';_,cards,_=rank(tmp_path,q)
     result=model_answer(cards,q)
     assert result['answer_completeness']=='PARTIAL' and result['model_gaps']==[] and result['coverage_gaps']
     assert result['claims'][0]['check']=='TABLE_ROW_FIELDS_RESTORED'
@@ -97,7 +102,7 @@ def test_model_cannot_claim_complete_or_hide_row_conditions_when_one_aspect_is_m
 def test_all_located_aspects_still_check_which_evidence_the_model_used(tmp_path):
     intro,row,_,_=rows(tmp_path)
     version={**row,'evidence_id':'version','text':'表头：序号 | 管理事项 | 具体要求\n行：2 | 版本管理 | 新版发放时登记，旧版标注失效。'}
-    q='文档的收发及版本管理有哪些要求？'
+    q='设计文件的收发和版本管理有哪些要求？'
     result=FocusedCandidate([],Titles(),Reranker(),records=[intro,row,version]).rank(q,[intro])
     _,cards=assemble(result,q)
     assert len(cards)==2 and result['facet_coverage']['status']=='TOPICS_LOCATED_NOT_SEMANTICALLY_VERIFIED'
@@ -109,7 +114,7 @@ def test_all_located_aspects_still_check_which_evidence_the_model_used(tmp_path)
 
 
 def test_coverage_metadata_must_belong_to_current_question(tmp_path):
-    q='文档的收发及版本管理有哪些要求？';_,cards,_=rank(tmp_path,q)
+    q='设计文件的收发和版本管理有哪些要求？';_,cards,_=rank(tmp_path,q)
     cards[0]['facet_coverage']['question_sha256']='a'*64
     with pytest.raises(ValueError,match='与本题不一致'):model_answer(cards,q)
 
@@ -119,7 +124,7 @@ def test_recalled_duplicate_header_and_unknown_cells_do_not_cover_missing_topic(
     fake={**header,'text':'表头：序号 | 版本管理\n行：序号 | 版本管理'}
     missing={**row,'text':'表头：序号 | 管理事项 | 要求\n行：2 | 版本管理 | 待补充'}
     provider=FocusedCandidate([],Titles(),Reranker(),records=[intro,row,fake,missing])
-    result=provider.rank('文档的收发及版本管理需要明确哪些内容？',[intro,fake,missing])
+    result=provider.rank('设计文件的收发和版本管理需要明确哪些内容？',[intro,fake,missing])
     assert result['facet_coverage']['status']=='PARTIAL'
     assert result['facet_coverage']['facets'][1]['status']=='NOT_LOCATED'
     assert [r['evidence_id'] for r in result['candidate_evidence'] if r['answer_usage']=='PRIMARY']==['row']

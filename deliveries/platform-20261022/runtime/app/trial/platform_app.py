@@ -380,6 +380,7 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
                     disabled={s['source_id'] for s in store.snapshot()['sources'] if s.get('status')!='REGISTERED'}
                     cards=[c for c in cards if c['source_id'] not in disabled]
                     added=lifecycle.retrieve(value.question) if hasattr(existing,'features') else []
+                    if base.get('debug',{}).get('reviewed_table_audit') or base.get('debug',{}).get('native_flow_audit'):added=[{**r,'answer_usage':'BACKGROUND'} for r in added]
                     route=base.get('debug',{}).get('scope_resolution',{})
                     if route.get('status') in {'AMBIGUOUS_PROJECT_SELECTOR','CONFLICTING_EVIDENCE'}:
                         added=[]
@@ -509,7 +510,9 @@ def create_app(state_path: Path, ui_dist: Path | None = None, contract_path: Pat
         app.mount("/assets", StaticFiles(directory=ui_dist / "assets"), name="assets")
         @app.get("/{client_path:path}")
         def frontend(client_path: str):
-            return FileResponse(entry,headers={'Cache-Control':'no-store'})
+            framework_entry=ui_dist/'index.html'
+            selected=entry if client_path=='manage' or client_path.startswith('manage/') or not framework_entry.is_file() else framework_entry
+            return FileResponse(selected,headers={'Cache-Control':'no-store'})
     return app
 
 

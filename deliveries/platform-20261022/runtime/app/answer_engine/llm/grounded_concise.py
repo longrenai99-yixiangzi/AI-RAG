@@ -40,6 +40,33 @@ def _supported(text, source):
                               evidence, allow_connector_omission=True, allow_sentence_span=True)['valid']
 
 
+def collapse_source_quotes(raw, units):
+    """Offline projection: collapse contained quotes, keeping complete source wording."""
+    value=json.loads(raw);mapping={u['unit_id']:u['text'] for u in units}
+    if not isinstance(value,dict) or set(value)!={'status','claims','gaps'} or not isinstance(value['claims'],list) or not 1<=len(value['claims'])<=8:
+        raise ValueError('Unsupported source-quote projection shape')
+    claims=value['claims']
+    for claim in claims:
+        if not isinstance(claim,dict) or set(claim)!={'text','evidence_ids','support_quotes'}:
+            raise ValueError('Unsupported source-quote claim')
+        ids=claim['evidence_ids'];quotes=claim['support_quotes']
+        if (not isinstance(claim['text'],str) or not claim['text'].strip() or len(claim['text'])>400
+                or not isinstance(ids,list) or len(ids)!=1 or not isinstance(ids[0],str) or ids[0] not in mapping
+                or not isinstance(quotes,list) or len(quotes)!=1 or not isinstance(quotes[0],str)
+                or not quotes[0].strip() or len(quotes[0])>800 or quotes[0] not in mapping[ids[0]]):
+            raise ValueError('Projection requires an exact source-bound quote')
+    removed=[]
+    for i,claim in enumerate(claims):
+        for j,other in enumerate(claims):
+            if i==j or claim['evidence_ids']!=other['evidence_ids']:continue
+            quote,container=claim['support_quotes'][0],other['support_quotes'][0]
+            if quote in container and (quote!=container or i>j):removed.append(i);break
+    if not removed:return raw,{'method':'NO_PROJECTION','removed_claims':[]}
+    affected={tuple(claims[i]['evidence_ids']) for i in removed}
+    value['claims']=[{**claim,'text':claim['support_quotes'][0]} if tuple(claim['evidence_ids']) in affected else claim for i,claim in enumerate(claims) if i not in removed]
+    return json.dumps(value,ensure_ascii=False),{'method':'CONTAINED_SOURCE_QUOTES_COLLAPSED','removed_claims':[i+1 for i in removed],'original_claims':len(claims),'retained_claims':len(value['claims'])}
+
+
 def render_concise(raw, units, citations, question):
     value = json.loads(raw)
     if not isinstance(value, dict) or set(value) != {'status', 'claims', 'gaps'}:

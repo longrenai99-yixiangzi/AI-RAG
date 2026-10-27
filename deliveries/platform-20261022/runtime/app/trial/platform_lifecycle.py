@@ -96,6 +96,11 @@ class PlatformLifecycle:
             path = Path(job["input_path"])
             if file_hash(path) != job["sha256"]:
                 raise ValueError("上传副本版本已改变，未使用旧索引。")
+            if path.suffix.lower()=='.md':
+                from app.ingestion.normalization.markdown_normalizer import is_source_reference_note,is_navigation_only_note
+                content=path.read_text(encoding='utf-8-sig')
+                if is_source_reference_note(content) or is_navigation_only_note(content):
+                    raise ValueError("仅链接登记卡不能作为正文入库。")
             if job["existing_source_id"]:
                 snapshot = self.existing.source_snapshot(job["existing_source_id"])
                 records = snapshot["records"]
@@ -103,10 +108,6 @@ class PlatformLifecycle:
                     raise ValueError("已有片段版本与文件不一致。")
                 vectors, model = snapshot["vectors"], snapshot["model_digest"]
             else:
-                if path.suffix.lower() == '.md':
-                    from app.ingestion.normalization.markdown_normalizer import is_source_reference_note
-                    if is_source_reference_note(path.read_text(encoding='utf-8-sig')):
-                        raise ValueError("仅链接登记卡不能作为正文入库。")
                 parsed = parse_file(path, 25)
                 if parsed.parse_status != "parsed" or not parsed.blocks:
                     raise ValueError(f"未取得可用正文：{parsed.parse_status}；扫描件可能需要OCR。")
@@ -159,6 +160,12 @@ class PlatformLifecycle:
                     old["status"] = "SUPERSEDED"
                     self._invalidate(state, old["source_id"])
                 row["status"] = "ACTIVE"
+                source=state['sources'].get(row['source_id'])
+                if source and source.get('status')!='REGISTERED':
+                    if (not source.get('external_bound') or source.get('external_hash')!=row['sha256']
+                            or Path(source.get('external_path','')).resolve()!=Path(row['input_path']).resolve()):
+                        raise PlatformConflict('来源登记与受管版本不一致，未恢复旧来源。')
+                    source.update(status='REGISTERED',revision=source['revision']+1)
                 state["materials"][row["material_id"]] = {"material_id": row["material_id"], "job_id": key, "source_id": row["source_id"], "file_name": row["file_name"], "status": "ACTIVE"}
             elif action == "withdraw":
                 if row["status"] != "ACTIVE":

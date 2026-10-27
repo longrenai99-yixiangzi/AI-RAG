@@ -49,9 +49,12 @@ class PDFLoader:
 
     @staticmethod
     def _build_blocks(pdf: pymupdf.Document, path: Path, document_id: str) -> list[SourceBlock]:
+        import hashlib
+        from app.ingestion.pdf_text_recovery import clean_pdf_page
+        with path.open('rb') as stream:version=hashlib.file_digest(stream,'sha256').hexdigest()
         blocks: list[SourceBlock] = []
         for page_number, page in enumerate(pdf, start=1):
-            text = page.get_text("text").strip()
+            text = clean_pdf_page(page,version)
             blocks.append(
                 SourceBlock(
                     document_id=document_id,

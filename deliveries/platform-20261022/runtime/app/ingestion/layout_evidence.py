@@ -35,10 +35,13 @@ def slide_nodes(slide, width, height):
     def walk(shapes, transform=(1,1,0,0), groups=()):
         sx, sy, tx, ty = transform
         for shape in shapes:
+            if any(value is None for value in (shape.left,shape.top,shape.width,shape.height)):
+                continue  # Missing inherited geometry is retained separately by the component reader.
             box = [(shape.left*sx+tx)/width, (shape.top*sy+ty)/height,
                    ((shape.left+shape.width)*sx+tx)/width, ((shape.top+shape.height)*sy+ty)/height]
             if shape.shape_type == 6:
                 xfrm = shape._element.grpSpPr.xfrm
+                if xfrm is None or xfrm.chExt is None or xfrm.chOff is None:continue
                 child_sx = shape.width/xfrm.chExt.cx if xfrm.chExt.cx else 1
                 child_sy = shape.height/xfrm.chExt.cy if xfrm.chExt.cy else 1
                 walk(shape.shapes, (sx*child_sx,sy*child_sy,tx+sx*(shape.left-xfrm.chOff.x*child_sx),ty+sy*(shape.top-xfrm.chOff.y*child_sy)), groups+(str(shape.shape_id),))
@@ -93,6 +96,31 @@ def list_regions(nodes):
                             'items':items, 'bbox':[left,anchor['bbox'][1],right,1], 'anchor_shape_id':anchor['shape_id'],
                             'relation_status':'SPATIAL_CANDIDATE_NOT_OWNER_APPROVED'})
     return regions
+
+
+def labeled_text_regions(nodes):
+    """Bound explicit problem/measure labels across columns or stacked panels."""
+    labels={'存在问题','改进措施','解决措施'}
+    eligible=[n for n in nodes if n.get('bbox') and not n.get('review_reasons') and n.get('kind')!='table']
+    anchors=[n for n in eligible if compact(n['text']).strip('【】[]:：') in labels]
+    result=[]
+    for anchor in anchors:
+        cy=(anchor['bbox'][1]+anchor['bbox'][3])/2
+        peers=sorted([n for n in anchors if abs((n['bbox'][1]+n['bbox'][3])/2-cy)<.075],key=lambda n:n['bbox'][0])
+        centers=[(n['bbox'][0]+n['bbox'][2])/2 for n in peers];index=peers.index(anchor)
+        left=(centers[index-1]+centers[index])/2 if index else 0
+        right=(centers[index]+centers[index+1])/2 if index+1<len(peers) else 1
+        following=[n['bbox'][1] for n in anchors if n['bbox'][1]>anchor['bbox'][1]+.075 and left<=(n['bbox'][0]+n['bbox'][2])/2<=right]
+        bottom=min(following,default=1);members=[];crossing=[]
+        for node in eligible:
+            if node in anchors:continue
+            x0,y0,x1,y1=node['bbox'];x=(x0+x1)/2;y=(y0+y1)/2
+            if left<=x<=right and anchor['bbox'][1]-.015<=y<bottom:
+                if x0<left-.02 or x1>right+.02 or y1>bottom+.015:crossing.append(node['shape_id'])
+                else:members.append(node)
+        members.sort(key=lambda n:(n['bbox'][1],n['bbox'][0]))
+        result.append({'label':compact(anchor['text']).strip('【】[]:：'),'anchor_shape_id':anchor['shape_id'],'bbox':[left,anchor['bbox'][1],right,bottom],'shape_ids':[n['shape_id'] for n in members],'text':'\n'.join(n['text'] for n in members),'cross_boundary_shape_ids':crossing,'status':'NATIVE_LABELED_REGION_CANDIDATE'})
+    return result
 
 
 def pptx_evidence(path):

@@ -20,6 +20,7 @@ class PDFQualityResult:
     image_page_ratio: float = 0.0
     suspected_scanned: bool = False
     reason: str | None = None
+    low_text_image_pages: list[int] = field(default_factory=list)
 
 
 def assess_pdf(
@@ -37,11 +38,15 @@ def assess_pdf(
 
     page_text_lengths: list[int] = []
     page_image_counts: list[int] = []
-    for page in pdf:
-        text_length = len(page.get_text("text").strip())
+    low_text_image_pages: list[int] = []
+    for page_number, page in enumerate(pdf, start=1):
+        text = page.get_text("text")
+        text_length = len(text.strip())
         image_count = len(page.get_images(full=True))
         page_text_lengths.append(text_length)
         page_image_counts.append(image_count)
+        if image_count and len("".join(text.split())) < min_text_chars_per_page:
+            low_text_image_pages.append(page_number)
 
     text_chars = sum(page_text_lengths)
     text_pages = sum(length > 0 for length in page_text_lengths)
@@ -81,4 +86,5 @@ def assess_pdf(
         image_page_ratio=image_page_ratio,
         suspected_scanned=suspected_scanned,
         reason=reason,
+        low_text_image_pages=low_text_image_pages,
     )

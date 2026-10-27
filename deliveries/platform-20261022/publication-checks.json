@@ -1,8 +1,8 @@
 {
-  "date": "2026-10-24",
-  "source_files": 276,
+  "date": "2026-10-27",
+  "source_files": 332,
   "backend_tests": {
-    "passed": 675,
+    "passed": 910,
     "failed": 0,
     "warnings": 3
   },
@@ -764,5 +764,21 @@
     "multi_day_stability_verified": false,
     "continuous_24_hour_monitor_installed": false,
     "memory_leak_absence_proven": false
+  },
+  "latest_status": "R16_CODE_BUILD_HTTP_VERIFIED_BROWSER_AND_OWNER_ACCEPTANCE_PENDING",
+  "latest_20261027": {
+    "public_backend_passed": 910,
+    "public_frontend_passed": 3,
+    "local_ui_revision": "R16",
+    "local_content_revision": "R14",
+    "private_fixture_functions_omitted": 29,
+    "private_profiles_published": false,
+    "public_compiled_ui_uploaded": false,
+    "new_public_model_calls_during_publication": 0,
+    "runtime_switched_during_publication": false,
+    "whole_system_owner_accepted": false,
+    "real_browser_interactions_verified": false,
+    "colleague_access": "DEFERRED",
+    "backup_and_full_recovery": "DEFERRED_NOT_VERIFIED"
   }
 }

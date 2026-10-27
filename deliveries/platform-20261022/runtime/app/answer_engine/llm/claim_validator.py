@@ -8,6 +8,7 @@ from app.answer_engine.evidence_selector import EvidenceBundle
 
 
 SOURCE_PATTERN = re.compile(r"\[(S\d+)\]")
+TIMED_HEADING = re.compile(r'^\s*[^。；;！？!?\n]{0,48}[（(][^（）()\n]{0,16}(?:\d+|[一二三四五六七八九十两]+)\s*(?:个\s*)?(?:工作日|小时|分钟|天|日)\s*(?:内|前|后)[^（）()\n]{0,16}[）)]\s*$')
 
 
 def check_source_units(claims, evidence, *, allow_connector_omission=False, allow_sentence_span=False):
@@ -31,10 +32,12 @@ def check_source_units(claims, evidence, *, allow_connector_omission=False, allo
                     normalized=allow_connector_omission and [without_connector(p) for p in actual]==wanted
                     if not wanted or not (exact or normalized):continue
                     before=clauses[:start];after=clauses[start+len(wanted):]
-                    # shortcut: adjacent explicit scope labels only; implicit cross-sentence scope needs review.
+                    # shortcut: adjacent explicit labels and timed headings only; implicit scope needs review.
+                    timed_context=bool(index and TIMED_HEADING.fullmatch(sentences[index-1]))
                     if index and re.match(r'\s*(?:适用前提|适用条件|前提条件|仅当|只有|除非|仅在)',sentences[index-1]):before=parts(sentences[index-1])+before
                     if index+span<len(sentences) and re.match(r'\s*(?:但|不过|除外|仅限|不适用|否则|前提|须经|需经|必须)',sentences[index+span]):after+=parts(sentences[index+span])
                     omitted=any(re.search(r'^(?:适用前提|适用条件|前提条件|如果|若|当|仅在|仅当|只有|除非)|(?:条件下|前提下|审批通过后|批准后|验收后)',without_connector(p)) for p in before)
+                    omitted|=timed_context
                     omitted|=any(re.search(r'^(?:但|不过|除外|仅限|不适用|不得|严禁|需经|须经|应经|必须|须|需|应当|否则|前提|如果|若|当|仅当|只有|除非)',without_connector(p)) for p in after)
                     context_missing|=omitted
                     if not omitted:

@@ -40,8 +40,36 @@ def table_fields(text, target):
     return None
 
 
+def sibling_block(text, question):
+    """Select one authored peer block, preserving its complete text."""
+    from app.retrieval.named_source_scope import named_titles
+    from app.retrieval.section_tables import parallel_facets
+    for title in named_titles(question) or []:question=question.replace('《'+title+'》','')
+    if re.search(r'\d|比较|对比|区别|全部|所有|各项|哪几|几类|几种',question):return None
+    if parallel_facets(question):return None
+    headings=list(re.finditer(r'^(?:[（(]([A-Za-z])[）)][ \t\u3000]*\S[^\n。；]{0,70}$|(\d{1,2})、(?=\S))',text,re.M))
+    if len(headings)<2 or text[:headings[0].start()].strip():return None
+    if len({bool(h[1]) for h in headings})!=1:return None
+    labels=[ord(h[1].lower()) if h[1] else int(h[2]) for h in headings]
+    if labels!=list(range(labels[0],labels[0]+len(labels))):return None
+    blocks=[text[h.start():headings[i+1].start() if i+1<len(headings) else len(text)].strip() for i,h in enumerate(headings)]
+    if any(re.search(r'前述|上述|下述|以上|以下|前款|后款|本章|本节|所有条款|全部条款',block) for block in blocks):return None
+    question=re.sub(r'^(?:依据|根据|请问|请说明|请|关于|针对)[\s，,:：]*','',question).strip(' ，,:：')
+    subject=re.split(r'[？?；;，,]|哪些|什么|哪几|是否|如何|怎么|怎样',question,maxsplit=1)[0]
+    runs=re.findall(r'[\u4e00-\u9fff]{4,}',subject)
+    # shortcut: literal leading subject only; review implicit scope before supporting looser matches.
+    anchors={runs[0][:n] for n in range(4,min(len(runs[0]),12)+1)} if runs else set()
+    matches=[block for block in blocks if any(anchor in block for anchor in anchors)]
+    return matches[0] if len(matches)==1 else None
+
+
 def concise_text(text, question='', target=''):
     text = clean(text)
+    from app.retrieval.responsibility_scope import responsibility_action,responsibility_quotes
+    quotes=responsibility_quotes(responsibility_action(question),text)
+    rest=re.sub(r'\s+','',text).replace(quotes[0],'') if len(quotes)==1 else text
+    if len(quotes)==1 and not re.search(LIMITS+r'|当.{0,40}时|在.{0,40}(?:前|后|期间|阶段|条件下)',rest):
+        return quotes[0],'EXPLICIT_RESPONSIBILITY_SENTENCE'
     table = table_fields(text, target)
     if table:
         return table, 'NATIVE_SINGLE_ROW_FIELDS'
@@ -56,6 +84,8 @@ def concise_text(text, question='', target=''):
     # Numeric queries without a native, scope-checked row are not summarized.
     if re.search(r'多少|几人|几位|人数|金额|合计|计算|占比', question):
         return text, 'FULL_SOURCE_FALLBACK'
+    sibling=sibling_block(text,question)
+    if sibling is not None:return sibling,'EXPLICIT_SIBLING_BLOCK'
     paragraphs = [p.strip() for p in text.splitlines() if p.strip()]
     paragraphs = [p for p in paragraphs if not re.match(r'^(?:#{1,6}\s|\d+\.\d+\s*[^。；：]{1,50}$)', p)]
     # An explicit actor heading can select its own block, never another actor's duties.

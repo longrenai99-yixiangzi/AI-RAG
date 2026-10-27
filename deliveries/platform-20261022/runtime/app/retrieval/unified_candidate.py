@@ -10,7 +10,7 @@ from app.retrieval.reference_bindings import linked_path,binding_current
 from app.retrieval.project_source_scope import route_project_question
 from app.retrieval.focused_candidate import FocusedCandidate
 from app.retrieval.section_scope import SectionTitleIndex
-from app.ingestion.normalization.markdown_normalizer import is_source_reference_note
+from app.ingestion.normalization.markdown_normalizer import is_source_reference_note,is_navigation_only_note
 
 
 def file_sha(path):
@@ -53,7 +53,7 @@ def effective_indices(records,documents,contract):
 
 
 class UnifiedCandidate:
-    def __init__(self,folder,encoder,reranker,*,personnel_folder=None,quality_folder=None,scalar_links=None):
+    def __init__(self,folder,encoder,reranker,*,personnel_folder=None,quality_folder=None,scalar_links=None,text_cleanup_folder=None,paragraph_repair_folder=None,native_table_folder=None,flowchart_folder=None,additional_paragraph_folder=None,reviewed_table_folder=None,flow_relations_folder=None):
         started=time.perf_counter();folder=Path(folder)
         self.manifest=json.loads((folder/'manifest.json').read_text(encoding='utf-8'))
         for name,digest in self.manifest['artifact_sha256'].items():
@@ -68,12 +68,49 @@ class UnifiedCandidate:
         if ids!=sparse['chunk_ids'] or len(set(ids))!=len(ids):raise ValueError('Evidence/BM25 row identity mismatch')
         if self.vectors.shape!=(len(ids),1024) or not np.isfinite(self.vectors).all() or not np.allclose(np.linalg.norm(self.vectors,axis=1),1,atol=.003):raise ValueError('Invalid vector alignment or normalization')
         paths={p:path_key(p) for p in {r['source_path'] for r in self.records}|{d['source_path'] for d in docs}}
-        self.record_paths=[paths[r['source_path']] for r in self.records]
         versions={did:(paths[d['source_path']],declared_version(d)) for did,d in self.documents.items()}
         for r in self.records:
             if (paths[r['source_path']],r['source_version'])!=versions[r['document_id']]:raise ValueError('Evidence and catalog versions disagree')
+        cleanup_exclusions={};self.text_cleanup=None
+        if text_cleanup_folder is not None:
+            from app.retrieval.clean_text_overlay import apply_text_cleanup
+            self.vectors,cleanup_exclusions,self.text_cleanup=apply_text_cleanup(text_cleanup_folder,self.manifest['candidate_hash'],self.manifest.get('embedding_model_digest'),self.records,sparse['corpus'],self.vectors)
+        self.paragraph_repair=None;paragraph_exclusions={}
+        if paragraph_repair_folder is not None:
+            from app.retrieval.paragraph_repair import apply_paragraph_repair
+            self.vectors,paragraph_exclusions,self.paragraph_repair=apply_paragraph_repair(paragraph_repair_folder,self.manifest['candidate_hash'],self.manifest.get('embedding_model_digest'),(self.text_cleanup or {}).get('manifest_sha256'),self.records,sparse['corpus'],self.vectors)
+        self.native_tables=None;native_table_exclusions={}
+        if native_table_folder is not None:
+            from app.retrieval.native_pdf_tables import append_native_tables
+            self.vectors,native_table_exclusions,self.native_tables=append_native_tables(native_table_folder,self.manifest['candidate_hash'],self.manifest.get('embedding_model_digest'),(self.paragraph_repair or {}).get('manifest_sha256'),self.documents,self.records,sparse['corpus'],self.vectors)
+        self.flowcharts=None
+        if flowchart_folder is not None:
+            from app.retrieval.native_flowcharts import append_flowcharts
+            self.vectors,self.flowcharts=append_flowcharts(flowchart_folder,self.manifest['candidate_hash'],self.manifest.get('embedding_model_digest'),(self.native_tables or {}).get('manifest_sha256'),self.documents,self.records,sparse['corpus'],self.vectors)
+        self.additional_paragraph_repair=None;additional_exclusions={}
+        if additional_paragraph_folder is not None:
+            from app.retrieval.paragraph_repair import apply_paragraph_repair
+            extra=json.loads((Path(additional_paragraph_folder)/'manifest.json').read_text(encoding='utf-8'))
+            if not extra.get('required_runtime_flow_manifest_sha256') or extra['required_runtime_flow_manifest_sha256']!=(self.flowcharts or {}).get('manifest_sha256'):
+                raise ValueError('Additional paragraph flow dependency differs')
+            self.vectors,additional_exclusions,self.additional_paragraph_repair=apply_paragraph_repair(additional_paragraph_folder,self.manifest['candidate_hash'],self.manifest.get('embedding_model_digest'),(self.text_cleanup or {}).get('manifest_sha256'),self.records,sparse['corpus'],self.vectors)
+        self.reviewed_tables=None;reviewed_exclusions={}
+        if reviewed_table_folder is not None:
+            from app.retrieval.reviewed_table_rows import append_rows
+            self.vectors,reviewed_exclusions,self.reviewed_tables=append_rows(reviewed_table_folder,self.manifest['candidate_hash'],self.manifest.get('embedding_model_digest'),(self.additional_paragraph_repair or {}).get('manifest_sha256'),self.documents,self.records,sparse['corpus'],self.vectors)
+        self.reviewed_flat_ids=set(reviewed_exclusions)
+        self.record_paths=[paths[r['source_path']] for r in self.records]
         self.bm25=BM25Okapi([[sys.intern(t) for t in tokens] for tokens in sparse['corpus']]);del sparse
         sections=json.loads((folder/'sections.json').read_text(encoding='utf-8'))
+        if reviewed_table_folder is not None:
+            excluded=json.loads((Path(reviewed_table_folder)/'flat_exclusions.json').read_text(encoding='utf-8'))
+            hidden_pages={(path_key(r['source_path']),r['source_version'],r['page']) for r in excluded}
+            def hidden_section(s):
+                loc=s.get('location',{});page=loc.get('page');match=re.match(r'^Page (\d+)(?:$| > )',loc.get('section') or s.get('heading_path',''))
+                page=page or (int(match[1]) if match else None)
+                return (path_key(s['source_path']),s.get('source_version'),page) in hidden_pages
+            sections=[s for s in sections if not hidden_section(s)]
+
         self.scope_documents=dict(self.documents)
         self.encoder=encoder
         self.candidate_hash=self.manifest['candidate_hash'];self.by_path={};self.by_source={}
@@ -93,7 +130,7 @@ class UnifiedCandidate:
             if Path(path).suffix.lower() not in {'.md','.markdown'}:continue
             try:
                 raw=Path(path).read_bytes()
-                if hashlib.sha256(raw).hexdigest()==version and is_source_reference_note(raw.decode('utf-8-sig')):self.reference_only.add(path)
+                if hashlib.sha256(raw).hexdigest()==version and (is_source_reference_note(raw.decode('utf-8-sig')) or is_navigation_only_note(raw.decode('utf-8-sig'))):self.reference_only.add(path)
             except (OSError,UnicodeError):continue
         self.quality_exclusions={};self.reference_bindings={}
         if quality_folder is not None:
@@ -118,15 +155,26 @@ class UnifiedCandidate:
                 self.reference_bindings[sid]={**entry,'body_source_id':source_ids[body_key]}
                 for did,doc in self.documents.items():
                     if (path_key(doc['source_path']),declared_version(doc))==note_key:self.scope_documents[did]={**body,'file_name':doc['file_name'],'reference_note_path':doc['source_path']}
+        for eid,reason in cleanup_exclusions.items():self.quality_exclusions.setdefault(eid,reason)
+        for eid,reason in paragraph_exclusions.items():self.quality_exclusions.setdefault(eid,reason)
+        for eid,reason in native_table_exclusions.items():self.quality_exclusions.setdefault(eid,reason)
+        for eid,reason in additional_exclusions.items():self.quality_exclusions.setdefault(eid,reason)
+        for eid,reason in reviewed_exclusions.items():self.quality_exclusions.setdefault(eid,reason)
         self.scalar_links=scalar_links or {}
         for md,link in self.scalar_links.items():
             # A derived duplicate can be excluded while its original remains admitted.
             pairs=((md,link['markdown_sha256']),(link['original_path'],link['original_sha256']))
             if not any((path_key(p),version) in source_ids for p,version in pairs):raise ValueError('Scalar scope is outside the admitted candidate')
         self.focused=FocusedCandidate(sections,SectionTitleIndex(sections),reranker,documents=self.scope_documents,
-            records=[r for r in self.records if path_key(r['source_path']) not in self.reference_only and r['evidence_id'] not in self.quality_exclusions])
+            records=[r for r in self.records if path_key(r['source_path']) not in self.reference_only and r['evidence_id'] not in self.quality_exclusions and not r.get('reviewed_table_row')])
+        self.reviewed_flow_relations=None
+        if flow_relations_folder is not None:
+            from app.retrieval.reviewed_flow_relations import load_index
+            self.reviewed_flow_relations=load_index(flow_relations_folder,(self.flowcharts or {}).get('manifest_sha256'),self.records)
+            self.flowcharts={**self.flowcharts,'original_drawn_arrows':self.flowcharts['drawn_arrows'],'drawn_arrows':self.reviewed_flow_relations['direct_relations'],
+                'original_arrows_held':self.flowcharts['arrows_held'],'arrows_held':0,'direct_drawn_relations_used_for_answers':True}
         from app.retrieval.complete_lists import build_catalog
-        self.complete_lists=build_catalog([r for r in self.records if path_key(r['source_path']) not in self.reference_only and r['evidence_id'] not in self.quality_exclusions])
+        self.complete_lists=build_catalog([r for r in self.records if path_key(r['source_path']) not in self.reference_only and r['evidence_id'] not in self.quality_exclusions and not r.get('reviewed_table_row')])
         self.load_ms=round((time.perf_counter()-started)*1000,2)
 
     def sources(self,query='',file_type='',offset=0,limit=50):
@@ -153,8 +201,11 @@ class UnifiedCandidate:
             if not binding_current(binding):return {'items':[],'candidate_hash':self.candidate_hash,'reference_resolution':binding,'failure_message':'关联版本已变，不能沿用旧原件正文。'}
             return {**self.source_evidence(binding['body_source_id'],limit),'reference_resolution':binding}
         rows=[r for r in self.personnel.records if r['source_id']==source_id] if self.personnel else []
-        rows += [self.records[i] for i in self.by_source.get(source_id,[])]
-        return {'items':[{'evidence_id':r['evidence_id'],'source_version':r['source_version'],'heading_path':r.get('heading_path'),'location':r.get('location') or {},'raw_text':r['text'],'excerpt':r['text'],**({'answer_exclusion_reason':self.quality_exclusions[r['evidence_id']]} if r['evidence_id'] in self.quality_exclusions else {})} for r in rows[:limit]], 'candidate_hash':self.candidate_hash,**({'personnel_index_sha256':self.personnel.manifest['records_sha256']} if self.personnel else {})}
+        from app.retrieval.native_flowcharts import is_flow_record
+        structured=lambda r:bool(r.get('native_pdf_table') or r.get('native_pdf_table_note') or is_flow_record(r) or r.get('reviewed_table_row'))
+        native=[self.records[i] for i in self.by_source.get(source_id,[]) if structured(self.records[i])]
+        rows += native+[self.records[i] for i in self.by_source.get(source_id,[]) if not structured(self.records[i])]
+        return {'items':[{'evidence_id':r['evidence_id'],'source_version':r['source_version'],'heading_path':r.get('heading_path'),'location':r.get('location') or {},'raw_text':('[旧混排片段已停用，请查结构化字段或原页]' if r['evidence_id'] in self.reviewed_flat_ids else r['text']),'excerpt':('[旧混排片段已停用，请查结构化字段或原页]' if r['evidence_id'] in self.reviewed_flat_ids else r['text']),**({'text_cleanup':r['text_cleanup']} if r.get('text_cleanup') else {}),**({'paragraph_completion':r['paragraph_completion']} if r.get('paragraph_completion') else {}),**({'answer_exclusion_reason':self.quality_exclusions[r['evidence_id']]} if r['evidence_id'] in self.quality_exclusions else {})} for r in rows[:limit]], 'candidate_hash':self.candidate_hash,**({'text_cleanup':self.text_cleanup} if self.text_cleanup else {}),**({'paragraph_repair':self.paragraph_repair} if self.paragraph_repair else {}),**({'personnel_index_sha256':self.personnel.manifest['records_sha256']} if self.personnel else {})}
 
     def retrieve(self,question,query_vector=None,*,source_versions=None):
         start=time.perf_counter()
@@ -162,7 +213,11 @@ class UnifiedCandidate:
         bindings=[b for b in self.reference_bindings.values() if path_key(b['note_path']) in named_paths]
         reference_meta={'reference_resolution':bindings} if bindings else {}
         if any(not binding_current(b) for b in bindings):return {'candidate_evidence':[],'bundle_status':'SOURCE_SCOPE_MISSING','candidate_hash':self.candidate_hash,**reference_meta,'selection_notes':['登记卡、链接目标或原件版本已变，停止使用旧关联；不能据此认为原库没有资料。']}
-        route=route_project_question(question,self.scope_documents);routed=route['question']
+        preferred=None
+        if self.additional_paragraph_repair:
+            from app.retrieval.contract_context import project_contract_selector
+            preferred=project_contract_selector(question,self.records)
+        route=preferred or route_project_question(question,self.scope_documents);routed=route['question']
         if route['status'] in {'AMBIGUOUS_PROJECT_SELECTOR','SOURCE_SCOPE_MISSING','CONFLICTING_EVIDENCE'}:
             return {'candidate_evidence':[],'bundle_status':'CONFLICTING_EVIDENCE' if route['status']=='CONFLICTING_EVIDENCE' else 'SOURCE_SCOPE_MISSING','scope_resolution':route,'candidate_hash':self.candidate_hash}
         scope=resolve_named_scope(routed,self.scope_documents);allowed=scope['allowed_paths']
@@ -192,11 +247,48 @@ class UnifiedCandidate:
             return {'candidate_evidence':[{**self.records[i],'role':'DIRECT','answer_usage':'BACKGROUND'} for i in sorted(reference_rows)[:8]],'bundle_status':'SOURCE_SCOPE_MISSING','candidate_hash':self.candidate_hash,
                     'selection_notes':['所指定资料只有来源链接，或片段解析质量尚未通过核对；本候选没有可用的正文证据。仍可查阅来源线索，不能据此认定原件不存在。']}
         mask=[i for i in mask if i not in reference_rows]
+        if self.reviewed_tables:
+            from app.retrieval.reviewed_table_fields import bundle
+            table=bundle(question,[self.records[i] for i in mask],allowed is not None and len(set(allowed))==1)
+            if table is not None:return {**table,'candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,**reference_meta}
+        mask=[i for i in mask if not self.records[i].get('reviewed_table_row')]
+        if self.additional_paragraph_repair:
+            from app.retrieval.contract_context import context_bundle,paragraph_bundle
+            contract=context_bundle(question,[self.records[i] for i in mask],source_scoped=allowed is not None and len(set(allowed))==1)
+            if contract is not None:
+                linked_scope={**scope,'allowed_paths':sorted({path_key(r['source_path']) for r in contract['candidate_evidence']})}
+                return {**contract,'candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':linked_scope,**reference_meta}
+            paragraph=paragraph_bundle(question,[self.records[i] for i in mask],source_scoped=allowed is not None and len(set(allowed))==1)
+            if paragraph is not None:return {**paragraph,'candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,**reference_meta}
+        if self.reviewed_flow_relations:
+            from app.retrieval.reviewed_flow_relations import relation_bundle
+            relation=relation_bundle(question,[self.records[i] for i in mask],self.reviewed_flow_relations)
+            if relation is not None:return {**relation,'candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,**reference_meta}
+        from app.retrieval.native_flowcharts import frame_bundle,is_flow_record
+        flow=frame_bundle(question,[self.records[i] for i in mask])
+        if flow is not None:return {**flow,'candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,**reference_meta}
+        mask=[i for i in mask if not is_flow_record(self.records[i])]
+        from app.retrieval.native_pdf_tables import scoped_indices
+        native_scope=scoped_indices(question,self.records,mask)
+        if native_scope is not None:
+            mask=native_scope
+            if not mask:return {'candidate_evidence':[],'bundle_status':'SOURCE_SCOPE_MISSING','candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,
+                'scope_mismatch_message':'已定位所选原表，但问句中的业务或评价范围与原表不一致。请核对附件号及“建造/地产、建设/执行”范围；本次未改用其他表代答。',
+                'selection_notes':['所问附件的业务或评价范围不一致，未改用其他表。']}
+        from app.retrieval.native_pdf_tables import direct_bundle
+        direct=direct_bundle(question,[self.records[i] for i in mask],allowed)
+        if direct is not None:return {**direct,'candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,**reference_meta}
+        from app.retrieval.native_pdf_tables import purpose_supported
+        mask=[i for i in mask if purpose_supported(question,self.records[i])]
+        if not mask:return {'candidate_evidence':[],'bundle_status':'SOURCE_SCOPE_MISSING','candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,'selection_notes':['已定位的表格用途或业务范围尚未匹配本题，未用评分表替代一般职责规定。']}
         from app.retrieval.table_schema import schema_bundle
         schema=schema_bundle(question,[self.records[i] for i in mask],self.complete_lists)
         if schema is not None:return {**schema,'candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,**reference_meta,
                                      'retrieval_audit':{'method':'NATIVE_PDF_HEADER_GEOMETRY','new_document_embeddings':0,'total_ms':round((time.perf_counter()-start)*1000,2)}}
         from app.retrieval.complete_lists import list_bundle
+        from app.retrieval.native_pdf_tables import overview_bundle
+        overview=overview_bundle(question,[self.records[i] for i in mask],allowed)
+        if overview is not None:return {**overview,'candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,**reference_meta}
         complete=list_bundle(question,self.complete_lists,{self.records[i]['evidence_id'] for i in mask})
         if complete is not None:
             return {**complete,'candidate_hash':self.candidate_hash,'scope_resolution':route,'source_scope':scope,**reference_meta,
@@ -226,6 +318,11 @@ class UnifiedCandidate:
                           retrieval_audit={'method':'EXISTING_VERSIONED_TEXT_SCALAR','eligible_rows':len(mask),'recalled_ids':[r['evidence_id'] for r in recalled],'new_document_embeddings':0,'total_ms':round((time.perf_counter()-start)*1000,2)})
             return bundle
         bundle=self.focused.rank(routed,recalled,allowed_versions=allowed_versions)
+        if self.additional_paragraph_repair and not uncovered:
+            from app.retrieval.contract_context import context_bundle
+            contract=context_bundle(question,[r for r in bundle.get('candidate_evidence',[]) if r.get('answer_usage')=='PRIMARY'],cited_only=True)
+            if contract is not None:
+                bundle=contract;scope={**scope,'allowed_paths':sorted({path_key(r['source_path']) for r in contract['candidate_evidence']})}
         if bundle.get('facet_coverage'):bundle['facet_coverage']['question_sha256']=hashlib.sha256(question.encode()).hexdigest()
         if uncovered:
             bundle.update(bundle_status='SOURCE_SCOPE_MISSING',personnel_scope_audit=scoped['personnel_scope_audit'],selection_notes=scoped['selection_notes'])

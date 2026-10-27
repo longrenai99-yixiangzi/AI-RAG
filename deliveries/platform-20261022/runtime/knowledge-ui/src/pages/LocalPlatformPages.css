@@ -1,0 +1,5 @@
+.platform-workbench.local-platform { max-width:none; margin:0; padding:0; }
+.local-scope-note { line-height:1.8; color:#52677a; padding:14px 20px; }
+.local-scope-note a { color:#225d9c; }
+.local-platform .pw-columns.pw-query { grid-template-columns:minmax(0,1fr) minmax(250px,.42fr); }
+@media(max-width:1400px) { .local-platform .pw-columns.pw-query { grid-template-columns:minmax(0,1fr); } }

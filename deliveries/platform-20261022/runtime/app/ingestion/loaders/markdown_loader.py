@@ -37,6 +37,8 @@ class MarkdownLoader:
 
         try:
             text = normalize_markdown_text(path.read_bytes().decode("utf-8-sig"))
+            from app.ingestion.pdf_text_recovery import clean_markdown_lines
+            lines = clean_markdown_lines(path,text)
         except UnicodeDecodeError as error:
             return MarkdownLoadResult(
                 status="encoding_error",
@@ -51,7 +53,6 @@ class MarkdownLoader:
         if not text.strip():
             return MarkdownLoadResult(status="empty")
 
-        lines = text.splitlines()
         body_start, front_matter, front_matter_error = self._parse_front_matter(lines)
         if front_matter_error:
             return MarkdownLoadResult(

@@ -39,6 +39,22 @@ def test_complete_answer_cannot_pass_on_a_valid_citation_with_an_unsupported_num
     assert '9人' not in r['answer'] and r['citations'][0]['evidence_id']=='e'
 
 
+@pytest.mark.parametrize('heading',['3. 会后落实（24 小时内完成）','办理期限（3个工作日内）','审核期限（两日内完成）'])
+def test_adjacent_timed_heading_is_a_required_source_condition(tmp_path,heading):
+    source=heading+'\n设计管理部编制会议纪要，经参会方确认后分发。'
+    _,e=evidence(tmp_path,source)
+    claim={'claim_id':'C1','claim_text':'设计管理部编制会议纪要，经参会方确认后分发。','evidence_ids':['S1']}
+    checked=check_source_units([claim],e,allow_connector_omission=True,allow_sentence_span=True)
+    assert not checked['valid'] and checked['checks'][0]['status']=='CONDITION_CONTEXT_OMITTED'
+    claim['claim_text']=source
+    assert check_source_units([claim],e,allow_connector_omission=True,allow_sentence_span=True)['valid']
+
+
+def test_unrelated_duration_is_not_a_timed_heading(tmp_path):
+    _,e=evidence(tmp_path,'会议持续24小时。\n设计管理部编制会议纪要。')
+    assert check_source_units([{'claim_id':'C1','claim_text':'设计管理部编制会议纪要。','evidence_ids':['S1']}],e)['valid']
+
+
 @pytest.mark.parametrize('source,claim,valid',[
     ('机电为内部单位，因此由技术总监牵头。','机电为内部单位，由技术总监牵头。',True),
     ('机电为内部单位，所以由技术总监牵头。','机电为内部单位，由技术总监牵头。',True),

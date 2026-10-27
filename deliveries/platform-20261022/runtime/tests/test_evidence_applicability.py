@@ -21,6 +21,19 @@ def answer(name):
             'claims':[{'text':'原文要点。'}],'citations':[{'citation_id':'S1','file_name':name,'answer_usage':'PRIMARY','excerpt':'原文要点。'}]}
 
 
+def test_named_project_source_can_describe_its_manual_but_not_establish_universal_policy(tmp_path):
+    path=tmp_path/'工业楼交流.pptx';path.write_text('项目交流',encoding='utf-8');version=hashlib.sha256(path.read_bytes()).hexdigest()
+    original=answer(path.name);original['citations'][0].update(source_path=str(path),source_version=version)
+    original['debug']={'source_scope':{'status':'NAMED_SOURCE_VERSION_MATCHED','bindings':[{'title':path.name,'source_version':version,'available_paths':[str(path)]}]}}
+    result=enforce_applicability('依据《工业楼交流.pptx》，界面移交管理手册需要识别什么，有何用途？',original)
+    assert result['evidence_scope_audit']['decision']=='ALLOW' and result['citations'][0]['answer_usage']=='PRIMARY'
+    reviewed={**original,'generation_mode':'HUMAN_REVIEWED_EXACT_QUESTION','answer':'用户校正的完整答案。'}
+    checked=enforce_applicability('依据《工业楼交流.pptx》，界面移交管理手册需要识别什么，有何用途？',reviewed)
+    assert checked['answer']==reviewed['answer'] and checked['applicability']
+    for question in ['依据《工业楼交流.pptx》，局手册有哪些统一要求？','依据《工业楼交流.pptx》，界面移交管理手册的正式模板是什么？']:
+        assert enforce_applicability(question,original)['evidence_scope_audit']['decision']=='FORMAL_BASIS_REQUIRED'
+
+
 @pytest.mark.parametrize('question,name,decision',[
     ('策划书主要包括哪五个部分？','管理讲稿.md','DOCUMENT_BASIS_REQUIRED'),
     ('正式策划模板有哪些章节？','管理讲稿.md','FORMAL_BASIS_REQUIRED'),

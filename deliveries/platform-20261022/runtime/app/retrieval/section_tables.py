@@ -13,7 +13,7 @@ def focus(question):
     value=value.rsplit('的',1)[-1].strip(' ？?；;，,。')
     value=re.sub(r'(?:应当|应该|应|需要|需|是|有)$','',value)
     # Predicate-only ellipses are not independent noun topics; keep the original question intact.
-    if re.fullmatch(r'(?:应当|应该|需要|需|应)?(?:重点|主要)?(?:关注|把控|控制|承担|负责|包括|包含|明确|保留|考虑)',value):return ''
+    if re.fullmatch(r'(?:应当|应该|需要|需|应|可以|可|能够|能|必须)?(?:重点|主要)?(?:关注|把控|控制|承担|负责|包括|包含|明确|保留|考虑|由)',value):return ''
     if value.startswith('设计') and len(value[2:])>=4:value=value[2:]
     if value.endswith('管理') and len(value[:-2])>=4:value=value[:-2]
     return value if len(value)>=2 and value not in {'管理流程','流程','内容','要求','管理','工作'} else ''

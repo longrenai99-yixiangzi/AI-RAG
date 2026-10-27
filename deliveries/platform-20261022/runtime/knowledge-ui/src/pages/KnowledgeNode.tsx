@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getAncestors, getNode } from '../data/mock/knowledgeTree'
 import { isSharedNode } from '../data/sharedKnowledge'
+import { LOCAL_PLATFORM } from '../localPlatform'
 import { ExistingMaterials } from './ExistingMaterials'
 
 type Knowledge = { knowledge_id: string; node_id: string; title: string; content: string; applicability?: string; source_id: string; source_version?: string; version: number; edit_origin?: string }
@@ -12,6 +13,7 @@ export function KnowledgeNode() {
   const [knowledge, setKnowledge] = useState<Knowledge[]>([])
   const [loadError, setLoadError] = useState(false)
   useEffect(() => {
+    if (LOCAL_PLATFORM && isSharedNode(id)) return
     fetch('/api/v2/knowledge/items', { cache: 'no-store' })
       .then(async (response) => { if (!response.ok) throw new Error(); return response.json() })
       .then((payload) => setKnowledge((payload.items || []).filter((item: Knowledge) => item.node_id === id)))

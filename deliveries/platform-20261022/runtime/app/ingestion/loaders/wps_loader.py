@@ -19,6 +19,7 @@ class WPSLoader:
             return WPSLoadResult("read_error", error=f"不支持的文件扩展名：{path.suffix or '无扩展名'}")
 
         app = document = None
+        update_links = None
         try:
             from win32com.client import DispatchEx
 
@@ -26,6 +27,9 @@ class WPSLoader:
             app.Visible = False
             app.DisplayAlerts = 0
             app.ScreenUpdating = False
+            app.AutomationSecurity = 3
+            update_links = app.Options.UpdateLinksAtOpen
+            app.Options.UpdateLinksAtOpen = False
             document = app.Documents.Open(
                 str(path),
                 ReadOnly=True,
@@ -55,6 +59,8 @@ class WPSLoader:
                     pass
             if app is not None:
                 try:
-                    app.Quit()
+                    if update_links is not None:
+                        app.Options.UpdateLinksAtOpen = update_links
+                    app.Quit(SaveChanges=0)
                 except Exception:
                     pass

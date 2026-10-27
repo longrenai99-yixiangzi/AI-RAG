@@ -24,7 +24,7 @@ def compact(text):return re.sub(r'\s+','',unicodedata.normalize('NFKC',text)).re
 
 def list_request(question):
     query=unicodedata.normalize('NFKC',question)
-    found=re.search(r'('+NUM+r')\s*(个|项|条|种|类)\s*([^，,。；;！？?]{2,35}?)(?:有哪些|分别是|包括哪些|是什么|如何|怎么)',query)
+    found=re.search(r'(?<![第\d.．零一二两三四五六七八九十])('+NUM+r')\s*(个|项|条|种|类)\s*([^，,。；;！？?]{2,35}?)(?:有哪些|分别是|包括哪些|是什么|如何|怎么)',query)
     if found:
         count,unit,topic=found.groups()
         result={'expected_count':number(count),'count_kind':'GROUPS' if unit=='类' else 'ITEMS','topic':compact(topic)}

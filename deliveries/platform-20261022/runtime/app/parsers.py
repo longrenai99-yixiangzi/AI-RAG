@@ -112,7 +112,7 @@ def _block(
     )
 
 
-def _parse_markdown(path: Path, document_id: str) -> list[SourceBlock]:
+def _parse_markdown(path: Path, document_id: str, source_version: str | None = None) -> list[SourceBlock]:
     text = path.read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()
     line_offset = 0
@@ -152,14 +152,23 @@ def _parse_markdown(path: Path, document_id: str) -> list[SourceBlock]:
         section_lines = [line]
         section_start = line_number
     flush()
+    from app.ingestion.pdf_text_recovery import PROFILES,clean_source_records
+    version=source_version or _sha256(path)
+    if PROFILES.get(version,{}).get('original_path'):
+        cleaned=clean_source_records([{'text':b.text,'source_path':str(path),'source_version':version} for b in blocks])
+        for block,row in zip(blocks,cleaned,strict=True):block.text=row['text']
+        blocks=[b for b in blocks if b.text.strip()]
     return blocks
 
 
-def _parse_pdf(path: Path, document_id: str) -> tuple[list[SourceBlock], str]:
+def _parse_pdf(path: Path, document_id: str, source_version: str | None = None) -> tuple[list[SourceBlock], str]:
+    from app.ingestion.pdf_text_recovery import clean_pdf_page
+    from app.retrieval.table_schema import PDF_READ_LOCK
+    version = source_version or _sha256(path)
     blocks: list[SourceBlock] = []
-    with pymupdf.open(path) as pdf:
+    with PDF_READ_LOCK, pymupdf.open(path) as pdf:
         for page_number, page in enumerate(pdf, start=1):
-            text = page.get_text("text").strip()
+            text = clean_pdf_page(page, version)
             if text:
                 blocks.append(_block(document_id, path, text, page=page_number))
     return blocks, "parsed" if blocks else "needs_ocr"
@@ -352,9 +361,9 @@ def parse_file(path: Path, max_file_size_mb: int) -> ParsedDocument:
     try:
         match path.suffix.lower():
             case ".md":
-                blocks, status = _parse_markdown(path, document_id), "parsed"
+                blocks, status = _parse_markdown(path, document_id, sha256), "parsed"
             case ".pdf":
-                blocks, status = _parse_pdf(path, document_id)
+                blocks, status = _parse_pdf(path, document_id, sha256)
             case ".docx":
                 blocks, status = _parse_docx(path, document_id), "parsed"
             case ".xlsx":

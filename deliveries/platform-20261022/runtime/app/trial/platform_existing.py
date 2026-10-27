@@ -82,6 +82,9 @@ class ExistingKnowledge:
                     result = event["result"]
         if result is None:
             raise ValueError("检索服务未返回完整结果，不能当作已经回答。")
+        return self.bind_catalog_citations(result)
+
+    def bind_catalog_citations(self,result):
         # Older section expansion returns a provenance path where the platform needs a catalog ID.
         from app.retrieval.named_source_scope import path_key
         legacy=[c for c in result.get('citations',[]) if c.get('source_id')==c.get('source_path')
@@ -109,6 +112,8 @@ def source_extract(result: dict, question: str = '') -> dict:
     from app.retrieval.evidence_applicability import enforce_applicability
     cards = readable_citations(result.get("citations", []))
     query=question or result.get('question','')
+    from app.ingestion.pdf_text_recovery import recover_pdf_citations
+    cards = recover_pdf_citations(cards, query)
     from app.retrieval.complete_lists import enforce_complete_list
     result=enforce_complete_list(query,{**result,'citations':cards})
     result=enforce_applicability(query,result);cards=result['citations']
@@ -117,6 +122,23 @@ def source_extract(result: dict, question: str = '') -> dict:
     primary = [c for c in cards if c.get("answer_usage") == "PRIMARY"]
     if not primary:
         return {**result, "answer_status": "SOURCES_ONLY", "answer": "本次只返回相关原文线索，尚未取得可用于本题答复的主证据。", "generation_mode": "NO_GENERATION"}
+    from app.retrieval.reviewed_table_fields import answer as table_fields_answer
+    fields_result=table_fields_answer(result)
+    if fields_result is not None:return enforce_applicability(query,fields_result)
+    from app.retrieval.contract_context import context_answer,paragraph_answer
+    contract=context_answer(result,query)
+    if contract is not None:return enforce_applicability(query,contract)
+    paragraph=paragraph_answer(result)
+    if paragraph is not None:return enforce_applicability(query,paragraph)
+    from app.retrieval.reviewed_flow_relations import relation_answer
+    relation=relation_answer(result)
+    if relation is not None:return enforce_applicability(query,relation)
+    from app.retrieval.native_flowcharts import frame_answer
+    flow=frame_answer(result)
+    if flow is not None:return enforce_applicability(query,flow)
+    from .native_table_answer import native_field_answer
+    native=native_field_answer(result,query)
+    if native is not None:return enforce_applicability(query,native)
     from .source_field_answer import area_answer,money_answer,subject
     money=money_answer(result,question or result.get('question',''))
     if money is not None:return enforce_applicability(query,{**result,**money})
@@ -124,8 +146,12 @@ def source_extract(result: dict, question: str = '') -> dict:
     if field is not None:return enforce_applicability(query,{**result,**field})
     target=result.get('debug',{}).get('personnel_scope_audit',{}).get('target','')
     from app.retrieval.section_tables import table_fields_text,citation_facets,facet_gaps,case_notice
-    extracts=[(c,table_fields_text(c['table_evidence']),'ASSOCIATED_TABLE_ROW_FIELDS') if c.get('table_evidence')
-              else (c,*concise_text(c['excerpt'],question or result.get('question',''),target)) for c in primary]
+    from .native_span_excerpt import native_unit_excerpt
+    extracts=[]
+    for c in primary:
+        if c.get('table_evidence'):text,method=table_fields_text(c['table_evidence']),'ASSOCIATED_TABLE_ROW_FIELDS'
+        else:text,method=native_unit_excerpt(c,query) or concise_text(c['excerpt'],query,target)
+        extracts.append((c,text,method))
     query=question or result.get('question','')
     if (not target and subject(query) and re.search(r'多少|几人|几位|人数|金额|合计|计算|占比',query)
             and all(method=='FULL_SOURCE_FALLBACK' for _,_,method in extracts)):
@@ -133,15 +159,17 @@ def source_extract(result: dict, question: str = '') -> dict:
                 'answer':'已找到相关原文，但尚未准确提取所问数值字段。本次只提供原文线索，不把整段当作直接答案；这不表示原文没有该信息。',
                 'citations':[{**c,'answer_usage':'BACKGROUND'} for c in cards],'claims':[],
                 'generation_mode':'NO_GENERATION','field_audit':{'reason':'PROJECT_NUMERIC_FIELD_NOT_EXTRACTED'}}
-    answer = "\n\n".join(f'{text}\n[{c["citation_id"]}]' for c,text,_ in extracts)
+    answer = "\n\n".join((c['native_pdf_table_note']['caption']+' · 原表附注：\n' if c.get('native_pdf_table_note') else '')+f'{text}\n[{c["citation_id"]}]' for c,text,_ in extracts)
     answer=case_notice(primary)+answer
     facets=citation_facets(primary,query);gaps=facet_gaps(facets)
-    if gaps:answer+='\n\n尚未核定：'+'；'.join(gaps)
+    native_units=all(method=='REVIEWED_NATIVE_UNIT_WITH_FULL_CONTEXT' for _,_,method in extracts)
+    if gaps and not native_units:answer+='\n\n尚未核定：'+'；'.join(gaps)
+    if native_units:result={k:v for k,v in result.items() if k!='coverage_gaps'}
     if any(c.get('chapter_coverage',{}).get('table_rows_not_selected') for c in primary):
         answer+='\n\n以上汇聚同章说明文字；附表明细未逐行核对，不作为完整清单或人数统计。'
     shortened=any(method!='FULL_SOURCE_FALLBACK' for _,_,method in extracts)
-    return enforce_applicability(query,{**result, "answer_status": "SOURCE_EXTRACT", "status_label": "部分原文要点 · 并列子问待核定" if gaps else "简明原文要点 · 待核对" if shortened else "原文摘录答复 · 待核对", "answer": answer,
-            **({'facet_coverage':facets,'coverage_gaps':gaps,'answer_completeness':'PARTIAL' if gaps else 'TOPICS_LOCATED_NOT_SEMANTICALLY_VERIFIED'} if facets else {}),
-            "generation_mode": "LOCAL_EXTRACTIVE_SUMMARY_NO_MODEL" if shortened else "VERBATIM_SOURCE_EXTRACT",
+    return enforce_applicability(query,{**result, "answer_status": "SOURCE_EXTRACT", "status_label": "已核原文单元 · 完整性待业务核对" if native_units else "部分原文要点 · 并列子问待核定" if gaps else "简明原文要点 · 待核对" if shortened else "原文摘录答复 · 待核对", "answer": answer,
+            **({'facet_coverage':facets,'unverified_facet_checks':gaps,'answer_completeness':'NATIVE_UNIT_LOCATED_NOT_BUSINESS_APPROVED'} if native_units and facets else {'facet_coverage':facets,'coverage_gaps':gaps,'answer_completeness':'PARTIAL' if gaps else 'TOPICS_LOCATED_NOT_SEMANTICALLY_VERIFIED'} if facets else {}),
+            "generation_mode": "SOURCE_BOUND_SPAN_NO_MODEL" if all(method=="REVIEWED_NATIVE_UNIT_WITH_FULL_CONTEXT" for _,_,method in extracts) else "LOCAL_EXTRACTIVE_SUMMARY_NO_MODEL" if shortened else "VERBATIM_SOURCE_EXTRACT",
             "summary_audit":[{'citation_id':c['citation_id'],'method':method,'source_chars':len(c['excerpt']),'display_chars':len(text)} for c,text,method in extracts],
-            "notice": "本地按原文结构提取要点或展示原表字段；条件或结构不清时保留全文，完整证据见下方引用。未运行生成模型，未自动业务审核；是否完整回答问题仍需核对。"+(' 本次摘录所引清单的说明条款，不代表已逐项核对表格全部字段。' if any(c.get('explanation_block') for c in primary) else '')})
+            "notice": "本地按原文结构提取要点或展示原表字段；条件或结构不清时保留全文，完整证据见下方引用。未运行生成模型，未自动业务审核；是否完整回答问题仍需核对。"+(' 本次摘录所引清单的说明条款，不代表已逐项核对表格全部字段。' if any(c.get('explanation_block') for c in primary) else '')+(' 并列子问尚未完成自动语义核验；这不表示所引原文缺失，请按引用核对完整性。' if native_units and gaps else '')})

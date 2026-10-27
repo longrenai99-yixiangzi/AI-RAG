@@ -62,6 +62,24 @@ def test_unapproved_policy_never_constructs_call_or_reads_price(daily):
     assert not service.status()['approved'] and calls==prices==[]
 
 
+def test_migrated_remainder_keeps_original_expiry_and_request_cap(daily):
+    _,flow,store,existing,policy,_,calls,now,_,run=daily
+    limited=copy.deepcopy(policy);limited.update(policy_id='remaining-only',max_requests=2,max_budget_cents=940,expires_at_limit=(now[0]+timedelta(hours=1)).isoformat())
+    service=DailyAnswers(store,flow,existing,limited,clock=lambda:now[0],price_reader=lambda:b'approved-price-page')
+    service.approve(service.policy_hash,'synthetic-transfer-approval')
+    assert datetime.fromisoformat(store._read()['daily_answer_policy']['expires_at'])==now[0]+timedelta(hours=1)
+    for _ in range(3):service.apply(run())
+    assert len(calls)==2 and service.status()['used_requests']==2
+    now[0]+=timedelta(hours=2)
+    assert not service.status()['active']
+    with pytest.raises(ValueError,match='截止时间'):service.approve(service.policy_hash,'cannot-extend')
+
+
+def test_hard_expiry_rejects_naive_timestamp_before_any_call(daily):
+    _,flow,store,existing,policy,*_=daily;limited=copy.deepcopy(policy);limited['expires_at_limit']='2026-10-30T09:06:18'
+    with pytest.raises(ValueError,match='时区'):DailyAnswers(store,flow,existing,limited)
+
+
 def test_approved_one_call_reserved_before_provider_and_no_duplicate_history(daily):
     service,_,store,_,_,_,calls,_,_,run=daily;approve(daily)
     key=run();saved=service.apply(key)

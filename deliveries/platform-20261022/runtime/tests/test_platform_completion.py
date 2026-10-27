@@ -113,6 +113,42 @@ def test_existing_snapshot_reuse_never_calls_parser(complete,monkeypatch):
     assert hashlib.sha256(existing.path.read_bytes()).hexdigest()==existing.hash
 
 
+def test_reactivating_old_material_allows_new_review_but_never_revives_old_knowledge(complete):
+    client,_=complete
+    text='# 橙色流程\n责任人须记录期限，橙色版本一。'
+    old=upload(client,'合成来源回退.md',text);activate(client,old)
+    question='《合成来源回退.md》责任人和期限怎么记录？';run=ask(client,question)
+    fb,_=feedback(client,run,expected_answer='责任人须记录期限，橙色版本一。',required_terms=['责任人','期限'],applicability='仅合成测试')
+    assert fb.status_code==200
+    published=publish(client,fb.json()['candidate_id'])
+    newer=upload(client,'合成来源回退.md',text.replace('版本一','版本二'));activate(client,newer)
+    activate(client,old)
+    state=client.get('/api/platform/state').json();source=next(s for s in state['sources'] if s['source_id']==old['source_id'])
+    assert source['status']=='REGISTERED'
+    knowledge=next(k for k in state['knowledge'] if k['knowledge_id']==published['knowledge_id'])
+    assert knowledge['status']=='REVIEW_REQUIRED'
+    new_run=ask(client,question);assert new_run['result'].get('generation_mode')!='HUMAN_REVIEWED_EXACT_QUESTION'
+    next_feedback,_=feedback(client,new_run,expected_answer='责任人须记录期限，橙色版本一。',required_terms=['责任人','期限'])
+    assert next_feedback.status_code==200
+
+
+def test_bare_link_navigation_is_not_accepted_as_a_new_body(complete):
+    client,_=complete
+    job=upload(client,'项目机制登记.md','[机制原件](file:///D:/演示/机制.docx)\n## ## 关联内容\n- [[业务/机制]]')
+    assert job['status']=='FAILED' and '仅链接登记卡' in job['error']
+
+
+def test_existing_snapshot_reuse_cannot_bypass_navigation_admission(complete,monkeypatch):
+    client,existing=complete
+    existing.path.write_text('[原件](file:///D:/演示/机制.docx)\n## 关联内容\n- [[业务/机制]]',encoding='utf-8')
+    existing.hash=hashlib.sha256(existing.path.read_bytes()).hexdigest();existing.source['current_hash']=existing.hash
+    monkeypatch.setattr(existing,'source_snapshot',lambda *a:(_ for _ in ()).throw(AssertionError('must reject before snapshot')))
+    response=client.post('/api/platform/imports/from-existing',headers=HEADERS,json={'source_id':'SRC_fixture'})
+    assert response.status_code==200
+    job=job_wait(client,response.json()['job_id'])
+    assert job['status']=='FAILED' and '仅链接登记卡' in job['error']
+
+
 def test_parse_failure_retry_cancel_and_path_guards(complete):
     client,_=complete
     failed=upload(client,'坏文件.docx','not a zip')

@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import uuid
 from collections import defaultdict
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Iterable
 from urllib.parse import unquote, urlparse
@@ -25,6 +26,7 @@ from app.ingestion.metadata.governance import GovernanceClassifier
 from app.ingestion.metadata.schema import MetadataRecord
 from app.ingestion.loaders.markdown_loader import MarkdownLoader
 from app.ingestion.loaders.wps_loader import WPSLoader
+from app.ingestion.quality.pdf_quality import assess_pdf
 
 
 SCHEMA_VERSION = "document_intelligence.v2"
@@ -62,7 +64,8 @@ def json_value(value: Any) -> Any:
 
 
 def clean_text(value: Any) -> str:
-    return " ".join(str(json_value(value) or "").split())
+    normalized = json_value(value)
+    return " ".join(str(normalized if normalized is not None else "").split())
 
 
 def profile_field(value: Any, source: str, confidence: float) -> dict[str, Any]:
@@ -153,6 +156,8 @@ class DocumentIntelligenceV2Builder:
             },
             "metadata_quality": self._metadata_quality(profile, metadata),
         }
+        if "extraction_quality" in parsed:
+            document["extraction_quality"] = parsed["extraction_quality"]
         for item in parsed["headings"]:
             item["schema_version"] = SCHEMA_VERSION
             item["document_id"] = did
@@ -248,7 +253,8 @@ class DocumentIntelligenceV2Builder:
         result.update({"parse_status": loaded.status, "error": loaded.error, "front_matter": loaded.front_matter})
         if loaded.status != "parsed":
             return result
-        lines = path.read_text(encoding="utf-8-sig").splitlines()
+        from app.ingestion.pdf_text_recovery import clean_markdown_lines
+        lines = clean_markdown_lines(path,path.read_text(encoding="utf-8-sig"))
         body_start, front_matter, front_matter_error = MarkdownLoader._parse_front_matter(lines)
         if front_matter_error:
             result.update({"parse_status": "front_matter_error", "error": front_matter_error, "front_matter": front_matter})
@@ -314,12 +320,14 @@ class DocumentIntelligenceV2Builder:
 
     def _parse_txt(self, path: Path, did: str) -> dict[str, Any]:
         result = self._empty_result()
-        text = path.read_text(encoding="utf-8", errors="replace")
-        lines = [line.strip() for line in text.splitlines() if line.strip()]
+        text = path.read_text(encoding="utf-8-sig")
+        lines = text.splitlines()
         headings, sections = _make_heading_sections(did, [], max(len(lines), 1), "txt")
         result.update({"parse_status": "parsed", "headings": headings, "sections": sections, "title": path.stem, "text": text})
         section = sections[0]
         for order, line in enumerate(lines, start=1):
+            line=line.strip()
+            if not line:continue
             result["paragraphs"].append({"paragraph_id": stable_id("paragraph", did, order, line), "section_id": section["section_id"], "text": line, "order": order, "location": {"line_start": order, "line_end": order}, "style": "text"})
         return result
 
@@ -364,6 +372,9 @@ class DocumentIntelligenceV2Builder:
                 word = win32com.client.DispatchEx("Word.Application")
                 word.Visible = False
                 word.DisplayAlerts = 0
+                word.AutomationSecurity = 3
+                update_links = word.Options.UpdateLinksAtOpen
+                word.Options.UpdateLinksAtOpen = False
                 document = None
                 try:
                     document = word.Documents.Open(str(path), ReadOnly=True, AddToRecentFiles=False, ConfirmConversions=False)
@@ -372,7 +383,8 @@ class DocumentIntelligenceV2Builder:
                 finally:
                     if document is not None:
                         document.Close(SaveChanges=False)
-                    word.Quit()
+                    word.Options.UpdateLinksAtOpen = update_links
+                    word.Quit(SaveChanges=0)
                 if converted.exists():
                     return self._parse_docx(converted, did)
         except Exception as error:
@@ -524,11 +536,15 @@ class DocumentIntelligenceV2Builder:
         return result
 
     def _parse_pdf(self, path: Path, did: str) -> dict[str, Any]:
+        from app.ingestion.pdf_text_recovery import clean_pdf_page
+        from app.retrieval.table_schema import PDF_READ_LOCK
         result = self._empty_result()
-        with pymupdf.open(path) as pdf:
+        version=sha256(path)
+        with PDF_READ_LOCK, pymupdf.open(path) as pdf:
+            result["extraction_quality"] = asdict(assess_pdf(pdf))
             text_parts: list[str] = []
             for page_number, page in enumerate(pdf, start=1):
-                text = page.get_text("text") or ""
+                text = clean_pdf_page(page,version)
                 lines = [line.strip() for line in text.splitlines() if line.strip()]
                 text_parts.extend(lines)
                 section_id = stable_id("section", did, "page", page_number)
@@ -629,8 +645,9 @@ class DocumentIntelligenceV2Builder:
             for sheet in formulas.worksheets:
                 value_sheet = cached[sheet.title]
                 nonempty = []
-                for row_number in range(1, sheet.max_row + 1):
-                    cells = [_cell_with_merge(sheet, value_sheet, row_number, column) for column in range(1, sheet.max_column + 1)]
+                row_end, column_end = _xlsx_value_bounds(sheet)
+                for row_number in range(1, row_end + 1):
+                    cells = [_cell_with_merge(sheet, value_sheet, row_number, column) for column in range(1, column_end + 1)]
                     if any(cell["display"] not in (None, "") for cell in cells):
                         nonempty.append((row_number, cells))
                 heading_id = stable_id("heading", did, "sheet", sheet.title)
@@ -639,18 +656,18 @@ class DocumentIntelligenceV2Builder:
                 result["sections"].append({"section_id": section_id, "heading_id": heading_id, "heading": sheet.title, "heading_path": sheet.title, "parent_section_id": None, "depth": 0, "section_order": len(result["sections"]) + 1, "section_text": "", "location_start": {"sheet_name": sheet.title}, "location_end": {"sheet_name": sheet.title}, "paragraph_ids": [], "table_ids": [], "synthetic": True})
                 if not nonempty:
                     continue
-                header_number, header_cells = _find_xlsx_header(nonempty)
-                headers = [clean_text(cell["display"]) or f"列{index}" for index, cell in enumerate(header_cells, start=1)]
-                carry_index = next((index for index, header in enumerate(headers) if any(term in header for term in ("专业", "类别", "单位", "分公司"))), None)
-                carry_value = None
+                header_number, header_end, headers = _xlsx_headers(sheet, nonempty)
                 table_id = stable_id("table", did, sheet.title, header_number)
                 last_row = nonempty[-1][0]
                 table_record = {
                     "table_id": table_id,
                     "section_id": section_id,
                     "sheet_name": sheet.title,
+                    "sheet_state": sheet.sheet_state,
                     "table_title": sheet.title,
                     "header": headers,
+                    "header_rows": list(range(header_number, header_end + 1)),
+                    "preamble_rows": [{"row": number, "values": [json_value(cell["display"]) for cell in cells]} for number, cells in nonempty if number < header_number],
                     "row_count": len([item for item in nonempty if item[0] >= header_number]),
                     "column_count": len(headers),
                     "source_location": {"sheet_name": sheet.title, "row_start": header_number, "row_end": last_row, "column_start": 1, "column_end": len(headers)},
@@ -660,18 +677,14 @@ class DocumentIntelligenceV2Builder:
                 }
                 result["tables"].append(table_record)
                 result["sections"][-1]["table_ids"].append(table_id)
+                header_patterns = {tuple(clean_text(cell["display"]) for cell in cells) for number, cells in nonempty if header_number <= number <= header_end}
                 for row_number, cells in nonempty:
                     if row_number < header_number:
                         continue
-                    if carry_index is not None:
-                        if cells[carry_index]["display"] in (None, "") and carry_value not in (None, ""):
-                            cells[carry_index]["display"] = carry_value
-                            cells[carry_index]["inherited_from_blank"] = f"row:{row_number - 1}"
-                        elif cells[carry_index]["display"] not in (None, ""):
-                            carry_value = cells[carry_index]["display"]
                     values = [cell["display"] for cell in cells[: len(headers)]]
                     row_record = _table_row(table_id, section_id, row_number, values, headers, {"sheet_name": sheet.title, "row_start": row_number, "row_end": row_number, "column_count": len(headers), "header_row": header_number})
-                    row_record["is_header"] = row_number == header_number
+                    row_record["is_header"] = row_number <= header_end or tuple(clean_text(value) for value in values) in header_patterns
+                    row_record["source_location"]["header_row_end"] = header_end
                     row_record["is_summary"] = _is_summary_row(values, cells)
                     row_record["cells"] = [
                         {"column": get_column_letter(index + 1), "header": headers[index], "value": json_value(cell["display"]), "formula": json_value(cell["formula"]), "cached_value": json_value(cell["cached"]), "inherited_from_merged": cell.get("inherited_from_merged"), "inherited_from_blank": cell.get("inherited_from_blank")}
@@ -680,7 +693,7 @@ class DocumentIntelligenceV2Builder:
                     result["table_rows"].append(row_record)
                     table_record["structured"]["rows"].append(row_record["row_number"])
                     table_record["structured"]["source_row_numbers"].append(row_number)
-                    table_record["semantic"]["representative_rows"].append(values[: min(len(values), 5)])
+                    table_record["semantic"]["representative_rows"].append([json_value(value) for value in values[: min(len(values), 5)]])
                     text_parts.append(f"工作表：{sheet.title} 第{row_number}行：" + " | ".join(f"{headers[i]}：{clean_text(values[i])}" for i in range(min(len(headers), len(values))) if values[i] not in (None, "")))
             result["title"] = path.stem
             result["text"] = "\n".join(text_parts)
@@ -964,13 +977,37 @@ def _cell_with_merge(formula_sheet: Any, value_sheet: Any, row: int, column: int
 
 
 def _find_xlsx_header(rows: list[tuple[int, list[dict[str, Any]]]]) -> tuple[int, list[dict[str, Any]]]:
-    preferred_terms = ("专业", "序号", "项目名称", "工作任务", "审查内容", "字段", "名称", "类别")
+    preferred_terms = ("专业", "序号", "项目名称", "工作任务", "审查内容", "字段", "名称", "类别", "题目类型", "题干", "正确答案", "选项")
+    candidates = []
     for row_number, cells in rows[:20]:
         values = [clean_text(cell["display"]) for cell in cells]
         nonempty = [value for value in values if value]
-        if len(nonempty) >= 2 and len(set(nonempty)) >= 2 and any(any(term in value for term in preferred_terms) for value in nonempty):
-            return row_number, cells
-    return rows[0]
+        if len(nonempty) >= 2 and len(set(nonempty)) >= 2:
+            candidates.append((row_number, cells))
+            if any(any(term in value for term in preferred_terms) for value in nonempty):
+                return row_number, cells
+    return candidates[0] if candidates else rows[0]
+
+
+def _xlsx_value_bounds(sheet: Any) -> tuple[int, int]:
+    # Formatting can extend to XFD without any business content there.
+    cells = [cell for cell in sheet._cells.values() if cell.value not in (None, "")]
+    return max((cell.row for cell in cells), default=0), max((cell.column for cell in cells), default=0)
+
+
+def _xlsx_headers(sheet: Any, rows: list[tuple[int, list[dict[str, Any]]]]) -> tuple[int, int, list[str]]:
+    start, cells = _find_xlsx_header(rows)
+    end = start
+    groups = [area for area in sheet.merged_cells.ranges if area.min_row == start == area.max_row and area.max_col > area.min_col]
+    if groups:
+        # shortcut: only extend headers when vertical merges prove the depth; other layouts need review.
+        end = max([start] + [area.max_row for area in sheet.merged_cells.ranges if area.min_row == start and area.min_col == area.max_col])
+    header_cells = [values for number, values in rows if start <= number <= end]
+    headers = []
+    for column in range(len(cells)):
+        labels = list(dict.fromkeys(clean_text(values[column]["display"]) for values in header_cells if clean_text(values[column]["display"])))
+        headers.append(" > ".join(labels) or f"列{column + 1}")
+    return start, end, headers
 
 
 def _is_summary_row(values: list[Any], cells: list[dict[str, Any]]) -> bool:

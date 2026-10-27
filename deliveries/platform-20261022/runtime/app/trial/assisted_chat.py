@@ -93,7 +93,7 @@ def assemble(bundle,question=None,include_background=False):
         cards.append({'citation_id':sid,'evidence_id':candidate['evidence_id'],'source_id':candidate.get('source_id') or candidate['document_id'],
                       'source_version':version,'file_name':path.name,'source_path':str(path),'location':item.location,'display_location':candidate.get('display_location') or candidate.get('heading_path') or '位置见原文','excerpt':text,'answer_usage':candidate.get('answer_usage','UNCLASSIFIED')})
         if candidate.get('chapter_coverage'):cards[-1]['chapter_coverage']=candidate['chapter_coverage']
-        for key in ('table_evidence','table_association','facet_coverage','explanation_block'):
+        for key in ('table_evidence','table_association','facet_coverage','explanation_block','paragraph_completion','native_pdf_table','native_pdf_table_note','native_flow_node','native_flow_header','native_flow_relation','contract_clause_context','reviewed_contract_paragraph','reviewed_table_row','reviewed_table_context','reviewed_table_plan'):
             if candidate.get(key):cards[-1][key]=candidate[key]
         if len(items)==8:break
     return EvidenceBundle(items=items,status='EVIDENCE_READY' if items else 'NO_EVIDENCE'),cards
@@ -114,7 +114,7 @@ def run_flow(data,retrieve,generator,save,resolved_question=None):
         yield {'type':'status','stage':'retrieval','msg':'正在检索已有知识库。','query_run_id':run_id}
         bundle=retrieve(resolved_question,source_versions=data.source_versions) if data.source_versions is not None else retrieve(resolved_question)
         evidence,cards=assemble(bundle,resolved_question,include_background=data.mode=='sources')
-        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','retrieval_source_filter','coverage_audit','topic_coverage','chapter_coverage','facet_coverage','table_association_audit','intent_audit','personnel_scope_audit','complete_list_audit','table_schema_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
+        result={**base,'citations':cards,'debug':{k:bundle[k] for k in ('candidate_hash','bundle_status','scope_resolution','source_scope','reference_resolution','retrieval_source_filter','coverage_audit','topic_coverage','chapter_coverage','facet_coverage','table_association_audit','intent_audit','personnel_scope_audit','complete_list_audit','table_schema_audit','native_table_overview_audit','native_flow_audit','contract_context_audit','reviewed_table_audit','selection_notes','ranking_audit','retrieval_audit') if k in bundle}}
         result=enforce_applicability(data.question,result);cards=result['citations']
         yield {'type':'sources','sources':cards,'query_run_id':run_id}
         if bundle.get('reference_resolution'):result['source_resolution_note']='本题由登记卡关联到同版原件；引用来自原件，登记卡未被补写为正文，内容与适用范围仍待核对。'
@@ -129,7 +129,7 @@ def run_flow(data,retrieve,generator,save,resolved_question=None):
             result['complete_list_audit']=bundle['complete_list_audit']
             result=enforce_complete_list(data.question,result)
         elif not evidence.items or blocked:
-            result.update(answer_status='EVIDENCE_INSUFFICIENT',status_label='证据范围不足',answer='本次没有取得足以组织回答的同版证据。已返回的片段仅供查阅，不能据此认定原库没有资料。')
+            result.update(answer_status='EVIDENCE_INSUFFICIENT',status_label='证据范围不足',answer=bundle.get('scope_mismatch_message') or '本次没有取得足以组织回答的同版证据。已返回的片段仅供查阅，不能据此认定原库没有资料。')
             if bundle.get('selection_notes'):result['failure_message']='；'.join(bundle['selection_notes'])
             if bundle.get('facet_coverage'):
                 from app.retrieval.section_tables import facet_gaps
